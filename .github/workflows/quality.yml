@@ -1,0 +1,43 @@
+# 质量门 CI（CONTRIBUTING「质量门」）。
+# 与本地同一命令：scripts/quality_gate.py。本目录尚在工作台大仓内，
+# 独立成仓并推送 GitHub 后本工作流生效。
+name: quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  gate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+
+      - name: Sync dev dependencies
+        run: uv sync --extra dev
+
+      - name: Quality gate (authoritative sequence)
+        run: uv run python scripts/quality_gate.py
+
+  gate-linux:
+    # 协议目标跨平台（DESIGN §13.1）；Linux 上再跑一遍同一道门。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+
+      - name: Sync dev dependencies
+        run: uv sync --extra dev
+
+      - name: Quality gate (authoritative sequence)
+        run: uv run python scripts/quality_gate.py

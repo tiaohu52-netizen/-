@@ -1,0 +1,45 @@
+# long-horizon-goals
+
+> LHGP 协议面向 AI 的 skill 教学。配合 `longtask-mcp` 使用。
+
+## 何时触发
+
+当用户**委托一个跨会话的任务**给你，且该任务：
+- 超过单次对话上下文窗口
+- 可能需要"歇一歇再继续"（即分散在多个时间点执行）
+- 需要可被审计（用户事后要回看每一步）
+
+→ 触发本 skill：把任务转成 LHGP 合同 + 提交给 `longtask-mcp`，而非自己直接做。
+
+## 核心公理
+
+> **会话只持有一次尝试，LHGP 持有长期承诺。**
+
+你的会话可能随时结束（上下文耗尽、用户关闭、模型服务重启）。
+你起草的合同**不会**因为你的会话结束而消失——daemon 在本机持有它，
+按 Deadline 风险推进或换另一个会话继续。
+
+## 七步走通 MCP 工具链
+
+1. `health` — 确认 daemon 在线
+2. `list_executors` — 查可用执行器池（Codex / Claude Code / DSH / 任何 CLI 适配器）
+3. `prepare_contract` — 起草合同：objective / acceptance / deadline / budget / authority
+4. `approve_contract` — 用户确认后批准（drafted → active）
+5. `get_contract` — 看运行状态、当前 attempt、leasing
+6. （等待 daemon 派 attempt；轮询 get_contract 或订阅 events）
+7. `list_contracts` — 复盘历史 + 审计事件链
+
+## 起草合同时必须写清
+
+- **objective** — 写验收，不是方法（"输出 result.txt 含 'hi'" 而非 "用 python 写"）
+- **acceptance.checks** — 逐条可独立核对（不要 "看起来对就行"）
+- **workload_initial_hours** — 如实填（决定紧迫度档位）
+- **authority.executors** — 你知道哪些 CLI 可用；未列即拒（default-deny）
+- **deadline** — 给时区，ISO-8601
+
+## 不要做
+
+- 不要把模型输出塞进 argv 或环境变量（注入防线 §14）
+- 不要编造检查通过——failed 就是 failed
+- 不要把"看起来对"算 pass——必须 evidence
+- 不要试图执行合同——交给 daemon 派 attempt

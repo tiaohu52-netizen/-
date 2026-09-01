@@ -1,0 +1,265 @@
+"""临时上下文（DESIGN §4.1）：认知工作集的物化与限额。
+
+临时上下文是给当前执行者的认知工作集，不是第三份任务真相：由合同、
+交接（handover）、最新进度编译出该次 attempt 的 active.md 快照 +
+scratch.md 可编辑区。attempt 之间互不共享；快照带来源版本与过期时间。
+
+实现范围（Developer Preview 最小闭环）：
+- ContextPolicy：§4.1 policy 的程序化表达（limits.max_bytes、
+  expires_after_minutes、editable 区块）；从合同 context 字段解析。
+- compile_context_snapshot：物化 active.md（合同锚点 + 交接剩余/
+  next_action + 最近 attempt 终态摘要），容量超限按 fail-closed 记
+  context/capacity-refused 并拒绝启动（§4.1 容量合同）。
+- init_scratch：初始化 scratch.md 可编辑区骨架。
+- build_attempt_context：AttemptRunner 派发前的入口——编译快照并把
+  交接摘要融入任务文本（修复「再派 attempt 没有验收失败上下文」的
+  真实缺口，见 examples/dsh-minimax-run）。
+
+source 阶段摘要（stages/*.md）与 promotion 流程属 §4.1 完整语义，
+本期不实现（claims 如实记录）；交接文件已是跨 attempt 的权威通道。
+"""
+
+from __future__ import annotations
+
+import sqlite3
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any
+
+from longtask.contracts.schema import ContractDraft, ContractView
+from longtask.persistence.events import EventType
+from longtask.persistence.store import append_event, get_events
+
+CONTEXT_DIR = "context"
+ATTEMPTS_DIR = "attempts"
+ACTIVE_FILE = "active.md"
+SCRATCH_FILE = "scratch.md"
+
+# §4.1 默认限额：快照总量与过期时间（合同 context 字段可覆盖）
+DEFAULT_MAX_BYTES = 24000
+DEFAULT_EXPIRES_MINUTES = 240
+
+# task_prompt 内交接摘要的追加上限：任务文本不该被交接内容淹没
+HANDOVER_IN_PROMPT_CHARS = 1200
+
+
+@dataclass(frozen=True, slots=True)
+class ContextPolicy:
+    """§4.1 准入合同的程序化表达（Developer Preview 子集）。
+
+    required=true 的合同要求执行器装配临时上下文（§9：适配器无快照
+    即拒接）；max_bytes 是容量合同，超限 fail-closed 拒绝启动 attempt。
+    """
+
+    required: bool = False
+    max_bytes: int = DEFAULT_MAX_BYTES
+    expires_after_minutes: int = DEFAULT_EXPIRES_MINUTES
+    editable_sections: tuple[str, ...] = (
+        "current_focus",
+        "working_hypotheses",
+        "next_actions",
+        "risks",
+        "open_questions",
+        "handoff_notes",
+    )
+
+    @classmethod
+    def from_contract(cls, draft: ContractDraft) -> ContextPolicy:
+        """从合同 context 字段解析；形状不对按默认值（fail-open 只对
+        可选字段，required 显式声明 true 即生效）。"""
+        raw: Any = draft.context
+        if not isinstance(raw, dict):
+            raw = {}
+        limits_raw = raw.get("limits")
+        limits: dict[str, Any] = limits_raw if isinstance(limits_raw, dict) else {}
+        try:
+            max_bytes = int(limits.get("max_bytes", DEFAULT_MAX_BYTES))
+            expires = int(limits.get("expires_after_minutes", DEFAULT_EXPIRES_MINUTES))
+        except (TypeError, ValueError):
+            max_bytes, expires = DEFAULT_MAX_BYTES, DEFAULT_EXPIRES_MINUTES
+        return cls(
+            required=bool(raw.get("required", False)),
+            max_bytes=max(1, max_bytes),
+            expires_after_minutes=max(1, expires),
+        )
+
+
+def _handover_data(root: Path, contract_id: str) -> dict[str, str]:
+    """读交接文件的最低必填结构；缺失按空值（无交接=初次 attempt）。"""
+    from longtask.persistence.projections import parse_handover_markdown
+
+    path = root / "contracts" / contract_id / "handover.md"
+    if not path.is_file():
+        return {}
+    try:
+        data, _violations = parse_handover_markdown(path.read_text(encoding="utf-8"))
+    except OSError:
+        return {}
+    if data is None:
+        return {}
+    return {
+        "current_stage": data.current_stage,
+        "remaining": "\n".join(f"- {item}" for item in data.remaining),
+        "next_action": data.next_action,
+        "estimate_remaining_hours": str(data.estimate_remaining_hours),
+        "source_attempt_id": data.source_attempt_id,
+    }
+
+
+def _recent_attempt_digest(conn: sqlite3.Connection, contract_id: str, limit: int = 3) -> str:
+    """最近 attempt 终态摘要（含失败原因）——验收失败上下文的主通道。"""
+    events = get_events(conn, contract_id=contract_id)
+    terminal = [
+        e
+        for e in events
+        if e.event_type
+        in (EventType.ATTEMPT_SUCCEEDED, EventType.ATTEMPT_FAILED, EventType.ATTEMPT_STALE)
+    ]
+    lines: list[str] = []
+    for e in terminal[-limit:]:
+        if e.attempt_id:
+            lines.append(f"- {e.attempt_id}: {str(e.event_type).split('/')[-1]}")
+    return "\n".join(lines)
+
+
+def compile_context_snapshot(
+    root: Path,
+    conn: sqlite3.Connection,
+    contract: ContractView,
+    attempt_id: str,
+    now: datetime,
+) -> tuple[Path, Path]:
+    """物化该次 attempt 的上下文：active.md 快照 + scratch.md 骨架。
+
+    返回 (active_path, scratch_path)。容量超限（policy.max_bytes）记
+    context/capacity-refused 并抛 CapacityRefusedError（fail-closed，
+    §4.1：压缩后仍不满足 required 容量合同则拒绝启动 attempt）。
+    """
+    policy = ContextPolicy.from_contract(contract.draft)
+    draft = contract.draft
+    handover = _handover_data(root, contract.contract_id)
+    digest = _recent_attempt_digest(conn, contract.contract_id)
+
+    sections: list[str] = [
+        f"# Active Context: {contract.contract_id} / {attempt_id}",
+        "",
+        f"- compiled_at: {now.isoformat()}",
+        f"- expires_at: {(now + timedelta(minutes=policy.expires_after_minutes)).isoformat()}",
+        f"- contract_revision: {contract.revision}",
+        "",
+        "## 合同锚点（冻结区，只读）",
+        f"- objective: {draft.objective}",
+        f"- deadline_at: {draft.deadline_at.isoformat()}",
+        f"- hard_constraints: {draft.hard_constraints}",
+        f"- acceptance.standard: {draft.acceptance.standard}",
+        f"- acceptance.checks: {list(draft.acceptance.checks)}",
+        "",
+    ]
+    if handover:
+        sections += [
+            "## 交接（上一 attempt 留下的现场）",
+            f"- current_stage: {handover.get('current_stage', '')}",
+            f"- remaining:\n{handover.get('remaining', '')}",
+            f"- next_action: {handover.get('next_action', '')}",
+            f"- estimate_remaining_hours: {handover.get('estimate_remaining_hours', '')}",
+            f"- source_attempt_id: {handover.get('source_attempt_id', '')}",
+            "",
+        ]
+    if digest:
+        sections += ["## 最近 attempt 终态（验收上下文）", digest, ""]
+    sections += [
+        "## scratch（本次 attempt 可编辑区，见 scratch.md）",
+        "allowed sections: " + ", ".join(policy.editable_sections),
+        "",
+    ]
+    body = "\n".join(sections)
+    encoded = body.encode("utf-8")
+    if len(encoded) > policy.max_bytes:
+        append_event(
+            conn,
+            contract_id=contract.contract_id,
+            attempt_id=attempt_id,
+            event_type=EventType.CONTEXT_CAPACITY_REFUSED,
+            payload={
+                "bytes": len(encoded),
+                "max_bytes": policy.max_bytes,
+                "reason": "compiled context exceeds policy capacity (§4.1)",
+            },
+            now=now,
+            actor="daemon",
+        )
+        raise CapacityRefusedError(
+            f"context snapshot {len(encoded)}B exceeds policy max_bytes={policy.max_bytes}"
+        )
+
+    attempt_dir = (
+        root / "contracts" / contract.contract_id / CONTEXT_DIR / ATTEMPTS_DIR / attempt_id
+    )
+    attempt_dir.mkdir(parents=True, exist_ok=True)
+    active_path = attempt_dir / ACTIVE_FILE
+    active_path.write_text(body, encoding="utf-8")
+
+    scratch_path = attempt_dir / SCRATCH_FILE
+    scratch_path.write_text(_scratch_skeleton(attempt_id), encoding="utf-8")
+
+    append_event(
+        conn,
+        contract_id=contract.contract_id,
+        attempt_id=attempt_id,
+        event_type=EventType.CONTEXT_SNAPSHOT_BUILT,
+        payload={
+            "active_path": str(active_path),
+            "bytes": len(encoded),
+            "expires_after_minutes": policy.expires_after_minutes,
+        },
+        now=now,
+        actor="daemon",
+    )
+    return active_path, scratch_path
+
+
+def _scratch_skeleton(attempt_id: str) -> str:
+    """scratch.md 骨架：§4.1 editable 区块。"""
+    return (
+        f"# Scratch: {attempt_id}\n\n"
+        "## current_focus\n\n(当前焦点)\n\n"
+        "## working_hypotheses\n\n(工作假设)\n\n"
+        "## next_actions\n\n(下一步)\n\n"
+        "## risks\n\n(风险)\n\n"
+        "## open_questions\n\n(待解问题)\n\n"
+        "## handoff_notes\n\n(交接备注)\n"
+    )
+
+
+class CapacityRefusedError(Exception):
+    """容量合同不满足：拒绝启动 attempt（§4.1 fail-closed）。"""
+
+
+def handover_prompt_addendum(root: Path, contract_id: str) -> str:
+    """交接摘要的任务文本附言（修复再派 attempt 缺上下文的缺口）。
+
+    优先级：handover.remaining/next_action（跨 attempt 现场）>
+    最近 attempt 失败原因。截断到 HANDOVER_IN_PROMPT_CHARS——
+    任务文本是准入面不是全文搬运面。
+    """
+    handover = _handover_data(root, contract_id)
+    parts: list[str] = []
+    if handover.get("next_action"):
+        parts.append(f"交接指引（上一 attempt 留下）：{handover['next_action']}")
+    if handover.get("remaining"):
+        parts.append(f"剩余工作：{handover['remaining']}")
+    if not parts:
+        return ""
+    text = " ".join(parts)
+    return text[:HANDOVER_IN_PROMPT_CHARS]
+
+
+__all__ = [
+    "ACTIVE_FILE",
+    "SCRATCH_FILE",
+    "CapacityRefusedError",
+    "ContextPolicy",
+    "compile_context_snapshot",
+    "handover_prompt_addendum",
+]

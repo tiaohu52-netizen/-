@@ -1,0 +1,102 @@
+{
+  "agents": [
+    {
+      "id": "exec-a",
+      "kind": "subprocess",
+      "launch": {
+        "argv": [
+          "node",
+          "C:\\Users\\17464\\AppData\\Roaming\\com.kimi.shell\\dsh\\current\\node_modules\\@deepseek-ai\\dsh\\lib\\bin.js",
+          "--profile",
+          "headless"
+        ],
+        "cwd": null,
+        "env_allowlist": [
+          "DSH_HOME",
+          "MINIMAX_CN_API_KEY",
+          "PATH",
+          "SYSTEMROOT",
+          "SYSTEMDRIVE",
+          "WINDIR",
+          "COMSPEC",
+          "TEMP",
+          "TMP",
+          "APPDATA",
+          "USERPROFILE",
+          "NODE_PATH"
+        ]
+      },
+      "capabilities": {
+        "spawn": true,
+        "observe": true,
+        "cancel": true,
+        "notify": false,
+        "followup": false,
+        "steer": false,
+        "interrupt": true,
+        "context": "optional",
+        "sandbox": {
+          "file_effects": "workspace-write",
+          "network": "unsupported",
+          "process": "unsupported",
+          "enforcement": "partial"
+        },
+        "acceptance_evidence": true
+      },
+      "limits": {
+        "max_concurrent_attempts": 1
+      },
+      "cost_hint": "low",
+      "enabled": true
+    },
+    {
+      "id": "exec-b",
+      "kind": "subprocess",
+      "launch": {
+        "argv": [
+          "node",
+          "C:\\Users\\17464\\AppData\\Roaming\\com.kimi.shell\\dsh\\current\\node_modules\\@deepseek-ai\\dsh\\lib\\bin.js",
+          "--profile",
+          "headless"
+        ],
+        "cwd": null,
+        "env_allowlist": [
+          "DSH_HOME",
+          "MINIMAX_CN_API_KEY",
+          "PATH",
+          "SYSTEMROOT",
+          "SYSTEMDRIVE",
+          "WINDIR",
+          "COMSPEC",
+          "TEMP",
+          "TMP",
+          "APPDATA",
+          "USERPROFILE",
+          "NODE_PATH"
+        ]
+      },
+      "capabilities": {
+        "spawn": true,
+        "observe": true,
+        "cancel": true,
+        "notify": false,
+        "followup": false,
+        "steer": false,
+        "interrupt": true,
+        "context": "optional",
+        "sandbox": {
+          "file_effects": "workspace-write",
+          "network": "unsupported",
+          "process": "unsupported",
+          "enforcement": "partial"
+        },
+        "acceptance_evidence": true
+      },
+      "limits": {
+        "max_concurrent_attempts": 1
+      },
+      "cost_hint": "medium",
+      "enabled": true
+    }
+  ]
+}

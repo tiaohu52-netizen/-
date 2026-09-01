@@ -1,0 +1,8 @@
+1) initialize: {'name': 'longtask-mcp', 'version': '0.1.0a0'}
+2) tools/list: ['longtask_approve_contract', 'longtask_attach_to_executor', 'longtask_get_contract', 'longtask_health', 'longtask_list_contracts', 'longtask_list_executors', 'longtask_prepare_contract']
+3) health: protocol=1
+4) list_executors: ['exec-a', 'exec-b']
+5) prepare: cid=lt-20260901-mcpe2e state=drafted
+6) approve: ok=True
+7) get: state=active
+8) attach: lease.holder=att-mcp-e2e write_back.gen=1 events=[4, 5]
