@@ -1,0 +1,155 @@
+"""执行器 RPC 控制面方法集成测试（DESIGN §8、§11.2、§11.7）。
+
+测试覆盖：
+1. executor/list 列表查询与 enabled_only 过滤；
+2. executor/enable 与 executor/disable 用户框定开关；
+3. executor/health 健康与能力摘要；
+4. UNKNOWN_EXECUTOR 错误码；
+5. VALIDATION_FAILED 缺少 executor_id 错误码。
+"""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from typing import Any
+
+import pytest
+
+from longtask import PROTOCOL_VERSION
+from longtask.adapters.manifest import Capabilities, SandboxCapability
+from longtask.adapters.registry import (
+    CostHint,
+    ExecutorRegistry,
+    LaunchSpec,
+    RegistryEntry,
+)
+from longtask.contracts.schema import Enforcement
+from longtask.rpc.errors import ErrorCode, RpcError
+from longtask.rpc.methods import Method
+from longtask.rpc.server import RequestEnvelope, route
+
+pytestmark = pytest.mark.integration
+
+NOW = datetime(2026, 9, 1, 12, 0, 0, tzinfo=UTC)
+
+
+def make_test_registry() -> ExecutorRegistry:
+    reg = ExecutorRegistry()
+    caps = Capabilities(
+        spawn=True,
+        observe=True,
+        cancel=True,
+        notify=False,
+        followup=False,
+        steer=False,
+        interrupt=False,
+        context="optional",
+        sandbox=SandboxCapability(
+            file_effects="workspace-write",
+            network="unsupported",
+            process="unsupported",
+            enforcement=Enforcement.PARTIAL,
+        ),
+        acceptance_evidence=True,
+    )
+    reg.register(
+        RegistryEntry(
+            id="codex-cli",
+            kind="subprocess",
+            launch=LaunchSpec(argv=("codex", "exec"), cwd=None, env_allowlist=()),
+            capabilities=caps,
+            limits={"max_concurrent_attempts": 2},
+            cost_hint=CostHint.LOW,
+            enabled=False,
+        )
+    )
+    reg.register(
+        RegistryEntry(
+            id="agent-cli-bridge",
+            kind="bridge",
+            launch=LaunchSpec(argv=("agent-cli", "--headless"), cwd=None, env_allowlist=("agent-cli_CONFIG",)),
+            capabilities=caps,
+            limits={"max_concurrent_attempts": 1},
+            cost_hint=CostHint.MEDIUM,
+            enabled=True,
+        )
+    )
+    return reg
+
+
+def make_envelope(
+    method: Method,
+    params: dict[str, Any] | None = None,
+    request_id: str = "req-test-001",
+) -> RequestEnvelope:
+    return RequestEnvelope(
+        method=method,
+        request_id=request_id,
+        client_id="test-client",
+        protocol_version=PROTOCOL_VERSION,
+        params=params or {},
+    )
+
+
+class TestExecutorRpc:
+    def test_executor_list_all_and_enabled_only(self) -> None:
+        reg = make_test_registry()
+        # 查全量
+        env = make_envelope(Method.EXECUTOR_LIST)
+        resp = route(env, registry=reg, now=NOW)
+        assert resp["ok"] is True
+        result = resp["result"]
+        assert result["total"] == 2
+        assert [e["id"] for e in result["executors"]] == ["codex-cli", "agent-cli-bridge"]
+
+        # 仅查已启用
+        env_enabled = make_envelope(Method.EXECUTOR_LIST, params={"enabled_only": True})
+        resp_enabled = route(env_enabled, registry=reg, now=NOW)
+        assert resp_enabled["ok"] is True
+        assert resp_enabled["result"]["total"] == 1
+        assert resp_enabled["result"]["executors"][0]["id"] == "agent-cli-bridge"
+
+    def test_executor_enable_and_disable(self) -> None:
+        reg = make_test_registry()
+        assert not reg.get("codex-cli").enabled  # type: ignore[union-attr]
+
+        # 启用 codex-cli
+        env_en = make_envelope(Method.EXECUTOR_ENABLE, params={"executor_id": "codex-cli"})
+        resp_en = route(env_en, registry=reg, now=NOW)
+        assert resp_en["ok"] is True
+        assert resp_en["result"]["enabled"] is True
+        assert reg.get("codex-cli").enabled  # type: ignore[union-attr]
+
+        # 禁用 codex-cli
+        env_dis = make_envelope(Method.EXECUTOR_DISABLE, params={"executor_id": "codex-cli"})
+        resp_dis = route(env_dis, registry=reg, now=NOW)
+        assert resp_dis["ok"] is True
+        assert resp_dis["result"]["enabled"] is False
+        assert not reg.get("codex-cli").enabled  # type: ignore[union-attr]
+
+    def test_executor_health(self) -> None:
+        reg = make_test_registry()
+        env = make_envelope(Method.EXECUTOR_HEALTH, params={"executor_id": "codex-cli"})
+        resp = route(env, registry=reg, now=NOW)
+        assert resp["ok"] is True
+        res = resp["result"]
+        assert res["executor_id"] == "codex-cli"
+        assert res["healthy"] is True
+        assert res["cost_hint"] == "low"
+        assert res["capabilities"]["spawn"] is True
+
+    def test_unknown_executor_error(self) -> None:
+        reg = make_test_registry()
+        for method in (Method.EXECUTOR_ENABLE, Method.EXECUTOR_DISABLE, Method.EXECUTOR_HEALTH):
+            env = make_envelope(method, params={"executor_id": "non-existent"})
+            with pytest.raises(RpcError) as exc_info:
+                route(env, registry=reg, now=NOW)
+            assert exc_info.value.code == ErrorCode.UNKNOWN_EXECUTOR
+
+    def test_missing_executor_id_validation_error(self) -> None:
+        reg = make_test_registry()
+        for method in (Method.EXECUTOR_ENABLE, Method.EXECUTOR_DISABLE, Method.EXECUTOR_HEALTH):
+            env = make_envelope(method, params={})
+            with pytest.raises(RpcError) as exc_info:
+                route(env, registry=reg, now=NOW)
+            assert exc_info.value.code == ErrorCode.VALIDATION_FAILED

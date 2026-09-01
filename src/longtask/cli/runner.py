@@ -1,0 +1,574 @@
+"""执行桥接层：把调度簿记变成真实 attempt（DESIGN §3.4、§5.1、§10）。
+
+职责边界：run_daemon_tick 只做调度簿记（§3.3 ticker 不执行任务）；
+本模块的 AttemptRunner 负责 prepare 复验 + spawn 拉起 + 存活心跳续约 +
+终态回收（attempt/succeeded|failed + 租约释放）。
+
+适配器实例按 executor_id 缓存：跨轮 observe/collect 需要同一实例
+（subprocess 适配器持有进程句柄，fake 适配器持有脚本状态）。
+守护进程重启后丢失句柄的 attempt 由租约心跳超时回收兜底（§7）。
+"""
+
+from __future__ import annotations
+
+import contextlib
+import json
+import sqlite3
+from collections.abc import Callable
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any
+
+from longtask.adapters.base import (
+    AttemptInput,
+    ExecutorAdapter,
+    PrepareRefusedError,
+)
+from longtask.adapters.factory import build_adapter
+from longtask.adapters.registry import ExecutorRegistry, RegistryEntry
+from longtask.contracts.schema import AttemptRole, AttemptState, ContractDraft, ContractView
+from longtask.persistence.context import (
+    CapacityRefusedError,
+    compile_context_snapshot,
+    handover_prompt_addendum,
+)
+from longtask.persistence.events import EventType
+from longtask.persistence.projections import (
+    HANDOVER_FILE,
+    contract_dir,
+    rebuild_projection,
+)
+from longtask.persistence.store import (
+    LeaseFencedError,
+    acquire_lease,
+    append_event,
+    get_contract,
+    get_lease,
+    release_lease,
+    renew_lease,
+)
+
+# 事件 payload 内 stdout/stderr 截断上限：审计够用，不撑爆 log.jsonl
+OUTPUT_TAIL_CHARS = 2000
+
+
+def _tail_text(value: object) -> str:
+    text = str(value) if value is not None else ""
+    return text[-OUTPUT_TAIL_CHARS:]
+
+
+def contract_workspace(draft: ContractDraft) -> str:
+    """合同冻结区声明的 workspace_root；未声明返回空串（适配器按 launch.cwd 兜底或拒接）。"""
+    file_effects = draft.hard_constraints.get("file_effects")
+    if isinstance(file_effects, dict):
+        root = file_effects.get("workspace_root")
+        if isinstance(root, str) and root.strip():
+            return root
+    return ""
+
+
+def build_attempt_input(
+    root: Path,
+    conn: sqlite3.Connection,
+    contract: ContractView,
+    attempt_id: str,
+    now: datetime,
+    *,
+    with_context: bool = True,
+) -> AttemptInput:
+    """构造 AttemptInput（DESIGN §11.6 字段表）。
+
+    lease_generation 动态取当前租约：租约获取前作 prepare 探针（旧代次），
+    租约获取后作 spawn 入参（attempt 实际持有的新代次，§5.1 不可变五元组）。
+
+    with_context=True 时（§4.1 临时上下文，Developer Preview 最小闭环）：
+    - task_prompt 追加交接摘要附言（跨 attempt 现场——修复「再派 attempt
+      没有验收失败上下文」的缺口，见 examples/agent-cli-model-provider-run）；
+    - 物化该 attempt 的 context/attempts/<id>/active.md + scratch.md，
+      路径填 context_snapshot_path（适配器据此装配，context.required=true
+      无快照即拒接，§9）。容量超限抛 CapacityRefusedError（fail-closed）。
+    """
+    draft = contract.draft
+    active_lease = get_lease(conn, contract.contract_id)
+    context_snapshot_path: str | None = None
+    task_prompt = draft.objective
+    if with_context:
+        addendum = handover_prompt_addendum(root, contract.contract_id)
+        if addendum:
+            task_prompt = f"{draft.objective}\n\n{addendum}"
+        try:
+            active_path, _scratch = compile_context_snapshot(root, conn, contract, attempt_id, now)
+            context_snapshot_path = str(active_path)
+        except CapacityRefusedError:
+            # 容量合同不满足：按 §4.1 拒绝启动 attempt，向上传播
+            raise
+    return AttemptInput(
+        attempt_id=attempt_id,
+        contract_id=contract.contract_id,
+        revision=contract.revision,
+        lease_generation=active_lease.generation if active_lease else 0,
+        role=AttemptRole.EXECUTOR,
+        contract_snapshot=draft.to_dict(),
+        handover_path=str(contract_dir(root, contract.contract_id) / HANDOVER_FILE),
+        workspace_root=contract_workspace(draft),
+        budget_remaining={
+            "max_dispatches": draft.budget.max_dispatches,
+            "max_escalations": draft.budget.max_escalations,
+        },
+        task_prompt=task_prompt,
+        context_snapshot_path=context_snapshot_path,
+    )
+
+
+class AttemptRunner:
+    """attempt 生命周期驱动：start（拉起）与 poll（观察/续约/回收）。"""
+
+    def __init__(
+        self,
+        root: Path,
+        conn: sqlite3.Connection,
+        registry: ExecutorRegistry,
+        adapter_factory: Callable[[RegistryEntry], ExecutorAdapter | None] | None = None,
+        emit: Callable[[str], None] | None = None,
+    ) -> None:
+        self._root = root
+        self._conn = conn
+        self._registry = registry
+        self._factory = adapter_factory if adapter_factory is not None else build_adapter
+        self._emit: Callable[[str], None] = emit if emit is not None else (lambda _msg: None)
+        self._adapters: dict[str, ExecutorAdapter] = {}
+        self._running: dict[str, dict[str, Any]] = {}
+        self.spawned_count = 0
+        self.finished_count = 0
+
+    def replace_registry(self, registry: ExecutorRegistry) -> None:
+        """每轮重载注册表后同步给 runner（适配器缓存不重建，保持句柄）。"""
+        self._registry = registry
+
+    def _adapter_for(self, executor_id: str) -> ExecutorAdapter | None:
+        cached = self._adapters.get(executor_id)
+        if cached is not None:
+            return cached
+        entry = self._registry.get(executor_id)
+        if entry is None:
+            return None
+        adapter = self._factory(entry)
+        if adapter is None:
+            return None
+        self._adapters[executor_id] = adapter
+        return adapter
+
+    def start_attempt(
+        self, now: datetime, *, contract_id: str, attempt_id: str, executor_id: str
+    ) -> bool:
+        """prepare 复验 + spawn 拉起；任一步失败记 attempt/failed 并释放租约。"""
+        adapter = self._adapter_for(executor_id)
+        contract = get_contract(self._conn, contract_id)
+        if adapter is None or contract is None:
+            self._fail_attempt(
+                now, contract_id, attempt_id, f"executor or contract unavailable: {executor_id}"
+            )
+            return False
+        try:
+            input_ = build_attempt_input(self._root, self._conn, contract, attempt_id, now)
+        except CapacityRefusedError as exc:
+            # §4.1 容量合同不满足：拒绝启动 attempt（事件已由编译器记
+            # context/capacity-refused，这里补记账并释放租约）
+            self._fail_attempt(now, contract_id, attempt_id, f"context capacity refused: {exc}")
+            return False
+        try:
+            launch = adapter.prepare(input_)
+            session_ref = adapter.spawn(input_, launch)
+        except PrepareRefusedError as exc:
+            self._fail_attempt(now, contract_id, attempt_id, f"prepare refused: {exc}")
+            return False
+        except OSError as exc:
+            self._fail_attempt(now, contract_id, attempt_id, f"spawn failed: {exc}")
+            return False
+        lease = get_lease(self._conn, contract_id)
+        self._running[attempt_id] = {
+            "contract_id": contract_id,
+            "executor_id": executor_id,
+            "session_ref": session_ref,
+            "generation": lease.generation if lease else None,
+        }
+        self.spawned_count += 1
+        self._emit(f"runner/spawned:{contract_id}:{attempt_id}:{session_ref}")
+        return True
+
+    def poll_attempts(self, now: datetime) -> None:
+        """观察运行中 attempt：存活者续约心跳，换代/丢失者记 stale，收尾者回收。"""
+        for attempt_id, info in list(self._running.items()):
+            contract_id = str(info["contract_id"])
+            adapter = self._adapters.get(str(info["executor_id"]))
+            if adapter is None:
+                self._mark_stale(now, attempt_id, info, "executor no longer available")
+                continue
+            try:
+                observation = adapter.observe(attempt_id)
+            except KeyError:
+                self._mark_stale(now, attempt_id, info, "adapter lost the attempt")
+                continue
+
+            lease = get_lease(self._conn, contract_id)
+            generation = lease.generation if lease else None
+            if generation is not None and generation != info["generation"]:
+                # 租约被另一 attempt 接管：本 attempt 不再持有写权，停追（fencing §7）。
+                # generation is None 表示租约已被释放（attempt 已正常收尾）——继续走
+                # finish 路径让 collect 落 attempt/succeeded|failed，而不是误判 stale。
+                self._mark_stale(now, attempt_id, info, "lease moved to another generation")
+                continue
+
+            if str(observation.get("state")) == AttemptState.RUNNING.value:
+                # spawn 后短窗内子进程可能尚未退出（observe 只是瞬时快照）。
+                # 存活且持有当前租约：代发心跳续约；下一轮 poll 再看是否收尾。
+                # generation 为 None 表示租约已被释放（attempt 已收尾路径）——
+                # 但 state=RUNNING 时不太可能；如果走到这里就 fallback 到入参。
+                lease_gen = generation if generation is not None else int(info["generation"])
+                contract = get_contract(self._conn, contract_id)
+                if contract is not None:
+                    renew_lease(
+                        self._conn,
+                        contract_id=contract_id,
+                        holder_attempt_id=attempt_id,
+                        lease_generation=lease_gen,
+                        heartbeat_at=now,
+                        timeout=timedelta(minutes=contract.draft.budget.max_attempt_minutes),
+                        actor="daemon",
+                    )
+                continue
+
+            self._finish_attempt(now, attempt_id, info, adapter, str(observation.get("state")))
+
+    def _finish_attempt(
+        self,
+        now: datetime,
+        attempt_id: str,
+        info: dict[str, Any],
+        adapter: ExecutorAdapter,
+        state: str,
+    ) -> None:
+        """终态回收：collect 结果落事件（截断），释放租约，停止跟踪。"""
+        contract_id = str(info["contract_id"])
+        payload: dict[str, Any] = {"session_ref": info["session_ref"], "state": state}
+        try:
+            collected = adapter.collect(attempt_id)
+            payload["returncode"] = collected.get("returncode")
+            payload["stdout_tail"] = _tail_text(collected.get("stdout"))
+            payload["stderr_tail"] = _tail_text(collected.get("stderr"))
+        except Exception as exc:  # 回收失败也要如实收尾，不悬挂租约
+            payload["state"] = AttemptState.FAILED.value
+            payload["collect_error"] = str(exc)
+
+        succeeded = payload["state"] == AttemptState.SUCCEEDED.value
+        append_event(
+            self._conn,
+            contract_id=contract_id,
+            attempt_id=attempt_id,
+            event_type=EventType.ATTEMPT_SUCCEEDED if succeeded else EventType.ATTEMPT_FAILED,
+            payload=payload,
+            now=now,
+            actor="daemon",
+        )
+        # P1：更新 attempts 行状态（DESIGN §7 attempt 轴）
+        self._conn.execute(
+            """
+            UPDATE attempts
+            SET state = ?, terminal_at = ?, updated_at = ?,
+                return_code = ?, error_class = ?, payload_json = ?
+            WHERE attempt_id = ?
+            """,
+            (
+                payload["state"],
+                now.isoformat(),
+                now.isoformat(),
+                payload.get("returncode"),
+                payload.get("collect_error"),
+                json.dumps(payload, ensure_ascii=False),
+                attempt_id,
+            ),
+        )
+        self._release_lease_if_held(now, contract_id, attempt_id)
+        rebuild_projection(self._root, contract_id, self._conn)
+        executor_id = str(info["executor_id"])
+        del self._running[attempt_id]
+        self.finished_count += 1
+        self._emit(f"runner/attempt-{payload['state']}:{contract_id}:{attempt_id}")
+        if succeeded:
+            # 执行者 succeeded 后派生交叉 verifier（DESIGN §5.2：防止同源盲区）
+            self._dispatch_verifier(now, contract_id=contract_id, executor_id=executor_id)
+
+    def _fail_attempt(self, now: datetime, contract_id: str, attempt_id: str, reason: str) -> None:
+        append_event(
+            self._conn,
+            contract_id=contract_id,
+            attempt_id=attempt_id,
+            event_type=EventType.ATTEMPT_FAILED,
+            payload={"reason": reason},
+            now=now,
+            actor="daemon",
+        )
+        # P1：更新 attempts 行
+        self._conn.execute(
+            """
+            UPDATE attempts
+            SET state = 'failed',
+                terminal_at = ?,
+                error_class = ?,
+                updated_at = ?
+            WHERE attempt_id = ?
+            """,
+            (now.isoformat(), "attempt-failed", now.isoformat(), attempt_id),
+        )
+        self._release_lease_if_held(now, contract_id, attempt_id)
+        rebuild_projection(self._root, contract_id, self._conn)
+        self.finished_count += 1
+        self._emit(f"runner/attempt-failed:{contract_id}:{attempt_id}")
+
+    def _mark_stale(
+        self, now: datetime, attempt_id: str, info: dict[str, Any], reason: str
+    ) -> None:
+        append_event(
+            self._conn,
+            contract_id=str(info["contract_id"]),
+            attempt_id=attempt_id,
+            event_type=EventType.ATTEMPT_STALE,
+            payload={"reason": reason, "session_ref": info["session_ref"]},
+            now=now,
+            actor="daemon",
+        )
+        # P1：更新 attempts 行
+        self._conn.execute(
+            """
+            UPDATE attempts
+            SET state = 'stale', terminal_at = ?, updated_at = ?
+            WHERE attempt_id = ?
+            """,
+            (now.isoformat(), now.isoformat(), attempt_id),
+        )
+        rebuild_projection(self._root, str(info["contract_id"]), self._conn)
+        del self._running[attempt_id]
+        self._emit(f"runner/attempt-stale:{info['contract_id']}:{attempt_id}")
+
+    def _release_lease_if_held(self, now: datetime, contract_id: str, attempt_id: str) -> None:
+        lease = get_lease(self._conn, contract_id)
+        if lease is None or lease.holder_attempt_id != attempt_id:
+            return
+        # 已被回收/接管时 release_lease 抛 LeaseFencedError：fencing 生效，不重复释放
+        with contextlib.suppress(LeaseFencedError):
+            release_lease(
+                self._conn,
+                contract_id=contract_id,
+                holder_attempt_id=attempt_id,
+                lease_generation=lease.generation,
+                now=now,
+                actor="daemon",
+            )
+
+    def cancel_attempt(
+        self, now: datetime, *, contract_id: str, attempt_id: str, reason: str
+    ) -> bool:
+        """control/interrupt：打断执行中的 attempt（DESIGN §10 用户可干涉）。
+
+        adapter.cancel 尽力打断（subprocess terminate→kill 宽限；fake 剧本化）；
+        无论 adapter 是否成功取消都记 attempt/cancelled + 释放租约 + 停追，
+        不悬挂租约。返回是否命中正在运行的 attempt。
+        """
+        info = self._running.get(attempt_id)
+        if info is None or str(info.get("contract_id")) != contract_id:
+            return False
+        adapter = self._adapters.get(str(info["executor_id"]))
+        if adapter is not None:
+            try:
+                adapter.cancel(attempt_id, reason)
+            except Exception as exc:  # 取消失败也要如实收尾，不悬挂租约
+                self._emit(f"runner/cancel-error:{contract_id}:{attempt_id}:{exc}")
+        append_event(
+            self._conn,
+            contract_id=contract_id,
+            attempt_id=attempt_id,
+            event_type=EventType.ATTEMPT_CANCELLED,
+            payload={"reason": reason},
+            now=now,
+            actor="user",
+        )
+        self._release_lease_if_held(now, contract_id, attempt_id)
+        rebuild_projection(self._root, contract_id, self._conn)
+        self._running.pop(attempt_id, None)
+        self._emit(f"runner/attempt-cancelled:{contract_id}:{attempt_id}")
+        return True
+
+    def _dispatch_verifier(self, now: datetime, *, contract_id: str, executor_id: str) -> bool:
+        """执行者 succeeded 后派生 verifier（DESIGN §5.2 交叉核对）。
+
+        候选必须 ≠ 执行者（防止同源盲区）；复用 start_attempt 的
+        prepare+spawn 链，仅 role 切到 VERIFIER。verifier 自己核对
+        acceptance.checks 后写回 attempt/succeeded|failed，由上层
+        据此转 complete 或退回 active。
+        """
+        from longtask.contracts.schema import ContractState
+
+        contract = get_contract(self._conn, contract_id)
+        if contract is None or contract.state != ContractState.ACTIVE:
+            return False
+        # C1 修复（P1）：用 attempts 实体表的 role='verifier' 判定已派生，
+        # 不再用 payload_json 字符串匹配（会误判子串）。
+        # SPEC §12.3 明确「历史 verifier 不得阻止新的 verifier 派生」——
+        # 只有当存在非 terminal 的 verifier attempt 时才视为正在派生，
+        # 避免与同 attempt_id 上后续轮次冲突。
+        existing_verifier = self._conn.execute(
+            """
+            SELECT state FROM attempts
+            WHERE goal_id = ? AND role = 'verifier'
+              AND state NOT IN ('succeeded', 'failed', 'cancelled', 'stale', 'orphaned')
+            ORDER BY admitted_at DESC LIMIT 1
+            """,
+            (contract_id,),
+        ).fetchone()
+        if existing_verifier is not None:
+            return False
+        # 选择候选：排除执行者本身，按执行器匹配规则排序
+        candidates = self._registry.match_candidates(contract.draft)
+        verifier_entry: RegistryEntry | None = None
+        for entry in candidates:
+            if entry.id == executor_id:
+                continue
+            verifier_entry = entry
+            break
+        if verifier_entry is None:
+            # 池中无独立候选：如实记事件，不静默假装
+            append_event(
+                self._conn,
+                contract_id=contract_id,
+                event_type=EventType.ESCALATION_HANDED_TO_USER,
+                payload={"reason": "no independent verifier candidate in registry (§5.2)"},
+                now=now,
+                actor="daemon",
+            )
+            return False
+
+        # verifier attempt id：v-<ts>-<seq> 区分
+        verifier_id = f"ver-{now.strftime('%Y%m%d%H%M%S')}-{contract_id[-4:]}"
+        adapter = self._adapter_for(verifier_entry.id)
+        if adapter is None:
+            self._fail_attempt(
+                now,
+                contract_id,
+                verifier_id,
+                f"verifier adapter unavailable: {verifier_entry.id}",
+            )
+            return False
+        input_ = self._build_verifier_input(contract, verifier_id, now)
+        try:
+            launch = adapter.prepare(input_)
+            session_ref = adapter.spawn(input_, launch)
+        except PrepareRefusedError as exc:
+            self._fail_attempt(now, contract_id, verifier_id, f"verifier prepare refused: {exc}")
+            return False
+        except OSError as exc:
+            self._fail_attempt(now, contract_id, verifier_id, f"verifier spawn failed: {exc}")
+            return False
+
+        # verifier 占租约（fencing：与执行者不同 attempt_id 不同代次）
+        active_lease = get_lease(self._conn, contract_id)
+        expected_gen = active_lease.generation if active_lease else 0
+        acquire_lease(
+            self._conn,
+            contract_id=contract_id,
+            holder_attempt_id=verifier_id,
+            expected_generation=expected_gen,
+            heartbeat_at=now,
+            timeout=timedelta(minutes=contract.draft.budget.max_attempt_minutes),
+            actor="daemon",
+            payload={"executor_id": verifier_entry.id, "urgency_tier": 3},
+            role="verifier",
+            contract_revision=contract.revision,
+        )
+        append_event(
+            self._conn,
+            contract_id=contract_id,
+            attempt_id=verifier_id,
+            event_type=EventType.ATTEMPT_STARTED,
+            payload={
+                "executor_id": verifier_entry.id,
+                "role": "verifier",
+                "verifier_for": executor_id,
+                "contract_revision": contract.revision,
+            },
+            now=now,
+            actor="daemon",
+            goal_id=contract.goal_id,
+            contract_revision=contract.revision,
+            role="verifier",
+        )
+        # P1：写入 attempts 行（DESIGN §7 attempt 轴）
+        self._conn.execute(
+            """
+            INSERT INTO attempts (
+                attempt_id, goal_id, contract_revision, role,
+                executor_id, state, lease_generation, partition_id,
+                admitted_at, started_at, terminal_at, return_code, error_class,
+                payload_json, updated_at
+            ) VALUES (?, ?, ?, 'verifier', ?, 'admitted', NULL, NULL, ?,
+                      NULL, NULL, NULL, NULL, ?, ?)
+            ON CONFLICT (attempt_id) DO UPDATE SET
+                state = excluded.state,
+                updated_at = excluded.updated_at,
+                payload_json = excluded.payload_json
+            """,
+            (
+                verifier_id,
+                contract.goal_id,
+                contract.revision,
+                verifier_entry.id,
+                now.isoformat(),
+                json.dumps({"verifier_for": executor_id, "executor_id": verifier_entry.id}),
+                now.isoformat(),
+            ),
+        )
+        lease = get_lease(self._conn, contract_id)
+        self._running[verifier_id] = {
+            "contract_id": contract_id,
+            "executor_id": verifier_entry.id,
+            "session_ref": session_ref,
+            "generation": lease.generation if lease else None,
+        }
+        self.spawned_count += 1
+        self._emit(f"runner/verifier-spawned:{contract_id}:{verifier_id}:{session_ref}")
+        return True
+
+    def _build_verifier_input(
+        self, contract: ContractView, attempt_id: str, now: datetime
+    ) -> AttemptInput:
+        """verifier attempt 的 AttemptInput：role=verifier，task_prompt 带 checks。
+
+        context_snapshot_path 通过 build_attempt_input 获得（含交接上下文——§5.2
+        verifier 应能从交接文件读到执行者上轮的产出与失败原因）。
+        """
+        from longtask.persistence.context import handover_prompt_addendum
+
+        base = build_attempt_input(self._root, self._conn, contract, attempt_id, now)
+        checks_text = "\n".join(f"- {c}" for c in contract.draft.acceptance.checks)
+        verifier_prompt = (
+            "你是 verifier（DESIGN §5.2）：独立核对以下验收条款，"
+            "逐条核对并在 attempt/write-back 报告每条 pass/fail/undeterminable + 证据指针；"
+            "全部 pass 才声明 succeeded，否则 failed。\n\n"
+            f"## acceptance.checks\n{checks_text}\n\n"
+            f"## 标准\n{contract.draft.acceptance.standard}"
+        )
+        addendum = handover_prompt_addendum(self._root, contract.contract_id)
+        if addendum:
+            verifier_prompt = f"{verifier_prompt}\n\n{addendum}"
+        return AttemptInput(
+            attempt_id=base.attempt_id,
+            contract_id=base.contract_id,
+            revision=base.revision,
+            lease_generation=base.lease_generation,
+            role=AttemptRole.VERIFIER,
+            contract_snapshot=base.contract_snapshot,
+            handover_path=base.handover_path,
+            workspace_root=base.workspace_root,
+            budget_remaining=base.budget_remaining,
+            task_prompt=verifier_prompt,
+            context_snapshot_path=base.context_snapshot_path,
+        )

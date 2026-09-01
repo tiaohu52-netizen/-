@@ -1,0 +1,317 @@
+# Long-Horizon Goal Protocol (LHGP)
+
+> [中文说明](./README.zh-CN.md)
+
+Your goal should not die with the chat.
+
+LHGP lets you place a goal under an independent, local contract: define the
+outcome, acceptance checks, deadline, budget, and which agent CLIs and models
+may work on it. Sessions may end and agents may change; the commitment,
+evidence, and handoff state remain.
+
+> **Session owns an attempt. LHGP owns the commitment.**
+
+> **Read this first, plainly.** This is a **Developer Preview**. The full
+> specification ([`docs/LHGP-SPEC.md`](docs/LHGP-SPEC.md)) is ahead of the
+> implementation. The implementation roadmap is
+> [`docs/LHGP-ROADMAP.md`](docs/LHGP-ROADMAP.md); each capability claim in
+> this README is backed by a row in [`quality/claims.json`](quality/claims.json).
+> Three things the protocol does **not** do: it does not work when your
+> machine is off; the deadline is not a result guarantee; plugins and the
+> protocol are not the same layer.
+
+---
+
+## Why you'd want it
+
+You know the kind of task that has these problems:
+
+- *"Take a look at this on Friday."* — you forget, or you remember at 11pm and don't want to deal with it.
+- *"Try this in a different model to check."* — but you'll only remember to do it three weeks from now.
+- *"This needs to run while I'm not here."* — and you want a record of exactly what got done.
+- *"Don't start this until 2am."* — but you don't want to stay up to launch it.
+
+Plain chat memory doesn't survive a session. A cron job doesn't know what
+"done" looks like. A workflow tool doesn't carry the goal across agents.
+LHGP is a **persistent commitment ledger with a local scheduler and an
+executor pool**, living in a SQLite file on your laptop. The session that
+drafted the goal is not the thing that finishes it.
+
+If that sounds like what you want, read on. If you just want a chatbot that
+remembers things, this isn't it.
+
+## Goal / Contract / Attempt — three layers
+
+| Layer | Lives in | Owned by | Lifetime |
+|---|---|---|---|
+| **Goal** | Your head, then a contract | You | Until you cancel or it terminates |
+| **Contract** | `state.db` + `~/.lhgp/contracts/<id>/` | LHGP, not the session | Until terminal commitment state |
+| **Attempt** | One running agent CLI process | A session | Until the agent exits or the lease expires |
+
+The session that holds an attempt is replaceable. The contract is not. When
+the lease expires, a different authorized agent can pick up where the last
+one left off — without losing accepted evidence.
+
+## What it does, in one paragraph
+
+You write a **contract**: a goal, what "done" looks like, constraints,
+deadline, and a budget for how many tries it's allowed. You approve it.
+Then the local daemon (`lhgpd`) takes over:
+
+1. **Watches the clock.** It knows when the contract is due and when you
+   said it should wake up.
+2. **Picks a runner.** When the time comes, it looks at the user-approved
+   list of installed agent tools (Codex, Claude Code, agent-cli, anything that
+   has a CLI) and picks one that can do the job.
+3. **Runs it.** Spawns the runner with your task text and the work directory.
+4. **Watches over it.** Keeps the lease alive while the runner is working;
+   if it dies, takes the lease back and tries someone else.
+5. **Checks the work.** After the runner reports success, it dispatches a
+   **second, different** runner to verify the work against your acceptance
+   criteria. If the verifier disagrees, it goes back and tries again.
+6. **Tells you.** The contract reaches a terminal commitment state. The
+   whole story — every event, every heartbeat, every check — is in
+   `state.db` and in the file projections you can grep.
+
+You can stop paying attention. Or watch along — it's a normal Unix daemon.
+
+> The daemon only wakes up while your machine is on. If the lid is closed,
+> the L0 power guard and L1 RTC alarm stand in for it (see §6.4 of the
+> spec); L2 (cloud relay) and L3 (always-on relay) are designed but not
+> deployed. The deadline is a scheduling hint, not a service-level
+> guarantee.
+
+## How this differs from things that look like it
+
+| Tool | What it actually is | Why it isn't LHGP |
+|---|---|---|
+| Goal-mode chat | The same session keeps going until done | No contract; dies with the session |
+| `cron` / launchd | Fires a script on a clock | No "done" check, no handoff |
+| n8n / Temporal / LangGraph | Durable workflow engines | You're the operator; the agents aren't interchangeable and authorized under a contract |
+| Vector memory DB | Stores chat history | No scheduler, no commitment, no acceptance |
+
+LHGP is **not** a workflow engine. The agent can be replaced mid-run
+under a still-valid lease; the goal cannot be replaced by the agent.
+
+## What is actually implemented today
+
+This is honest inventory. Each row is backed by an entry in
+[`quality/claims.json`](quality/claims.json) — open it to see the evidence
+path and the pinned commit for every claim.
+
+| Capability | Status | Claim |
+|---|---|---|
+| Skeleton passes all seven quality gates | Verified | `skeleton-gates-green` |
+| Urgency tiering per DESIGN §6.2 | Verified | `urgency-tier-thresholds` |
+| Lease generation/holder fencing | Verified | `lease-fencing-logic` |
+| Wire-protocol error code registry complete | Verified | `error-code-registry-complete` |
+| Transactional SQLite store + WAL crash recovery | Verified | `persistence-transactional-writes` |
+| Default-deny refusal paths (no silent degradation) | Verified | `refusal-never-degrades` |
+| Escalation ladder (tier 0–5 with arbitration) | Verified | `escalation-ladder-decision` |
+| JSON-RPC contract lifecycle + cursor pagination | Verified | `rpc-contract-lifecycle` |
+| Executor registry, capability matching, cost-priority dispatch | Verified | `executor-registry-matching` |
+| File projections + handover.md schema | Verified | `file-projections-and-handover` |
+| CLI + daemon control plane + dry-run | Verified | `cli-and-daemon-control-plane` |
+| Strict-deadline layered wakeup (L0/L1 done; L2/L3 designed, not deployed) | Accepted debt (review by 2026-12-01) | `strict-deadline-wakeup-design` |
+| MCP server + model-facing skill (7 tools, not a 1:1 RPC tunnel) | Verified | `mcp-server-and-skill` |
+| Ephemeral context + cross-checking verifier | Verified | `ephemeral-context-and-verifier` |
+| Executor-side RPC (status / renew / write-back) | Verified | `executor-session-rpc` |
+| Daemon lifecycle + attempt runner (real subprocess) | Verified | `daemon-lifecycle-and-attempt-runner` |
+
+What this list **does not** claim:
+
+- Four-axis commitment state (commitment lifecycle / deadline / acceptance /
+  attempt) — the spec requires four axes; the store currently models two.
+- Default-deny authorization across executor × model × role (a single
+  allowlist under a contract). The verifier is dispatched, but the
+  three-dimensional allowlist is not yet enforced.
+- External run handles (`external_run_id`, `session_locator`,
+  `recovery_strategy`, `capability_snapshot`) so the daemon can resume
+  work spawned by harnesses it doesn't own.
+- Six-component forecast (queue / startup / remaining work / verification /
+  retry reserve / safety margin) that drives event-driven wakeup.
+- Typed acceptance checks with `evidence` entities and a repair brief that
+  is itself structured.
+- The full plugin / MCP-tool / `lhgp` rename / fresh-machine distribution
+  story (still shipped as `longtask` / `longtaskd` / `~/.longtask`; the
+  rename is staged in P6 of the roadmap).
+
+These gaps are tracked explicitly in [`docs/LHGP-ROADMAP.md`](docs/LHGP-ROADMAP.md).
+
+## 30 seconds from clone to first task
+
+You need Python 3.11+ and [`uv`](https://docs.astral.sh/uv/) (`pip install uv`).
+
+```bash
+git clone https://github.com/your-org/longtask-protocol
+cd longtask-protocol
+uv sync --extra dev
+uv run python scripts/quality_gate.py   # ~10s; the same gate CI runs
+uv run python -m longtask.cli.main doctor
+```
+
+You should see something like:
+
+```
+[gate] ALL PASS (7 gates)
+=== longtask doctor (v0.1.0a0, protocol v1) ===
+[PASS] python_runtime: Python 3.13.x
+[PASS] storage_directory: ~/.longtask accessible
+[PASS] database_integrity: state.db healthy
+[PASS] executor_registry: registry accessible (0 enabled / 0 registered)
+```
+
+Done. You now have a working local LHGP install. (The CLI binary is still
+named `longtask` / `longtaskd` and the data directory is still
+`~/.longtask` during the rename window — see the roadmap's P6.)
+
+### Your first contract, end to end
+
+You need a runner. For now, register anything with a CLI that exits 0
+when it's done:
+
+```bash
+# tell LHGP about a runner (here: just `echo`, as a sanity check)
+cat > /tmp/my-runners.json <<'EOF'
+{
+  "agents": [{
+    "id": "echo-runner",
+    "kind": "subprocess",
+    "launch": { "argv": ["/bin/sh", "-c", "echo done > $WORKSPACE/result.txt"] },
+    "capabilities": {},
+    "limits": {},
+    "cost_hint": "low",
+    "enabled": true
+  }]
+}
+EOF
+# point at it (path can be anything; it's config data, not a CLI flag)
+cp /tmp/my-runners.json ~/.longtask/registry.json
+```
+
+Write a contract:
+
+```bash
+uv run python -m longtask.cli.main prepare \
+  --contract-id lt-hello \
+  --title "First contract" \
+  --objective "Write hello.txt with 'hi from LHGP' in my workspace." \
+  --deadline 2026-12-31T00:00:00+00:00
+```
+
+Approve it:
+
+```bash
+uv run python -m longtask.cli.main approve lt-hello
+```
+
+Start the daemon in another terminal:
+
+```bash
+uv run python -m longtask.cli.main start --interval 30
+# leave it running; it'll pick up the contract, run echo, verify, complete.
+```
+
+Check:
+
+```bash
+uv run python -m longtask.cli.main get lt-hello
+uv run python -m longtask.cli.main status    # daemon / kill-switch
+cat ~/.longtask/contracts/lt-hello/contract.yaml
+```
+
+The whole story of the run — `contract/prepared` → `contract/approved` →
+`attempt/started` → `attempt/succeeded` → `contract/completed` — is in
+`state.db` and mirrored into `~/.longtask/contracts/lt-hello/`.
+
+### If your agent is an MCP-compatible LLM
+
+The package also installs `longtask-mcp`, a thin [MCP](https://modelcontextprotocol.io)
+server that exposes 7 task-flow tools to your model (not a 1:1 tunnel onto
+the 24 RPC methods — see the spec on §11.1). Point your harness at it
+(usually one line in your MCP config) and the model can discover and use
+the protocol directly — see [`skills/longtask-contract/SKILL.md`](skills/longtask-contract/SKILL.md)
+for the model-side onboarding.
+
+## What it explicitly does not do (yet)
+
+- **Multi-host.** Single laptop, single user. If you want it on a server farm, you're too early.
+- **Multi-tenant.** No auth, no accounts. Local file trust boundary only.
+- **Network wakeup (cloud relay).** The protocol has a four-layer wakeup spec; L0 (local power) and L1 (RTC) are in, L2 (cloud) and L3 (relay) are designed but not implemented. The daemon falls back gracefully when they're unavailable. See the `strict-deadline-wakeup-design` claim in the registry.
+- **A web UI.** LHGP is files + CLI + RPC. The file projections (`contract.yaml`, `lease.json`, `log.jsonl`) are the human interface — version-controllable, greppable, scriptable.
+- **Result guarantee at the deadline.** The deadline drives *when* the daemon decides to escalate; it does not guarantee the work is finished on time.
+- **Survives the laptop being off forever.** L0/L1 cover sleep and lid-closed states only. Truly offline, always-on wakeup requires L2/L3, which are tracked as accepted debt.
+
+## Where things live in this repo
+
+```
+docs/LHGP-SPEC.md         the protocol specification (single source of truth for semantics)
+docs/LHGP-ROADMAP.md      the implementation roadmap (single source of truth for ordering)
+README.md                 you are here
+README.zh-CN.md           中文说明
+LICENSE                   Apache-2.0
+SECURITY.md               threat model + how to report
+CONTRIBUTING.md           how to participate
+CODE_OF_CONDUCT.md        community standards
+CHANGELOG.md              what changed in each version
+schemas/                  machine-readable JSON Schemas for the wire protocol
+
+src/longtask/             the reference implementation, Python 3.11+, zero runtime deps
+  contracts/              contract schema + validation
+  persistence/            SQLite store + file projections + §4.1 ephemeral context
+  scheduler/              ticker + wakeup
+  promoter/               urgency, escalation ladder, lease + fencing
+  adapters/               how to wrap a CLI runner (Codex / Claude / agent-cli / ...)
+  rpc/                    JSON-RPC control plane
+  cli/                    the `longtask` command + `longtaskd` daemon
+  mcp_server.py           the `longtask-mcp` model-facing entry
+
+skills/longtask-contract/ onboards an AI to use the protocol
+quality/                  governance: claims registry + 7 quality gates
+  claims.json             capability claims with evidence paths and pinned_sha
+  claim-schema.json       the schema the registry is validated against
+docs/decisions/           ADRs (architecture decision records)
+examples/                 real-run archives (do not edit — they're audit evidence)
+  agent-cli-model-provider-run/        first end-to-end with DeepSeek Harness + model-provider-M2.7
+  agent-cli-model-provider-run-v2/     same task with ephemeral context + verifier enabled
+  mcp-discovery/          8-step contract lifecycle via the MCP server
+tests/                    unit / integration / conformance
+scripts/                  the 7-gate quality runner (local == CI)
+.github/workflows/        multi-OS CI on every push
+```
+
+## Help, it's not working
+
+- **First stop**: `uv run python -m longtask.cli.main doctor`. It runs 4 sanity checks and tells you which one failed.
+- **Stuck contract**: `uv run python -m longtask.cli.main get <id>`. Look at `state`, `blocked_reason`, and the events.
+- **Kill switch**: `uv run python -m longtask.cli.main kill-switch --activate` halts all dispatching immediately. Re-arming is `--deactivate`.
+- **Daemon wedged**: `uv run python -m longtask.cli.main stop`, then `start` again. State is preserved.
+- **Found a bug?** File it via the [bug report template](../../issues/new?template=bug_report.md). Include `uv run python scripts/quality_gate.py` output if you ran it.
+- **Asking a design question**: check [`docs/LHGP-SPEC.md`](docs/LHGP-SPEC.md) first (it's 1100+ lines but searchable). If still unclear, use the [documentation template](../../issues/new?template=documentation.md).
+
+## Maturity
+
+This is the **0.1.0 "Developer Preview"** release. The specification is
+ahead of the implementation; the implementation roadmap
+([`docs/LHGP-ROADMAP.md`](docs/LHGP-ROADMAP.md)) tracks the gap. The
+real-world validation so far is a few test runs of "write a palindrome
+checker" with an AI model as the runner, and they went end-to-end (see
+`examples/`). The shape is solid; the rough edges are around
+authorization enforcement, external run handles, deadline-driven
+wakeup, typed acceptance, and the public plugin / distribution story —
+all explicitly tracked in P2–P6 of the roadmap.
+
+If you're an early user, expect: rough edges, missing docs in places,
+occasional gate noise. The 7 quality gates and the claims registry exist
+exactly to keep those honest.
+
+## Naming migration window
+
+The protocol is **LHGP** (`Long-Horizon Goal Protocol`). The current
+implementation binary is still **`longtask`** / **`longtaskd`**, with the
+data directory at **`~/.longtask`**, because the rename to `lhgp` /
+`lhgpd` / `~/.lhgp` is staged for **P6** of the roadmap so existing
+installs keep working. A migration tool (dry-run + backup) will ship with
+P6; the old names will continue to work as aliases for at least one
+minor release after that. Don't pin scripts to either name yet — see
+[`docs/LHGP-ROADMAP.md`](docs/LHGP-ROADMAP.md) §P6 for the cut-over plan.

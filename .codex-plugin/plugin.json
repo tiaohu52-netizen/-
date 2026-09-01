@@ -1,0 +1,31 @@
+{
+  "name": "lhgp",
+  "version": "0.1.0",
+  "display_name": "Long-Horizon Goal Protocol (LHGP)",
+  "description": "远期目标协议——把一个目标放在本地合同里，会话死了目标不死。P6 公开 Alpha。",
+  "manifest_version": "0.1.0",
+  "author": "LHGP maintainers",
+  "license": "Apache-2.0",
+  "entrypoints": {
+    "mcp_server": {
+      "command": "longtask-mcp",
+      "args": [],
+      "env": {}
+    },
+    "cli": {
+      "command": "longtask",
+      "args": ["--help"]
+    }
+  },
+  "skills": [
+    {
+      "name": "long-horizon-goals",
+      "path": "skills/long-horizon-goals/SKILL.md"
+    }
+  ],
+  "mcp_config": ".mcp.json",
+  "compatibility": {
+    "codex_cli": ">=0.40.0",
+    "python": ">=3.11"
+  }
+}
