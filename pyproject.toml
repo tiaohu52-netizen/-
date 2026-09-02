@@ -36,7 +36,7 @@ longtaskd = "longtask.cli.daemon_proc:lhgpd_entrypoint"
 longtask-mcp = "longtask.mcp_server:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/longtask"]
+packages = ["src/longtask", "src/lhgp"]
 # 附带 §17 skill 资源（不是 Python 包，但模型工具链会读 MANIFEST.json 索引）
 artifacts = ["skills/long-horizon-goals/SKILL.md", "skills/longtask-contract/MANIFEST.json"]
 
