@@ -929,8 +929,8 @@ class TestPostReapSettlement:
         # 真实子进程：退出 + wait 收尸 → start_time 读不到 + pid（大概率）复用前
         proc = subprocess.Popen(  # noqa: S603 —— 测试固定 argv
             (_sys.executable, "-c", "pass"),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
         proc.wait(timeout=15)
         dead_pid = proc.pid
