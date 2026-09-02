@@ -113,6 +113,19 @@ class TestCliBasics:
         assert "prepare" in out
         assert "doctor" in out
 
+    def test_notifications_read_only_command(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        assert main(["--data-dir", str(tmp_path), "notifications"]) == 0
+        output = json.loads(capsys.readouterr().out)
+        assert output == {"notifications": []}
+
+    def test_notifications_rejects_out_of_range_limit(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        assert main(["--data-dir", str(tmp_path), "notifications", "--limit", "201"]) == 1
+        assert "between 1 and 200" in capsys.readouterr().err
+
     def test_doctor_report(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         report = run_doctor(tmp_path)
         assert report.all_ok

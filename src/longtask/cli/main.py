@@ -135,6 +135,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="按紧迫度下界过滤（仅 u>=min-u 显示）",
     )
 
+    notif_p = sub.add_parser("notifications", help="查看通知 outbox（只读审计）")
+    notif_p.add_argument(
+        "--status", choices=["pending", "leased", "sent"], default=None, help="按投递状态过滤"
+    )
+    notif_p.add_argument("--limit", type=int, default=50, help="返回数量上限（1-200）")
+    notif_p.add_argument(
+        "--include-payload", action="store_true", help="显示通知 payload（默认隐藏敏感内容）"
+    )
+
     # patch
     patch_p = sub.add_parser("patch", help="修订合同可变字段（soft_guidance/acceptance/workload）")
     patch_p.add_argument("contract_id", type=str, help="合同 ID")
@@ -457,6 +466,37 @@ def main(argv: list[str] | None = None) -> int:
         finally:
             conn.close()
         print(json.dumps(output, ensure_ascii=False, indent=2, default=str))
+        return 0
+
+    if args.command == "notifications":
+        from longtask.persistence.notifications import list_notifications
+
+        if not 1 <= args.limit <= 200:
+            print("Error: --limit must be between 1 and 200", file=sys.stderr)
+            return 1
+        conn = connect(StoreConfig(db_path=root / "state.db"))
+        try:
+            ensure_schema(conn)
+            rows = list_notifications(conn, status=args.status, limit=args.limit)
+        finally:
+            conn.close()
+        notification_output: list[dict[str, Any]] = []
+        for item in rows:
+            record: dict[str, Any] = {
+                "notification_id": item.notification_id,
+                "idempotency_key": item.idempotency_key,
+                "goal_id": item.goal_id,
+                "event_type": item.event_type,
+                "channel": item.channel,
+                "status": item.status,
+                "attempts": item.attempts,
+                "available_at": item.available_at.isoformat(),
+                "last_error": item.last_error,
+            }
+            if args.include_payload:
+                record["payload"] = item.payload
+            notification_output.append(record)
+        print(json.dumps({"notifications": notification_output}, ensure_ascii=False, indent=2))
         return 0
 
     if args.command == "patch":
