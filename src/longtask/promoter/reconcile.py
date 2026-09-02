@@ -31,9 +31,11 @@ from longtask.adapters.base import ExecutorAdapter
 from longtask.adapters.handles import (
     EXTERNAL_STATE_UNKNOWN,
     RECOVERY_NONRECOVERABLE,
+    RECOVERY_REATTACH,
     ExternalRunHandle,
     parse_legacy_session_ref,
 )
+from longtask.adapters.processes import process_alive
 from longtask.contracts.schema import AttemptState
 from longtask.persistence.attempts import (
     StoredAttempt,
@@ -196,6 +198,38 @@ def _reconcile_one(
         )
 
     if not adapter.reattach(handle):
+        # reattach 拒绝 ≠ 已终止（身份不可证时绝不当死）。但 pid 死活是
+        # 另一个问题：pid 确认不存在 = 该 run 必然已终止（收尸后 start_time
+        # 读不到的身份盲区，不掩盖「进程没了」这个事实）。
+        # 用 pid 做终态确认不违反 §11.3「pid 不单独作为身份真相」——
+        # 身份（是不是同一 run）不判，死活（进程在不在）如实判。
+        # 退出码不可得，走分支 2 如实结算（exit_code_known=False）。
+        # pid 死活探测仅对 reattach 策略句柄可信——spawn 时真实记录过
+        # pid；poll/legacy 句柄的 pid 只是解析提示（可能是占位数字），
+        # 不得拿去判终态（fail-closed：宁可 orphan 也不猜）。
+        pid = (
+            _pid_from_identity(handle.process_identity)
+            if handle.recovery_strategy == RECOVERY_REATTACH
+            else None
+        )
+        if pid is not None and process_alive(pid) is False:
+            return _collect(
+                root,
+                conn,
+                attempt,
+                adapter,
+                handle,
+                AttemptState.FAILED.value,
+                holds_lease=holds_lease,
+                lease_generation=lease.generation if lease else None,
+                now=now,
+                emit=emit,
+                exit_code_known=False,
+                collect_note=(
+                    "pid confirmed gone after reattach refused (post-reap window, §11.3): "
+                    "settled failed with unknown exit code"
+                ),
+            )
         # 无法确认 ≠ 已终止：这是 §11.3 分支 3 的入口
         return _orphan(
             root,
@@ -313,25 +347,36 @@ def _collect(
     lease_generation: int | None,
     now: datetime,
     emit: Callable[[str], None] | None,
+    exit_code_known: bool = True,
+    collect_note: str | None = None,
 ) -> ReconcileOutcome:
-    """分支 2：确认已终止 → collect 结果并结算 attempt（§11.3）。"""
+    """分支 2：确认已终止 → collect 结果并结算 attempt（§11.3）。
+
+    exit_code_known=False + collect_note：pid 确认消失但无法 collect 的
+    收尸后窗口（reattach 已拒绝）——如实结算 failed，不猜退出码。
+    """
     cid = attempt.goal_id
     payload: dict[str, Any] = {
         "external_run_id": handle.external_run_id,
         "session_locator": handle.session_locator,
     }
     state = observed_state
-    try:
-        collected = adapter.collect(attempt.attempt_id)
-        payload["returncode"] = collected.get("returncode")
-        payload["exit_code_known"] = collected.get("exit_code_known", True)
-        if collected.get("error_class"):
-            payload["error_class"] = collected["error_class"]
-    except Exception as exc:
-        # 回收失败如实记账：退出码不可得不等于成功（detached run 常见）
-        state = AttemptState.FAILED.value
-        payload["collect_error"] = str(exc)
-        payload["exit_code_known"] = False
+    if collect_note is not None:
+        # 进程已确认消失：不再调 collect（句柄不可用），直接如实结算
+        payload["exit_code_known"] = exit_code_known
+        payload["collect_note"] = collect_note
+    else:
+        try:
+            collected = adapter.collect(attempt.attempt_id)
+            payload["returncode"] = collected.get("returncode")
+            payload["exit_code_known"] = collected.get("exit_code_known", True)
+            if collected.get("error_class"):
+                payload["error_class"] = collected["error_class"]
+        except Exception as exc:
+            # 回收失败如实记账：退出码不可得不等于成功（detached run 常见）
+            state = AttemptState.FAILED.value
+            payload["collect_error"] = str(exc)
+            payload["exit_code_known"] = False
 
     succeeded = state == AttemptState.SUCCEEDED.value
     append_event(
@@ -557,6 +602,23 @@ def _renew(
 def _as_int(value: Any) -> int | None:
     """退出码取值：只认真正的 int，None/字符串一律当不可得（不猜 0）。"""
     return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def _pid_from_identity(identity: dict[str, Any]) -> int | None:
+    """从 process_identity 提取 pid：接受 int/float/str 数字形态。
+
+    JSON 往返会把 pid 变成 float（17620.0）——这是序列化形态不是
+    精度问题，如实转换；非数字（缺 pid/坏数据）返回 None。
+    """
+    raw = identity.get("pid")
+    if isinstance(raw, bool) or raw is None:
+        return None
+    if isinstance(raw, (int, float)):
+        pid = int(raw)
+        return pid if pid > 0 else None
+    if isinstance(raw, str) and raw.strip().isdigit():
+        return int(raw)
+    return None
 
 
 def _emit(emit: Callable[[str], None] | None, message: str) -> None:
