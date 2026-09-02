@@ -320,3 +320,20 @@ class TestMCPErrors:
             assert "limit must be an integer" in resp["error"]["message"]
         finally:
             _stop_mcp(proc)
+
+    def test_non_string_notification_filters_return_invalid_params(self, data_dir: Path) -> None:
+        proc = _spawn_mcp(data_dir)
+        try:
+            for arguments, expected in (
+                ({"status": ["pending"]}, "status must be a string"),
+                ({"goal_id": 42}, "goal_id must be a string"),
+            ):
+                resp = _roundtrip(
+                    proc,
+                    "tools/call",
+                    {"name": "lhgp_notifications", "arguments": arguments},
+                )
+                assert resp["error"]["code"] == -32602
+                assert expected in resp["error"]["message"]
+        finally:
+            _stop_mcp(proc)

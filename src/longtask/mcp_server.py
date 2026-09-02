@@ -201,6 +201,10 @@ def tool_notifications(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, A
     """只读通知队列状态；默认不返回 payload 内容。"""
     status = args.get("status")
     goal_id = args.get("goal_id")
+    if status is not None and not isinstance(status, str):
+        raise ValueError("status must be a string")
+    if goal_id is not None and not isinstance(goal_id, str):
+        raise ValueError("goal_id must be a string")
     raw_limit = args.get("limit", 50)
     if isinstance(raw_limit, bool) or not isinstance(raw_limit, int):
         raise ValueError("limit must be an integer")
@@ -210,8 +214,8 @@ def tool_notifications(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, A
     include_payload = bool(args.get("include_payload", False))
     rows = list_notifications(
         ctx["conn"],
-        status=str(status) if status else None,
-        goal_id=str(goal_id) if goal_id else None,
+        status=status or None,
+        goal_id=goal_id or None,
         limit=limit,
     )
     return {
