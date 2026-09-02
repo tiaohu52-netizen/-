@@ -8,6 +8,10 @@ on:
     branches: [main]
   pull_request:
 
+# Quality checks do not publish or mutate repository state.
+permissions:
+  contents: read
+
 jobs:
   gate:
     runs-on: windows-latest

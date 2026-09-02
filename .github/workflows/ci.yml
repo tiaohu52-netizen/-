@@ -11,6 +11,10 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# CI only needs to read the repository. Keep the default token least-privileged.
+permissions:
+  contents: read
+
 jobs:
   quality-gate:
     name: 7-gate quality (${{ matrix.os }})
