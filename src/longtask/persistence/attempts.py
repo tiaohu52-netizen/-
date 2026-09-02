@@ -27,6 +27,7 @@ _ATTEMPT_COLS = (
     "contract_revision",
     "role",
     "executor_id",
+    "model_id",
     "state",
     "lease_generation",
     "admitted_at",
@@ -55,6 +56,7 @@ class StoredAttempt:
     contract_revision: int
     role: str
     executor_id: str | None
+    model_id: str | None
     state: str
     lease_generation: int | None
     admitted_at: datetime
@@ -97,6 +99,7 @@ def _row_to_attempt(data: dict[str, Any]) -> StoredAttempt:
         contract_revision=int(data["contract_revision"]),
         role=str(data["role"]),
         executor_id=data["executor_id"],
+        model_id=data["model_id"],
         state=str(data["state"]),
         lease_generation=data["lease_generation"],
         admitted_at=datetime.fromisoformat(admitted_raw),

@@ -136,6 +136,7 @@ def _dispatch_attempt(
             contract_revision=contract.revision,
             role="executor",
             executor_id=entry.id,
+            model_id=selected_model,
             state="admitted",
             admitted_at=now,
             updated_at=now,

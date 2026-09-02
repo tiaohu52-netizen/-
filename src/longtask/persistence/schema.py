@@ -199,6 +199,7 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
             contract_revision INTEGER NOT NULL,
             role TEXT NOT NULL,  -- executor | verifier
             executor_id TEXT,
+            model_id TEXT,
             state TEXT NOT NULL,  -- attempt state axis (§7)
             lease_generation INTEGER,
             partition_id TEXT,
@@ -323,6 +324,7 @@ def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
 
     # P3：attempts 表外部句柄列（SPEC §11.3）——v2 早期 attempts 表无这些列
     _add_column_if_missing("attempts", "external_run_id TEXT")
+    _add_column_if_missing("attempts", "model_id TEXT")
     _add_column_if_missing("attempts", "session_locator TEXT")
     _add_column_if_missing("attempts", "recovery_strategy TEXT")
     _add_column_if_missing("attempts", "process_identity_json TEXT")
