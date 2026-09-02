@@ -25,6 +25,8 @@ from lhgp.admission.refuse import (
     AdmissionRefusedError as CanonicalModuleRefusedError,
 )
 from lhgp.cli.formatting import format_eta as canonical_format_eta
+from lhgp.contracts import Budget as CanonicalPackageBudget
+from lhgp.contracts.budget import Budget as CanonicalBudget
 from lhgp.contracts.contract_draft import ContractDraft as CanonicalContractDraft
 from lhgp.forecast import Forecast as CanonicalPackageForecast
 from lhgp.forecast.model import Forecast as CanonicalForecast
@@ -43,6 +45,7 @@ from longtask.admission.refuse import (
     AdmissionRefusedError as LegacyRefusedError,
 )
 from longtask.cli.formatting import format_eta as legacy_format_eta
+from longtask.contracts.budget import Budget as LegacyBudget
 from longtask.contracts.contract_draft import ContractDraft as LegacyContractDraft
 from longtask.forecast.model import Forecast as LegacyForecast
 from longtask.persistence.store import connect as legacy_connect
@@ -63,6 +66,8 @@ def test_contract_namespace_reexports_single_implementation() -> None:
     """Contract facades must preserve class identity during migration."""
 
     assert CanonicalContractDraft is LegacyContractDraft
+    assert CanonicalBudget is LegacyBudget
+    assert CanonicalPackageBudget is CanonicalBudget
 
 
 def test_persistence_namespace_reexports_single_implementation() -> None:
