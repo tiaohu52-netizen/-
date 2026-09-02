@@ -98,9 +98,7 @@ def parse_contract_draft(params: dict[str, Any]) -> ContractDraft:
             max_concurrent_attempts=int(budget_raw["max_concurrent_attempts"]),
             max_attempt_minutes=int(budget_raw["max_attempt_minutes"]),
             max_output_bytes=int(budget_raw["max_output_bytes"]),
-            verification_attempts_reserved=int(
-                budget_raw.get("verification_attempts_reserved", 1)
-            ),
+            verification_attempts_reserved=int(budget_raw.get("verification_attempts_reserved", 1)),
         )
 
         soft_guidance = dict(draft_data.get("soft_guidance", {}))

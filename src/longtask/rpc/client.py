@@ -30,7 +30,7 @@ def call_unix_socket(
         "protocol_version": PROTOCOL_VERSION,
         "params": params or {},
     }
-    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:  # type: ignore[attr-defined]
         connection.settimeout(timeout)
         connection.connect(str(endpoint))
         connection.sendall((json.dumps({"token": token}) + "\n").encode("utf-8"))

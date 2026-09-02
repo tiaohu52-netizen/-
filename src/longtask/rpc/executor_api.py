@@ -265,8 +265,10 @@ def handle_attempt_write_back(
                     code=ErrorCode.VALIDATION_FAILED,
                     message="model_id is required for an explicitly model-bound attempt",
                 )
-            if binding is not None and actual_model and not models_allow(
-                contract.draft.authority, binding=binding, model=actual_model
+            if (
+                binding is not None
+                and actual_model
+                and not models_allow(contract.draft.authority, binding=binding, model=actual_model)
             ):
                 raise RpcError(
                     code=ErrorCode.CAPABILITY_MISSING,

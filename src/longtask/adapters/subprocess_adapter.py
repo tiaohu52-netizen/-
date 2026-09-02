@@ -588,9 +588,9 @@ class SubprocessAdapter(ExecutorAdapter):
             return {
                 "state": state.value,
                 "returncode": returncode,
-                    "stdout": proc.stdout_text(),
-                    "stderr": proc.stderr_text(),
-                    "output_truncated": proc.output_truncated,
+                "stdout": proc.stdout_text(),
+                "stderr": proc.stderr_text(),
+                "output_truncated": proc.output_truncated,
             }
 
     def _require(self, attempt_id: str) -> _MonitoredProcess | _DetachedProcess:

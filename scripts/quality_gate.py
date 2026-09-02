@@ -26,8 +26,10 @@ class Gate:
 def build_gates() -> list[Gate]:
     py = sys.executable
     return [
-        Gate("format", ("ruff", "format", "--check", "src", "tests", "scripts")),
-        Gate("lint", ("ruff", "check", "src", "tests", "scripts")),
+        # 使用门禁自身的解释器加载 Ruff，避免 uv/venv 已安装但 PATH 未暴露
+        # 可执行文件时产生假阴性；模块缺失仍由 subprocess fail-closed。
+        Gate("format", (py, "-m", "ruff", "format", "--check", "src", "tests", "scripts")),
+        Gate("lint", (py, "-m", "ruff", "check", "src", "tests", "scripts")),
         Gate("arch", (py, "scripts/arch_check.py")),
         Gate("deps", (py, "scripts/deps_check.py")),
         Gate("claims", (py, "scripts/claims_check.py")),

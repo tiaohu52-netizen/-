@@ -380,8 +380,7 @@ class AttemptRunner:
             # 退出码无法证明 acceptance.checks 已被逐条核验。
             verifier_written_back = any(
                 event.attempt_id == attempt_id
-                and event.event_type
-                in (EventType.ATTEMPT_SUCCEEDED, EventType.ATTEMPT_FAILED)
+                and event.event_type in (EventType.ATTEMPT_SUCCEEDED, EventType.ATTEMPT_FAILED)
                 and (
                     (event.payload_json or "").find('"role": "verifier"') >= 0
                     or (event.payload_json or "").find('"checks"') >= 0
@@ -446,21 +445,21 @@ class AttemptRunner:
             )
             # P1：更新 attempts 行状态（DESIGN §7 attempt 轴）
             self._conn.execute(
-            """
+                """
             UPDATE attempts
             SET state = ?, terminal_at = ?, updated_at = ?,
                 return_code = ?, error_class = ?, payload_json = ?
             WHERE attempt_id = ?
             """,
-            (
-                payload["state"],
-                now.isoformat(),
-                now.isoformat(),
-                payload.get("returncode"),
-                payload.get("collect_error"),
-                json.dumps(payload, ensure_ascii=False),
-                attempt_id,
-            ),
+                (
+                    payload["state"],
+                    now.isoformat(),
+                    now.isoformat(),
+                    payload.get("returncode"),
+                    payload.get("collect_error"),
+                    json.dumps(payload, ensure_ascii=False),
+                    attempt_id,
+                ),
             )
             self._release_lease_if_held(now, contract_id, attempt_id)
             rebuild_projection(self._root, contract_id, self._conn)

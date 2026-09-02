@@ -100,6 +100,8 @@ def _build_admission_offer(
                 requested_model = model
                 break
             verdict = candidate_verdict
+        if verdict is None:
+            continue
         view = ExecutorCandidateView(
             executor_id=facts.executor_id,
             models=(requested_model,),

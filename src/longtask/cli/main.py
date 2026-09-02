@@ -295,8 +295,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "rpc-call":
         try:
-            params = json.loads(args.params)
-            if not isinstance(params, dict):
+            rpc_params = json.loads(args.params)
+            if not isinstance(rpc_params, dict):
                 raise ValueError("--params must be a JSON object")
             token_path = root / "daemon.token"
             token = token_path.read_text(encoding="utf-8").strip()
@@ -307,7 +307,7 @@ def main(argv: list[str] | None = None) -> int:
                 request_id=args.request_id
                 or f"cli-req-{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}",
                 client_id=args.client_id,
-                params=params,
+                params=rpc_params,
             )
             print(json.dumps(response.get("result", response), ensure_ascii=False, indent=2))
             return 0
