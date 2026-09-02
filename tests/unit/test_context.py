@@ -230,5 +230,9 @@ def test_attempt_input_carries_context_and_prompt_addendum(tmp_path: Path) -> No
     # probe 路径：不物化快照、无附言（§10 时序：探针先于租约）
     probe = build_attempt_input(root, conn, contract, "att-3", NOW, with_context=False)
     assert probe.context_snapshot_path is None
-    assert probe.task_prompt == "验证临时上下文"
+    # probe 仍带冻结区摘要（§11.2 合同可见性），但不带交接附言
+    assert "验证临时上下文" in probe.task_prompt
+    assert "acceptance.checks" in probe.task_prompt
+    assert "hard_constraints" in probe.task_prompt
+    assert "改 assertFalse" not in probe.task_prompt
     conn.close()

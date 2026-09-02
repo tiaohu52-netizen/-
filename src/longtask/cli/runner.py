@@ -71,6 +71,32 @@ def contract_workspace(draft: ContractDraft) -> str:
     return ""
 
 
+def _executor_prompt(contract: ContractView) -> str:
+    """执行者 task_prompt 的冻结区摘要（SPEC §11.2 合同可见性）。
+
+    模型被唤起时必须得知：目标、验收判据（做到什么算完成）、写权限边界
+    （硬约束）、deadline。合同延续与被遵守的前提是干活的模型知道合同
+    内容——不是只在库里存着。
+    """
+    draft = contract.draft
+    sections = [
+        f"# 合同 {contract.contract_id}（rev {contract.revision}）",
+        "",
+        "## objective（冻结区，只读）",
+        draft.objective,
+        "",
+        "## acceptance.checks（验收判据：逐条核对，全部 pass 才算完成）",
+        *(f"- {c}" for c in draft.acceptance.checks),
+        f"- 验收标准：{draft.acceptance.standard}",
+        "",
+        f"## deadline_at（冻结区）\n{draft.deadline_at.isoformat()}",
+    ]
+    if draft.hard_constraints:
+        constraints = json.dumps(draft.hard_constraints, ensure_ascii=False, indent=2)
+        sections += ["", "## hard_constraints（写权限边界，冻结区，只读）", constraints]
+    return "\n".join(sections)
+
+
 def build_attempt_input(
     root: Path,
     conn: sqlite3.Connection,
@@ -95,11 +121,14 @@ def build_attempt_input(
     draft = contract.draft
     active_lease = get_lease(conn, contract.contract_id)
     context_snapshot_path: str | None = None
-    task_prompt = draft.objective
+    # SPEC §11.2：被唤起的执行者必须能得知合同——task_prompt 带冻结区摘要
+    # （验收条款是「做到什么算完成」的判据，硬约束是写权限边界）。只给
+    # objective 等于让模型盲干：干完不知道按什么标准被验收。
+    task_prompt = _executor_prompt(contract)
     if with_context:
         addendum = handover_prompt_addendum(root, contract.contract_id)
         if addendum:
-            task_prompt = f"{draft.objective}\n\n{addendum}"
+            task_prompt = f"{task_prompt}\n\n{addendum}"
         try:
             active_path, _scratch = compile_context_snapshot(root, conn, contract, attempt_id, now)
             context_snapshot_path = str(active_path)
