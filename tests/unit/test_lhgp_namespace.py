@@ -36,6 +36,30 @@ from lhgp.contracts.authority import AuthorityBinding as CanonicalAuthorityBindi
 from lhgp.contracts.budget import Budget as CanonicalBudget
 from lhgp.contracts.continuity import Continuity as CanonicalContinuity
 from lhgp.contracts.contract_draft import ContractDraft as CanonicalContractDraft
+from lhgp.contracts.contract_view import (
+    AcceptanceStatus as CanonicalAcceptanceStatus,
+)
+from lhgp.contracts.contract_view import (
+    AttemptRole as CanonicalAttemptRole,
+)
+from lhgp.contracts.contract_view import (
+    AttemptState as CanonicalAttemptState,
+)
+from lhgp.contracts.contract_view import (
+    BlockReason as CanonicalBlockReason,
+)
+from lhgp.contracts.contract_view import (
+    ContractState as CanonicalContractState,
+)
+from lhgp.contracts.contract_view import (
+    DeadlineStatus as CanonicalDeadlineStatus,
+)
+from lhgp.contracts.contract_view import (
+    Enforcement as CanonicalEnforcement,
+)
+from lhgp.contracts.contract_view import (
+    EventActor as CanonicalEventActor,
+)
 from lhgp.forecast import Forecast as CanonicalPackageForecast
 from lhgp.forecast.model import Forecast as CanonicalForecast
 from lhgp.persistence.store import connect as canonical_connect
@@ -60,6 +84,30 @@ from longtask.contracts.authority import AuthorityBinding as LegacyAuthorityBind
 from longtask.contracts.budget import Budget as LegacyBudget
 from longtask.contracts.continuity import Continuity as LegacyContinuity
 from longtask.contracts.contract_draft import ContractDraft as LegacyContractDraft
+from longtask.contracts.contract_view import (
+    AcceptanceStatus as LegacyAcceptanceStatus,
+)
+from longtask.contracts.contract_view import (
+    AttemptRole as LegacyAttemptRole,
+)
+from longtask.contracts.contract_view import (
+    AttemptState as LegacyAttemptState,
+)
+from longtask.contracts.contract_view import (
+    BlockReason as LegacyBlockReason,
+)
+from longtask.contracts.contract_view import (
+    ContractState as LegacyContractState,
+)
+from longtask.contracts.contract_view import (
+    DeadlineStatus as LegacyDeadlineStatus,
+)
+from longtask.contracts.contract_view import (
+    Enforcement as LegacyEnforcement,
+)
+from longtask.contracts.contract_view import (
+    EventActor as LegacyEventActor,
+)
 from longtask.forecast.model import Forecast as LegacyForecast
 from longtask.persistence.store import connect as legacy_connect
 from longtask.promoter.urgency import classify as legacy_classify
@@ -89,6 +137,14 @@ def test_contract_namespace_reexports_single_implementation() -> None:
     assert CanonicalAuthorityBinding is LegacyAuthorityBinding
     assert CanonicalContinuity is LegacyContinuity
     assert CanonicalPackageContinuity is CanonicalContinuity
+    assert CanonicalContractState is LegacyContractState
+    assert CanonicalDeadlineStatus is LegacyDeadlineStatus
+    assert CanonicalAcceptanceStatus is LegacyAcceptanceStatus
+    assert CanonicalBlockReason is LegacyBlockReason
+    assert CanonicalAttemptRole is LegacyAttemptRole
+    assert CanonicalAttemptState is LegacyAttemptState
+    assert CanonicalEnforcement is LegacyEnforcement
+    assert CanonicalEventActor is LegacyEventActor
 
 
 def test_persistence_namespace_reexports_single_implementation() -> None:
