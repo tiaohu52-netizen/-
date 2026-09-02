@@ -42,6 +42,11 @@ Environment: new CPython 3.13 virtual environment created with `uv venv`
     `mode: dry-run (nothing changed)` and the checked temporary directory
     remained empty; an already-populated target was correctly refused rather
     than overwritten.
+16. Ran `lhgp --version` and a one-cycle `lhgp.cli.daemon_loop` scan against the
+    real default data directory; both canonical entrypoint checks succeeded.
+17. Opened a database with `user_version=2` but missing P3 additive columns;
+    `ensure_schema` repaired it in place, and the daemon completed one scan
+    without an `OperationalError`.
 
 ## Scope and remaining work
 
