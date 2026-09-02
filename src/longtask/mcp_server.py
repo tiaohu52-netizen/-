@@ -771,14 +771,14 @@ def main(argv: list[str] | None = None) -> int:
     import argparse
 
     parser = argparse.ArgumentParser(
-        prog="longtask-mcp",
-        description="LongTask Protocol MCP server (stdio JSON-RPC 2.0)",
+        prog=_server_name(),
+        description="LHGP Protocol MCP server (stdio JSON-RPC 2.0)",
     )
     parser.add_argument(
         "--data-dir",
         type=str,
         default=None,
-        help="LongTask 数据目录（默认 ~/.longtask）",
+        help="LHGP 数据目录（默认 ~/.lhgp；旧安装可回退到 ~/.longtask）",
     )
     args = parser.parse_args(argv)
     root = Path(args.data_dir).expanduser().resolve() if args.data_dir else default_data_root()
