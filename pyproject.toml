@@ -32,6 +32,7 @@ lhgp = "longtask.cli.main:entrypoint"
 lhgpd = "longtask.cli.daemon_proc:lhgpd_entrypoint"
 lhgp-mcp = "longtask.mcp_server:main"
 longtask = "longtask.cli.main:entrypoint"
+longtaskd = "longtask.cli.daemon_proc:lhgpd_entrypoint"
 longtask-mcp = "longtask.mcp_server:main"
 
 [tool.hatch.build.targets.wheel]
