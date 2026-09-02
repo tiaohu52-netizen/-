@@ -162,6 +162,12 @@ class _MonitoredProcess:
         for t in (self._t_out, self._t_err):
             t.join(timeout=timeout)
 
+    def close_streams(self) -> None:
+        """关闭已退出子进程的父端管道，释放句柄。"""
+        for stream in (self._proc.stdout, self._proc.stderr):
+            if stream is not None and not stream.closed:
+                stream.close()
+
     def _note_finished(self, event: dict[str, Any]) -> None:
         """reader 线程回调：扫到 attempt/finished 事件行。"""
         self.finished_event = event
@@ -528,6 +534,7 @@ class SubprocessAdapter(ExecutorAdapter):
         except subprocess.TimeoutExpired:
             proc.kill()
             proc.wait()
+        proc.close_streams()
         self._cancelled.add(attempt_id)
 
     def collect(self, attempt_id: str) -> dict[str, object]:
@@ -575,6 +582,7 @@ class SubprocessAdapter(ExecutorAdapter):
                     cmd="collect", timeout=self._collect_timeout_seconds
                 ) from exc
             proc.join_readers(timeout=5.0)
+            proc.close_streams()
             returncode = proc.returncode
             if returncode is None:
                 # 防御性兜底：wait 返回即已退出，不伪造结果
