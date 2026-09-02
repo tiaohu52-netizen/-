@@ -4,6 +4,7 @@ from longtask.acceptance.checks import (
     CheckKind,
     CheckSpec,
     RepairBrief,
+    parse_check,
 )
 
-__all__ = ["CheckKind", "CheckSpec", "RepairBrief"]
+__all__ = ["CheckKind", "CheckSpec", "RepairBrief", "parse_check"]
