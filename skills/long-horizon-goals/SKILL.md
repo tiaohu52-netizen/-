@@ -5,7 +5,8 @@ description: 将需要跨会话、跨 Agent 推进的用户目标转成 LHGP 合
 
 # long-horizon-goals
 
-> LHGP 协议面向 AI 的 skill 教学。配合 `longtask-mcp` 使用。
+> LHGP 协议面向 AI 的 skill 教学。配合 `lhgp-mcp` 使用；`longtask-mcp`
+> 仅作为迁移窗口内的兼容别名。
 
 ## 何时触发
 
@@ -14,7 +15,7 @@ description: 将需要跨会话、跨 Agent 推进的用户目标转成 LHGP 合
 - 可能需要"歇一歇再继续"（即分散在多个时间点执行）
 - 需要可被审计（用户事后要回看每一步）
 
-→ 触发本 skill：把任务转成 LHGP 合同 + 提交给 `longtask-mcp`，而非自己直接做。
+→ 触发本 skill：把任务转成 LHGP 合同 + 提交给 `lhgp-mcp`，而非自己直接做。
 
 ## 核心公理
 
