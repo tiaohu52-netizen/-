@@ -167,6 +167,9 @@ def spawn_daemon(
             proc = subprocess.Popen(  # noqa: S603 —— 固定解释器与模块路径，无外部输入拼接
                 cmd, **popen_kwargs
             )
+        except OSError:
+            (root / TOKEN_FILE).unlink(missing_ok=True)
+            raise
         finally:
             log_fh.close()
 
