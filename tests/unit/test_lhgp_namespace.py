@@ -5,6 +5,7 @@ import sys
 
 import longtask
 from lhgp import PROTOCOL_VERSION, __version__
+from lhgp.acceptance import CheckSpec as CanonicalPackageCheckSpec
 from lhgp.acceptance.checks import CheckSpec as CanonicalCheckSpec
 from lhgp.adapters.registry import ExecutorRegistry as CanonicalExecutorRegistry
 from lhgp.admission.offer import Offer as CanonicalOffer
@@ -79,6 +80,7 @@ def test_supporting_namespaces_reexport_single_implementation() -> None:
     """Acceptance, admission and forecast facades preserve class identity."""
 
     assert CanonicalCheckSpec is LegacyCheckSpec
+    assert CanonicalPackageCheckSpec is CanonicalCheckSpec
     assert CanonicalOffer is LegacyOffer
     assert CanonicalForecast is LegacyForecast
     assert CanonicalPackageForecast is CanonicalForecast
