@@ -203,6 +203,7 @@ class TestAttemptWriteBack:
                     "write_generation": 1,
                     "progress_note": "模块完成一半，测试还差两个用例",
                     "attempt_state": "succeeded",
+                    "model_id": "gpt-test-1",
                 },
                 "req-wb-1",
             ),
@@ -214,6 +215,12 @@ class TestAttemptWriteBack:
         types = [str(e.event_type) for e in get_events(store, contract_id=CID)]
         assert EventType.CONTEXT_SCRATCH_UPDATED.value in types
         assert EventType.ATTEMPT_SUCCEEDED.value in types
+        succeeded = [
+            e
+            for e in get_events(store, contract_id=CID)
+            if e.event_type == EventType.ATTEMPT_SUCCEEDED
+        ]
+        assert '"model_id": "gpt-test-1"' in succeeded[-1].payload_json
 
     def test_stale_generation_write_is_fenced(self, store: Any) -> None:
         """§7/§14.1：旧代次写回被 fenced，事件不落库。"""
