@@ -120,21 +120,15 @@ path and the pinned commit for every claim.
 
 What this list **does not** claim:
 
-- Four-axis commitment state (commitment lifecycle / deadline / acceptance /
-  attempt) — the spec requires four axes; the store currently models two.
-- Default-deny authorization across executor × model × role (a single
-  allowlist under a contract). The verifier is dispatched, but the
-  three-dimensional allowlist is not yet enforced.
-- External run handles (`external_run_id`, `session_locator`,
-  `recovery_strategy`, `capability_snapshot`) so the daemon can resume
-  work spawned by harnesses it doesn't own.
-- Six-component forecast (queue / startup / remaining work / verification /
-  retry reserve / safety margin) that drives event-driven wakeup.
-- Typed acceptance checks with `evidence` entities and a repair brief that
-  is itself structured.
-- The full plugin / MCP-tool / `lhgp` rename / fresh-machine distribution
-  story (still shipped as `longtask` / `longtaskd` / `~/.longtask`; the
-  rename is staged in P6 of the roadmap).
+- Strict completion guarantees at a wall-clock deadline. The daemon is a
+  best-effort local scheduler and reports risk rather than promising delivery.
+- Full seven-kind automatic acceptance for every check. Deterministic checks
+  are supported; model/human review and composite policies still require an
+  explicit evidence-producing verifier.
+- Multi-host or cloud relay execution. The current trust boundary is one local
+  machine and one user; L2/L3 wakeup remains accepted design debt.
+- A network JSON-RPC daemon transport. MCP stdio is supported; named-pipe and
+  Unix-socket control-plane transport is still planned.
 
 These gaps are tracked explicitly in [`docs/LHGP-ROADMAP.md`](docs/LHGP-ROADMAP.md).
 
@@ -156,14 +150,14 @@ You should see something like:
 [gate] ALL PASS (7 gates)
 === longtask doctor (v0.1.0a0, protocol v1) ===
 [PASS] python_runtime: Python 3.13.x
-[PASS] storage_directory: ~/.longtask accessible
+[PASS] storage_directory: ~/.lhgp accessible
 [PASS] database_integrity: state.db healthy
 [PASS] executor_registry: registry accessible (0 enabled / 0 registered)
 ```
 
-Done. You now have a working local LHGP install. (The CLI binary is still
-named `longtask` / `longtaskd` and the data directory is still
-`~/.longtask` during the rename window — see the roadmap's P6.)
+Done. You now have a working local LHGP install. The primary commands are
+`lhgp`, `lhgpd` and `lhgp-mcp`; the legacy `longtask`, `longtaskd` and
+`longtask-mcp` aliases remain available during the migration window.
 
 ### Your first contract, end to end
 
@@ -296,10 +290,9 @@ ahead of the implementation; the implementation roadmap
 ([`docs/LHGP-ROADMAP.md`](docs/LHGP-ROADMAP.md)) tracks the gap. The
 real-world validation so far is a few test runs of "write a palindrome
 checker" with an AI model as the runner, and they went end-to-end (see
-`examples/`). The shape is solid; the rough edges are around
-authorization enforcement, external run handles, deadline-driven
-wakeup, typed acceptance, and the public plugin / distribution story —
-all explicitly tracked in P2–P6 of the roadmap.
+`examples/`). The local contract, evidence, model-attestation, handover and
+daemon paths are implemented; the remaining rough edges are strict deadline
+guarantees, multi-host wakeup, and a network control-plane transport.
 
 If you're an early user, expect: rough edges, missing docs in places,
 occasional gate noise. The 7 quality gates and the claims registry exist
