@@ -101,14 +101,20 @@ def run_daemon_loop(
                 finally:
                     rpc_conn.close()
 
+            def serve_rpc() -> None:
+                try:
+                    serve_unix_socket(
+                        endpoint=root / RPC_SOCKET_FILE,
+                        token=token,
+                        dispatch=dispatch_rpc,
+                        stop_event=rpc_stop,
+                    )
+                except OSError as exc:
+                    if emit_fn is not None:
+                        emit_fn(f"rpc/degraded: local socket unavailable: {exc}")
+
             rpc_thread = threading.Thread(
-                target=serve_unix_socket,
-                kwargs={
-                    "endpoint": root / RPC_SOCKET_FILE,
-                    "token": token,
-                    "dispatch": dispatch_rpc,
-                    "stop_event": rpc_stop,
-                },
+                target=serve_rpc,
                 name="lhgp-rpc",
                 daemon=True,
             )

@@ -37,6 +37,7 @@ def test_start_stop_roundtrip(tmp_path: Path, capsys: pytest.CaptureFixture[str]
     assert (data_dir / PID_FILE).is_file()
     assert (data_dir / TOKEN_FILE).is_file()
     assert get_daemon_status(data_dir)["running"] is True
+    assert "rpc_socket_available" in get_daemon_status(data_dir)
 
     try:
         # 2. stop：daemon.stop 优雅退出（间隔 0.2s 的循环很快消费掉标记）
