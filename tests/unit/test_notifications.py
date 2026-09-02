@@ -6,6 +6,7 @@ from longtask.persistence.notifications import (
     claim_notifications,
     drain_notifications,
     enqueue_notification,
+    list_notifications,
     mark_failed,
     mark_sent,
     prune_sent,
@@ -57,6 +58,32 @@ def test_outbox_is_idempotent_and_retryable(tmp_path) -> None:
     assert retried[0].attempts == 2
     mark_sent(conn, notification_id=first.notification_id, now=now)
     assert claim_notifications(conn, now=now + timedelta(hours=1)) == []
+
+
+def test_list_notifications_filters_by_goal_id(tmp_path) -> None:
+    conn = connect(StoreConfig(db_path=tmp_path / "state.db"))
+    ensure_schema(conn)
+    now = datetime(2026, 9, 3, tzinfo=UTC)
+    enqueue_notification(
+        conn,
+        idempotency_key="goal-a",
+        goal_id="goal-a",
+        event_type="need_user",
+        channel="local",
+        payload={},
+        now=now,
+    )
+    enqueue_notification(
+        conn,
+        idempotency_key="goal-b",
+        goal_id="goal-b",
+        event_type="need_user",
+        channel="local",
+        payload={},
+        now=now,
+    )
+    assert [item.goal_id for item in list_notifications(conn, goal_id="goal-a")] == ["goal-a"]
+    conn.close()
 
 
 def test_drain_retries_channel_failure(tmp_path) -> None:

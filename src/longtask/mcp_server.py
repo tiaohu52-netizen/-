@@ -200,6 +200,7 @@ def tool_attempt_status(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, 
 def tool_notifications(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
     """只读通知队列状态；默认不返回 payload 内容。"""
     status = args.get("status")
+    goal_id = args.get("goal_id")
     raw_limit = args.get("limit", 50)
     if isinstance(raw_limit, bool) or not isinstance(raw_limit, int):
         raise ValueError("limit must be an integer")
@@ -207,7 +208,12 @@ def tool_notifications(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, A
     if not 1 <= limit <= 200:
         raise ValueError("limit must be between 1 and 200")
     include_payload = bool(args.get("include_payload", False))
-    rows = list_notifications(ctx["conn"], status=str(status) if status else None, limit=limit)
+    rows = list_notifications(
+        ctx["conn"],
+        status=str(status) if status else None,
+        goal_id=str(goal_id) if goal_id else None,
+        limit=limit,
+    )
     return {
         "notifications": [
             {
@@ -556,6 +562,7 @@ TOOLS.update(
                     "type": "object",
                     "properties": {
                         "status": {"enum": ["pending", "leased", "sent"]},
+                        "goal_id": {"type": "string"},
                         "limit": {"type": "integer", "minimum": 1, "maximum": 200},
                         "include_payload": {"type": "boolean"},
                     },

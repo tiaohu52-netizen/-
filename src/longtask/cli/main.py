@@ -139,6 +139,7 @@ def build_parser() -> argparse.ArgumentParser:
     notif_p.add_argument(
         "--status", choices=["pending", "leased", "sent"], default=None, help="按投递状态过滤"
     )
+    notif_p.add_argument("--goal-id", default=None, help="按目标/合同 ID 过滤")
     notif_p.add_argument("--limit", type=int, default=50, help="返回数量上限（1-200）")
     notif_p.add_argument(
         "--include-payload", action="store_true", help="显示通知 payload（默认隐藏敏感内容）"
@@ -477,7 +478,9 @@ def main(argv: list[str] | None = None) -> int:
         conn = connect(StoreConfig(db_path=root / "state.db"))
         try:
             ensure_schema(conn)
-            rows = list_notifications(conn, status=args.status, limit=args.limit)
+            rows = list_notifications(
+                conn, status=args.status, goal_id=args.goal_id, limit=args.limit
+            )
         finally:
             conn.close()
         notification_output: list[dict[str, Any]] = []
