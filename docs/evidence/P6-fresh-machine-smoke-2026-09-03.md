@@ -27,6 +27,8 @@ Environment: new CPython 3.13 virtual environment created with `uv venv`
 10. In a clean temporary data directory, started the daemon with a one-second
     interval, confirmed `status` reported the live PID and token, stopped it, and
     confirmed a second `status` reported `running: false`.
+11. Ran the Codex plugin creator validator against the repository; validation
+    passed after the plugin manifest was changed to strict SemVer `0.1.0`.
 
 ## Scope and remaining work
 
