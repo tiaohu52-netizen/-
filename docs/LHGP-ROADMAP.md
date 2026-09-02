@@ -4,7 +4,7 @@
 > 日期：2026-09-01
 > 上游：[LHGP-SPEC.md](./LHGP-SPEC.md)（语义权威）、[ADR-003](./decisions/0003-long-horizon-goal-protocol.md)（命名权威）
 > 状态：**执行计划基线（持续更新）**；P1–P5 已有大量实现，P6 双轨插件包已落地，
-> fresh-machine dogfood 与模块路径迁移仍在收尾
+> wheel 安装与基础 quickstart 已有隔离环境证据；非玩具 dogfood 与模块路径迁移仍在收尾
 
 本文档只回答两个问题：**做到什么算完成**，以及**按什么顺序做**。
 语义冲突以 LHGP-SPEC.md 为准；执行顺序与范围以本文档为准。
@@ -58,7 +58,9 @@
 历史盘点不再代表当前代码。现已落地：四轴合同状态与不可变 revision、typed
 checks 的确定性执行、attempt 外部句柄与 reconcile、模型/CLI 授权与证明、
 daemon + 本机认证 Unix-socket RPC、Goal Capsule/handover、L0/L1 唤醒、
-通知 outbox（幂等/重试/安静时间/风险红线）。完整证据以 README、测试和
+通知 outbox（幂等/重试/安静时间/风险红线）。P6 的 wheel 安装、双轨 CLI、MCP
+发现和基础 quickstart 已在 [`docs/evidence/P6-fresh-machine-smoke-2026-09-03.md`](evidence/P6-fresh-machine-smoke-2026-09-03.md)
+留证。完整证据以 README、测试和
 `quality/claims.json` 为准；仍未宣称跨主机 relay、严格墙钟交付保证或外部通知渠道。
 
 ### 2.2 四个必须先纠正的冲突项（历史基线）
