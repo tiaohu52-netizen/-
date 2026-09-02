@@ -96,6 +96,7 @@ def list_notifications(
     conn: sqlite3.Connection,
     *,
     status: str | None = None,
+    goal_id: str | None = None,
     limit: int = 50,
 ) -> list[Notification]:
     """只读列出通知，供控制面审计与 MCP 查看。"""
@@ -108,6 +109,11 @@ def list_notifications(
             raise ValueError(f"unknown notification status: {status}")
         clauses.append("status = ?")
         params.append(status)
+    if goal_id is not None:
+        if not goal_id.strip():
+            raise ValueError("goal_id must be non-empty when provided")
+        clauses.append("goal_id = ?")
+        params.append(goal_id)
     where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
     rows = conn.execute(
         "SELECT notification_id, idempotency_key, goal_id, event_type, channel, "
