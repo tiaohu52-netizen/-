@@ -319,10 +319,10 @@ def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
     - 给既有 contracts 行回填 next_wakeup_at（v1 已有，直接保留）。
     - 不重建既有事件数据。
     """
-    row = conn.execute("PRAGMA user_version").fetchone()
-    current = int(row[0]) if row else 0
-    if current >= 2:
-        return
+    # ``user_version`` tracks the logical schema, but early Developer Preview
+    # builds shipped P3 columns after setting it to 2.  Always reconcile the
+    # additive columns so an interrupted or partially upgraded database can be
+    # opened safely; every operation below is idempotent.
 
     # contracts：缺啥补啥（IF NOT EXISTS 风格靠 suppress(OperationalError)）
     def _add_column_if_missing(table: str, col_def: str) -> None:

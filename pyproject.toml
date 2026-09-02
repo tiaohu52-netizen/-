@@ -28,9 +28,9 @@ dev = [
 [project.scripts]
 # P6 双轨分发（SPEC §19.3）：新名 lhgp/lhgpd/lhgp-mcp 为主入口；
 # 旧名 longtask/longtask-mcp 保留一个次版本作为兼容 shim。
-lhgp = "longtask.cli.main:entrypoint"
-lhgpd = "longtask.cli.daemon_proc:lhgpd_entrypoint"
-lhgp-mcp = "longtask.mcp_server:main"
+lhgp = "lhgp.cli.main:entrypoint"
+lhgpd = "lhgp.cli.daemon_proc:lhgpd_entrypoint"
+lhgp-mcp = "lhgp.mcp_server:main"
 longtask = "longtask.cli.main:entrypoint"
 longtaskd = "longtask.cli.daemon_proc:lhgpd_entrypoint"
 longtask-mcp = "longtask.mcp_server:main"

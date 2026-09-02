@@ -55,3 +55,25 @@ def test_newer_schema_version_refused(tmp_path: Path) -> None:
     raw.close()
     with pytest.raises(StoreTamperedError, match="newer than supported"):
         connect(StoreConfig(db_path=db))
+
+
+def test_schema_reconciles_partial_v2_columns(tmp_path: Path) -> None:
+    """A v2 marker must not skip additive columns from a partial upgrade."""
+
+    db = tmp_path / "partial-v2.db"
+    raw = sqlite3.connect(db)
+    raw.execute(
+        "CREATE TABLE attempts (attempt_id TEXT PRIMARY KEY, goal_id TEXT, "
+        "state TEXT NOT NULL, role TEXT, admitted_at TEXT)"
+    )
+    raw.execute(f"PRAGMA user_version={STORE_SCHEMA_VERSION}")
+    raw.commit()
+    raw.close()
+
+    conn = connect(StoreConfig(db_path=db))
+    try:
+        ensure_schema(conn)
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(attempts)")}
+        assert {"model_id", "external_run_id", "session_locator"} <= columns
+    finally:
+        conn.close()
