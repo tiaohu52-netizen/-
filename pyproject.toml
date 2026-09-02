@@ -40,6 +40,15 @@ packages = ["src/longtask"]
 # 附带 §17 skill 资源（不是 Python 包，但模型工具链会读 MANIFEST.json 索引）
 artifacts = ["skills/long-horizon-goals/SKILL.md", "skills/longtask-contract/MANIFEST.json"]
 
+[tool.hatch.build.targets.wheel.force-include]
+# wheel 安装也要保留插件 companion 资源；否则仅从 wheel 安装时模型侧
+# 无法发现 skill/MCP 配置（源码包仍保留完整仓库布局）。
+".codex-plugin/plugin.json" = ".codex-plugin/plugin.json"
+".mcp.json" = ".mcp.json"
+"skills/long-horizon-goals/SKILL.md" = "skills/long-horizon-goals/SKILL.md"
+"skills/longtask-contract/MANIFEST.json" = "skills/longtask-contract/MANIFEST.json"
+"skills/longtask-contract/SKILL.md" = "skills/longtask-contract/SKILL.md"
+
 # ── ruff（format + lint 一体）────────────────────────────────
 [tool.ruff]
 target-version = "py311"
