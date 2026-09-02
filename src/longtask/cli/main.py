@@ -98,7 +98,12 @@ def build_parser() -> argparse.ArgumentParser:
     # prepare
     prep_p = sub.add_parser("prepare", help="起草新远期任务合同（drafted）")
     prep_p.add_argument("--file", type=str, help="从 JSON/YAML 合同草稿文件读取")
-    prep_p.add_argument("--contract-id", type=str, default=None, help="自定义合同 ID（可选）")
+    prep_p.add_argument(
+        "--contract-id",
+        type=str,
+        default=None,
+        help="自定义合同 ID（可选，格式：lt-YYYYMMDD-名称）",
+    )
     prep_p.add_argument("--title", type=str, help="合同标题")
     prep_p.add_argument("--objective", type=str, help="完成标准描述（冻结区）")
     prep_p.add_argument("--deadline", type=str, help="截止墙钟时间 (ISO 8601)")
