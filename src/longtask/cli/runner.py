@@ -262,7 +262,13 @@ class AttemptRunner:
         )
 
     def start_attempt(
-        self, now: datetime, *, contract_id: str, attempt_id: str, executor_id: str
+        self,
+        now: datetime,
+        *,
+        contract_id: str,
+        attempt_id: str,
+        executor_id: str,
+        model: str = "*",
     ) -> bool:
         """prepare 复验 + spawn 拉起；任一步失败记 attempt/failed 并释放租约。"""
         adapter = self._adapter_for(executor_id)
@@ -293,6 +299,7 @@ class AttemptRunner:
         self._running[attempt_id] = {
             "contract_id": contract_id,
             "executor_id": executor_id,
+            "model": model,
             "role": AttemptRole.EXECUTOR.value,
             "contract_revision": contract.revision,
             "session_ref": session_ref,
@@ -361,6 +368,7 @@ class AttemptRunner:
             "session_ref": info["session_ref"],
             "state": state,
             "role": role,
+            "model": str(info.get("model", "*")),
         }
         try:
             collected = adapter.collect(attempt_id)
@@ -725,6 +733,7 @@ class AttemptRunner:
             "executor_id": verifier_entry.id,
             "role": AttemptRole.VERIFIER.value,
             "contract_revision": contract.revision,
+            "model": next((m for m in verifier_entry.models if m != "*"), "*"),
             "session_ref": session_ref,
             "generation": lease.generation if lease else None,
         }

@@ -76,7 +76,12 @@ def _dispatch_attempt(
         except PrepareRefusedError as exc:
             _record_refusal(entry.id, str(exc))
             continue
-        lease_payload = {"executor_id": entry.id, "urgency_tier": int(tier)}
+        selected_model = next((model for model in entry.models if model != "*"), "*")
+        lease_payload = {
+            "executor_id": entry.id,
+            "model": selected_model,
+            "urgency_tier": int(tier),
+        }
         if active_lease is not None:
             # 心跳已断的旧租约：先回收再接管（lease/reclaimed，DESIGN §7）
             reclaim_lease(
@@ -112,6 +117,7 @@ def _dispatch_attempt(
             event_type=EventType.ATTEMPT_STARTED,
             payload={
                 "executor_id": entry.id,
+                "model": selected_model,
                 "tier": int(tier),
                 "role": "executor",
                 "contract_revision": contract.revision,
@@ -136,5 +142,10 @@ def _dispatch_attempt(
         )
         rebuild_projection(root, cid, conn)
         emit(f"promoter/dispatched:{cid}:{entry.id}")
-        return {"contract_id": cid, "attempt_id": attempt_id, "executor_id": entry.id}
+        return {
+            "contract_id": cid,
+            "attempt_id": attempt_id,
+            "executor_id": entry.id,
+            "model": selected_model,
+        }
     return None

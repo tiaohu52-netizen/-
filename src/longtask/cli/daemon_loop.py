@@ -108,6 +108,7 @@ def run_daemon_loop(
                     contract_id=str(started["contract_id"]),
                     attempt_id=str(started["attempt_id"]),
                     executor_id=str(started["executor_id"]),
+                    model=str(started.get("model", "*")),
                 )
             # 分层唤醒：L1 对齐 active 合同的唤醒注册；L0 按需持有/释放电源请求
             rtc.refresh(conn, now=now_val)
