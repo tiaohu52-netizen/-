@@ -5,13 +5,17 @@ from lhgp import PROTOCOL_VERSION, __version__
 from lhgp.adapters.registry import ExecutorRegistry as CanonicalExecutorRegistry
 from lhgp.contracts.contract_draft import ContractDraft as CanonicalContractDraft
 from lhgp.persistence.store import connect as canonical_connect
+from lhgp.promoter.urgency import classify as canonical_classify
 from lhgp.rpc.errors import ErrorCode as CanonicalErrorCode
 from lhgp.rpc.methods import Method as CanonicalMethod
+from lhgp.scheduler.wakeup import guard_needed as canonical_guard_needed
 from longtask.adapters.registry import ExecutorRegistry as LegacyExecutorRegistry
 from longtask.contracts.contract_draft import ContractDraft as LegacyContractDraft
 from longtask.persistence.store import connect as legacy_connect
+from longtask.promoter.urgency import classify as legacy_classify
 from longtask.rpc.errors import ErrorCode as LegacyErrorCode
 from longtask.rpc.methods import Method as LegacyMethod
+from longtask.scheduler.wakeup import guard_needed as legacy_guard_needed
 
 
 def test_canonical_namespace_matches_legacy_runtime_identity() -> None:
@@ -44,3 +48,10 @@ def test_rpc_namespace_reexports_protocol_types() -> None:
 
     assert CanonicalMethod is LegacyMethod
     assert CanonicalErrorCode is LegacyErrorCode
+
+
+def test_scheduler_and_promoter_namespaces_reexport_functions() -> None:
+    """Scheduling facades must preserve pure-function identity."""
+
+    assert canonical_guard_needed is legacy_guard_needed
+    assert canonical_classify is legacy_classify
