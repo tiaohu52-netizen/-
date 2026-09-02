@@ -258,9 +258,14 @@ def handle_attempt_write_back(
         attempt_role = attempt.role if attempt is not None else "executor"
         actual_model = str(params.get("model_id", "")).strip()
         contract = get_contract(conn, contract_id)
-        if actual_model and attempt is not None and attempt.executor_id and contract is not None:
+        if attempt is not None and attempt.executor_id and contract is not None:
             binding = binding_for_executor(contract.draft.authority, attempt.executor_id)
-            if binding is not None and not models_allow(
+            if binding is not None and not actual_model and "*" not in binding.models:
+                raise RpcError(
+                    code=ErrorCode.VALIDATION_FAILED,
+                    message="model_id is required for an explicitly model-bound attempt",
+                )
+            if binding is not None and actual_model and not models_allow(
                 contract.draft.authority, binding=binding, model=actual_model
             ):
                 raise RpcError(
