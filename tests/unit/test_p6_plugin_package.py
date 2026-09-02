@@ -35,6 +35,8 @@ class TestPluginManifest:
         data = json.loads((REPO_ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))
         skill_path = REPO_ROOT / data["skills"] / "long-horizon-goals" / "SKILL.md"
         assert skill_path.is_file(), f"missing skill at {skill_path}"
+        skill = skill_path.read_text(encoding="utf-8")
+        assert "`lhgp-mcp`" in skill
 
     def test_plugin_referenced_mcp_config_exists(self) -> None:
         data = json.loads((REPO_ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))
