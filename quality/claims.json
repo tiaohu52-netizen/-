@@ -23,14 +23,14 @@
           "kind": "source_static",
           "path": "docs/LHGP-ROADMAP.md",
           "recorded_at": "2026-09-01",
-          "summary": "ROADMAP §八变更规则：SPEC 与本文档冲突时先改 SPEC；文档自称「执行计划基线，尚未开始实施」——本文档写目标不代表已经实现。"
+          "summary": "ROADMAP §八变更规则：SPEC 与本文档冲突时先改 SPEC；本文档区分历史基线、当前实现与后续目标。"
         }
       ],
       "notes": "每次 SPEC 修订或代码新增概念后重验。"
     },
     {
       "id": "lhgp-spec-four-axis-model",
-      "statement": "承诺状态被显式分为四条独立状态轴（SPEC §7）：commitment lifecycle / deadline_status / acceptance_status / attempt state；当前实现只覆盖其中两轴，属于 P1 范围。",
+      "statement": "承诺状态被显式分为四条独立状态轴（SPEC §7）：commitment lifecycle / deadline_status / acceptance_status / attempt state；当前实现已落地四轴数据与状态迁移，严格 deadline 交付保证仍是独立债务。",
       "lifecycle": "verified",
       "scope_paths": [
         "docs/LHGP-SPEC.md"
@@ -56,7 +56,7 @@
           "kind": "source_static",
           "path": "docs/LHGP-SPEC.md",
           "recorded_at": "2026-09-01",
-          "summary": "SPEC §6.3 列出 7 个候选条件；§6.1 给出 authority/attention/continuity 三组字段；当前实现以 capability + cost_hint 决策，尚未引入三维 allowlist。"
+          "summary": "SPEC §6.3 列出 7 个候选条件；§6.1 给出 authority/attention/continuity 三组字段；当前实现已执行 executor/model/role 授权与 default-deny 判定。"
         }
       ]
     },
@@ -72,7 +72,7 @@
           "kind": "source_static",
           "path": "docs/LHGP-SPEC.md",
           "recorded_at": "2026-09-01",
-          "summary": "SPEC §11.3 句柄四元组；§11 reconcile 四分支明确；当前实现以 lease generation + holder 双重 fencing 覆盖「fence 后重派」其余三支待 P3。"
+          "summary": "SPEC §11.3 句柄四元组；§11 reconcile 四分支明确；当前实现已持久化句柄并实现 reattach/collect/orphan grace/fence 分支。"
         }
       ]
     },
@@ -120,7 +120,7 @@
           "kind": "source_static",
           "path": "docs/LHGP-SPEC.md",
           "recorded_at": "2026-09-01",
-          "summary": "SPEC §12.1 七种 check；§12.2 evidence 实体；§12.3 verifier 独立性（历史 verifier 不得阻止新 verifier）。当前实现的 verifier 已按 §12.3 派生独立 attempt 但 typed checks 尚未到位。"
+          "summary": "SPEC §12.1 七种 check；§12.2 evidence 实体；§12.3 verifier 独立性（历史 verifier 不得阻止新 verifier）。当前实现支持确定性 typed checks、结构化 evidence 与独立 verifier；模型/人工观察仍需显式证据。"
         }
       ]
     },
