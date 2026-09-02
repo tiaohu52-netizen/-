@@ -104,6 +104,20 @@ def test_goal_prepare_returns_offer_with_seven_fields(tmp_path) -> None:
     assert adm["acceptance_executable"] is True
 
 
+def test_offer_with_forecast_requires_safe_start_by() -> None:
+    """已产生 p90 预测但无法证明安全启动时刻时必须拒绝 admission。"""
+    from longtask.admission.offer import ExecutorCandidateView, Offer
+
+    candidate = ExecutorCandidateView(executor_id="exec-a", models=("*",), reason="ok")
+    offer = Offer(
+        eligible_executors=(candidate,),
+        acceptance_executable=True,
+        verification_reserve_sufficient=True,
+        forecast_p90_minutes=120.0,
+    )
+    assert offer.eligible is False
+
+
 def test_goal_prepare_closed_authority_no_eligible(tmp_path) -> None:
     """§6.1 默认 authority.executor_policy=closed、空 executors → 无候选可通过。"""
     conn = _conn(tmp_path)

@@ -8,7 +8,7 @@ build-backend = "hatchling.build"
 [project]
 name = "longtask-protocol"
 version = "0.1.0a0"
-description = "远期任务协议参考实现：harness 之外的 harness（RFC 阶段，尚无可用实现）"
+description = "远期目标协议参考实现：跨会话、跨 Agent 的本地合同、调度与验收运行时"
 readme = "README.md"
 requires-python = ">=3.11"
 # 运行时零第三方依赖：协议控制面只用标准库（DESIGN.md §13.1）。
@@ -37,7 +37,7 @@ longtask-mcp = "longtask.mcp_server:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/longtask"]
 # 附带 §17 skill 资源（不是 Python 包，但模型工具链会读 MANIFEST.json 索引）
-artifacts = ["skills/longtask-contract/MANIFEST.json"]
+artifacts = ["skills/long-horizon-goals/SKILL.md", "skills/longtask-contract/MANIFEST.json"]
 
 # ── ruff（format + lint 一体）────────────────────────────────
 [tool.ruff]

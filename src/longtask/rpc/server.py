@@ -10,10 +10,10 @@ from __future__ import annotations
 import sqlite3
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from longtask import PROTOCOL_VERSION
+from longtask.cli.paths import default_data_root
 from longtask.persistence.store import StoreConfig, connect, ensure_schema
 from longtask.rpc.errors import ErrorCode, RpcError
 from longtask.rpc.handlers import HANDLERS
@@ -97,7 +97,7 @@ def route(
         return handler(envelope, conn=conn, now=current_time, registry=registry)
 
     # 默认单用户库路径（DESIGN §3.1）
-    default_db_dir = Path.home() / ".longtask"
+    default_db_dir = default_data_root()
     default_db_dir.mkdir(parents=True, exist_ok=True)
     default_conn = connect(StoreConfig(db_path=default_db_dir / "state.db"))
     try:

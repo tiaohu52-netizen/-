@@ -19,7 +19,12 @@ from longtask.adapters.base import ExecutorAdapter
 from longtask.adapters.factory import build_adapter
 from longtask.adapters.registry import ExecutorRegistry, RegistryEntry
 from longtask.cli.dispatch import _dispatch_attempt
-from longtask.contracts.schema import BlockReason, ContractState
+from longtask.contracts.schema import (
+    AcceptanceStatus,
+    BlockReason,
+    ContractState,
+    DeadlineStatus,
+)
 from longtask.persistence.decisions import set_next_decision_at
 from longtask.persistence.events import EventType
 from longtask.persistence.projections import rebuild_projection
@@ -164,6 +169,7 @@ def run_daemon_tick(
                     contract_id=cid,
                     new_state=ContractState.EXPIRED,
                     now=now,
+                    deadline_status=DeadlineStatus.MISSED,
                     event_type=EventType.CONTRACT_EXPIRED,
                     event_payload={"arbitrated_at": now.isoformat()},
                     actor="daemon",
@@ -440,20 +446,36 @@ def _judge_verifier_outcomes(root: Path, conn: sqlite3.Connection, now: datetime
         verifier_attempt_id: str | None = None
         for event in get_events(conn, contract_id=contract.contract_id):
             payload_text = event.payload_json or ""
-            if "verifier" not in payload_text:
+            payload = _safe_json(payload_text)
+            # 只接受当前修订、明确标注 verifier 的终态事件。旧版事件没有
+            # role 字段时保留 actor=model/verifier 的兼容回退，但不再做
+            # 任意字符串子串匹配，避免 executor 输出误触发完成。
+            is_verifier = event.role == "verifier" or (
+                event.role is None
+                and payload.get("role") == "verifier"
+                and event.actor in ("model", "verifier")
+            )
+            if not is_verifier:
+                continue
+            if (
+                event.contract_revision is not None
+                and event.contract_revision != contract.revision
+            ):
                 continue
             if str(event.event_type) == EventType.ATTEMPT_SUCCEEDED.value:
                 last_verifier_state = "succeeded"
-                last_verifier_payload = _safe_json(payload_text)
+                last_verifier_payload = payload
                 verifier_attempt_id = event.attempt_id
             elif str(event.event_type) == EventType.ATTEMPT_FAILED.value:
                 last_verifier_state = "failed"
-                last_verifier_payload = _safe_json(payload_text)
+                last_verifier_payload = payload
                 verifier_attempt_id = event.attempt_id
 
         if last_verifier_state is None or verifier_attempt_id is None:
             continue
         if last_verifier_state == "succeeded":
+            if contract.acceptance_status == AcceptanceStatus.PASSED:
+                continue
             append_event(
                 conn,
                 contract_id=contract.contract_id,
@@ -470,6 +492,12 @@ def _judge_verifier_outcomes(root: Path, conn: sqlite3.Connection, now: datetime
                 contract_id=contract.contract_id,
                 new_state=ContractState.COMPLETE,
                 now=now,
+                acceptance_status=AcceptanceStatus.PASSED,
+                deadline_status=(
+                    DeadlineStatus.MET
+                    if now <= contract.draft.deadline_at
+                    else DeadlineStatus.MISSED
+                ),
             )
             rebuild_projection(root, contract.contract_id, conn)
         else:  # failed
@@ -497,6 +525,7 @@ def _judge_verifier_outcomes(root: Path, conn: sqlite3.Connection, now: datetime
                 contract_id=contract.contract_id,
                 new_state=ContractState.ACTIVE,
                 now=now,
+                acceptance_status=AcceptanceStatus.FAILED,
             )
             rebuild_projection(root, contract.contract_id, conn)
 

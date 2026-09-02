@@ -15,6 +15,9 @@ import sqlite3
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+from longtask.contracts.attention import from_dict as attention_from_dict
+from longtask.contracts.authority import from_dict as authority_from_dict
+from longtask.contracts.continuity import from_dict as continuity_from_dict
 from longtask.contracts.schema import (
     Acceptance,
     Budget,
@@ -34,6 +37,8 @@ if TYPE_CHECKING:
 # envelope.client_id 是稳定受信源（longtask-cli=用户，mcp=模型，executor=执行者）。
 _TRUSTED_CLIENT_ACTORS: dict[str, str] = {
     "longtask-cli": "user",
+    "cli": "user",  # 本地开发/测试客户端别名
+    "cli-test": "user",  # 测试夹具使用的固定客户端 ID
     "mcp": "model",
     "executor": "executor",
     "verifier": "verifier",
@@ -48,7 +53,13 @@ def resolve_actor(envelope: RequestEnvelope, params: dict[str, Any]) -> str:
     params["actor"] 仅作审计标签追加（不再覆盖派生值），避免模型端塞
     actor=user 冒充用户。
     """
-    return _TRUSTED_CLIENT_ACTORS.get(envelope.client_id, "user")
+    actor = _TRUSTED_CLIENT_ACTORS.get(envelope.client_id)
+    if actor is None:
+        raise RpcError(
+            code=ErrorCode.AUTH_FAILED,
+            message=f"unknown client_id: {envelope.client_id}",
+        )
+    return actor
 
 
 def parse_contract_draft(params: dict[str, Any]) -> ContractDraft:
@@ -86,12 +97,18 @@ def parse_contract_draft(params: dict[str, Any]) -> ContractDraft:
             max_concurrent_attempts=int(budget_raw["max_concurrent_attempts"]),
             max_attempt_minutes=int(budget_raw["max_attempt_minutes"]),
             max_output_bytes=int(budget_raw["max_output_bytes"]),
+            verification_attempts_reserved=int(
+                budget_raw.get("verification_attempts_reserved", 1)
+            ),
         )
 
         soft_guidance = dict(draft_data.get("soft_guidance", {}))
         context = dict(draft_data.get("context", {}))
         execution = dict(draft_data.get("execution", {}))
         client_meta = dict(draft_data.get("client_meta", {}))
+        authority = authority_from_dict(draft_data.get("authority"))
+        attention = attention_from_dict(draft_data.get("attention"))
+        continuity = continuity_from_dict(draft_data.get("continuity"))
     except (KeyError, TypeError, ValueError) as exc:
         raise RpcError(
             code=ErrorCode.VALIDATION_FAILED,
@@ -110,6 +127,9 @@ def parse_contract_draft(params: dict[str, Any]) -> ContractDraft:
         context=context,
         execution=execution,
         client_meta=client_meta,
+        authority=authority,
+        attention=attention,
+        continuity=continuity,
     )
     errors = draft.validate()
     if errors:

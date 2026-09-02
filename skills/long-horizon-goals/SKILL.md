@@ -1,3 +1,8 @@
+---
+name: long-horizon-goals
+description: 将需要跨会话、跨 Agent 推进的用户目标转成 LHGP 合同，明确授权、验收、Deadline、预算和交接边界。
+---
+
 # long-horizon-goals
 
 > LHGP 协议面向 AI 的 skill 教学。配合 `longtask-mcp` 使用。

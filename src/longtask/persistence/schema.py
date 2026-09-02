@@ -70,7 +70,7 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
             goal_id TEXT NOT NULL,  -- P1：与 contract_id 同义（§7 命名迁移）
             revision INTEGER NOT NULL DEFAULT 1,
             state TEXT NOT NULL,  -- commitment lifecycle 轴
-            deadline_status TEXT NOT NULL DEFAULT 'on_track',  -- P1：deadline 轴
+            deadline_status TEXT NOT NULL DEFAULT 'not_due',  -- P1：deadline 轴
             acceptance_status TEXT NOT NULL DEFAULT 'pending',  -- P1：acceptance 轴
             blocked_reason TEXT,
             title TEXT NOT NULL,
@@ -304,7 +304,12 @@ def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {col_def}")
 
     _add_column_if_missing("contracts", "goal_id TEXT")
-    _add_column_if_missing("contracts", "deadline_status TEXT NOT NULL DEFAULT 'on_track'")
+    _add_column_if_missing("contracts", "deadline_status TEXT NOT NULL DEFAULT 'not_due'")
+    # 早期预发布版本曾写入不存在的 on_track 枚举；迁移时统一到协议
+    # 当前语义的 not_due，避免旧库在读取 ContractView 时崩溃。
+    conn.execute(
+        "UPDATE contracts SET deadline_status = 'not_due' WHERE deadline_status = 'on_track'"
+    )
     _add_column_if_missing("contracts", "acceptance_status TEXT NOT NULL DEFAULT 'pending'")
     _add_column_if_missing("contracts", "authority_json TEXT NOT NULL DEFAULT '{}'")
     _add_column_if_missing("contracts", "attention_json TEXT NOT NULL DEFAULT '{}'")

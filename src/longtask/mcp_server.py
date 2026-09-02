@@ -105,6 +105,12 @@ def tool_prepare_contract(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str
                 "max_output_bytes": 1048576,
             },
         ),
+        "authority": args.get("authority", {}),
+        "attention": args.get("attention", {}),
+        "continuity": args.get("continuity", {}),
+        "context": args.get("context", {}),
+        "execution": args.get("execution", {}),
+        "client_meta": args.get("client_meta", {}),
     }
     params: dict[str, Any] = {"draft": payload}
     # contract_id 提到 envelope params（与 handle_contract_prepare 的入参对齐）
@@ -364,6 +370,14 @@ TOOLS: dict[
                         "type": "object",
                         "description": "可选覆盖默认预算",
                     },
+                    "authority": {
+                        "type": "object",
+                        "description": "允许被唤起的 executor、model 与 role 绑定",
+                    },
+                    "attention": {"type": "object"},
+                    "continuity": {"type": "object"},
+                    "context": {"type": "object"},
+                    "execution": {"type": "object"},
                     "contract_id": {"type": "string", "description": "可选自定义 ID"},
                 },
             },

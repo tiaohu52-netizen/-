@@ -12,13 +12,16 @@
     "hard_constraints",
     "acceptance",
     "workload_estimate",
-    "budget"
+    "budget",
+    "authority",
+    "attention",
+    "continuity"
   ],
   "properties": {
-    "schema_version": { "const": 1 },
+    "schema_version": { "const": 2 },
     "contract_id": {
       "type": "string",
-      "pattern": "^lt-[0-9]{8}-[0-9]{3,}$",
+      "pattern": "^lt-[A-Za-z0-9_-]+$",
       "description": "服务端分配；prepare 入参不得携带"
     },
     "title": { "type": "string", "minLength": 1, "maxLength": 200 },
@@ -35,7 +38,7 @@
     "hard_constraints": {
       "type": "object",
       "description": "冻结区：适配器必须能完整翻译，否则拒接（DESIGN §9）",
-      "required": ["file_effects", "network", "process", "package_install"],
+      "required": ["file_effects"],
       "properties": {
         "file_effects": {
           "type": "object",
@@ -69,12 +72,15 @@
           "additionalProperties": false
         }
       },
-      "additionalProperties": false
+      "additionalProperties": true
     },
     "soft_guidance": {
       "type": "object",
       "description": "可修订区：注入提示词的软指引"
     },
+    "authority": { "type": "object" },
+    "attention": { "type": "object" },
+    "continuity": { "type": "object" },
     "acceptance": {
       "type": "object",
       "required": ["standard", "checks"],
@@ -145,6 +151,7 @@
         "max_concurrent_attempts": { "type": "integer", "exclusiveMinimum": 0 },
         "max_attempt_minutes": { "type": "integer", "exclusiveMinimum": 0 },
         "max_output_bytes": { "type": "integer", "exclusiveMinimum": 0 }
+        ,"verification_attempts_reserved": { "type": "integer", "minimum": 0 }
       },
       "additionalProperties": false
     },
@@ -155,5 +162,5 @@
     },
     "created_by": { "enum": ["user"] }
   },
-  "additionalProperties": false
+  "additionalProperties": true
 }

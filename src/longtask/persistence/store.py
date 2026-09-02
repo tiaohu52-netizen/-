@@ -179,13 +179,19 @@ def _row_to_contract_view(row: sqlite3.Row | tuple[Any, ...]) -> ContractView:
         continuity=continuity_from_dict(json.loads(continuity_json)),
     )
 
+    try:
+        deadline_status = DeadlineStatus(deadline_status_str)
+    except ValueError:
+        # 兼容迁移前写入的 on_track 等旧值；未知值不应让整个守护进程
+        # 因一行损坏数据崩溃，按最保守的 not_due 读取并由 doctor 报告。
+        deadline_status = DeadlineStatus.NOT_DUE
     return ContractView(
         draft=draft,
         contract_id=contract_id,
         goal_id=goal_id or contract_id,
         revision=int(revision),
         state=ContractState(state_str),
-        deadline_status=DeadlineStatus(deadline_status_str),
+        deadline_status=deadline_status,
         acceptance_status=AcceptanceStatus(acceptance_status_str),
         created_at=datetime.fromisoformat(created_at_str),
         updated_at=datetime.fromisoformat(updated_at_str),
