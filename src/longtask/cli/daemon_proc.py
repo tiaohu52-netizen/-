@@ -23,6 +23,7 @@ PID_FILE = "daemon.pid"
 TOKEN_FILE = "daemon.token"  # noqa: S105
 DAEMON_STOP_FILE = "daemon.stop"
 DAEMON_LOG_FILE = "daemon.log"
+START_LOCK_FILE = "daemon.start.lock"
 REGISTRY_FILE = "registry.json"
 DEFAULT_TICK_INTERVAL_SECONDS = 60.0
 STOP_GRACE_SECONDS = 10.0
@@ -118,60 +119,70 @@ def spawn_daemon(
     分离子进程运行 run_daemon_loop，写真实 pid 与一次性 token；
     已在运行、启动后立即退出（附 daemon.log 尾部）均如实报告，不假装成功。
     """
-    status = get_daemon_status(root)
-    if status["running"] and status["pid"] is not None:
-        return {"ok": False, "error": f"daemon already running (pid {status['pid']})"}
-
-    # 清理上次残留的 pid/token（进程已死或文件损坏）
-    (root / PID_FILE).unlink(missing_ok=True)
-    (root / TOKEN_FILE).unlink(missing_ok=True)
     root.mkdir(parents=True, exist_ok=True)
-
-    log_path = root / DAEMON_LOG_FILE
-    log_fh = log_path.open("ab")
-    cmd = [
-        sys.executable,
-        "-m",
-        "longtask.cli.main",
-        "--data-dir",
-        str(root),
-        "_daemon-run",
-        "--interval",
-        str(interval_seconds),
-    ]
-    popen_kwargs: dict[str, Any] = {
-        "stdin": subprocess.DEVNULL,
-        "stdout": log_fh,
-        "stderr": log_fh,
-        "close_fds": True,
-    }
-    if sys.platform == "win32":
-        popen_kwargs["creationflags"] = (
-            subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
-        )
-    else:
-        popen_kwargs["start_new_session"] = True
+    lock_path = root / START_LOCK_FILE
     try:
-        proc = subprocess.Popen(  # noqa: S603 —— 固定解释器与模块路径，无外部输入拼接
-            cmd, **popen_kwargs
-        )
+        lock_fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        status = get_daemon_status(root)
+        if status["running"] and status["pid"] is not None:
+            return {"ok": False, "error": f"daemon already running (pid {status['pid']})"}
+        lock_path.unlink(missing_ok=True)
+        lock_fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    try:
+        status = get_daemon_status(root)
+        if status["running"] and status["pid"] is not None:
+            return {"ok": False, "error": f"daemon already running (pid {status['pid']})"}
+        (root / PID_FILE).unlink(missing_ok=True)
+        (root / TOKEN_FILE).unlink(missing_ok=True)
+
+        log_path = root / DAEMON_LOG_FILE
+        log_fh = log_path.open("ab")
+        cmd = [
+            sys.executable,
+            "-m",
+            "longtask.cli.main",
+            "--data-dir",
+            str(root),
+            "_daemon-run",
+            "--interval",
+            str(interval_seconds),
+        ]
+        popen_kwargs: dict[str, Any] = {
+            "stdin": subprocess.DEVNULL,
+            "stdout": log_fh,
+            "stderr": log_fh,
+            "close_fds": True,
+        }
+        if sys.platform == "win32":
+            popen_kwargs["creationflags"] = (
+                subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+            )
+        else:
+            popen_kwargs["start_new_session"] = True
+        try:
+            proc = subprocess.Popen(  # noqa: S603 —— 固定解释器与模块路径，无外部输入拼接
+                cmd, **popen_kwargs
+            )
+        finally:
+            log_fh.close()
+
+        for _ in range(40):
+            if proc.poll() is not None:
+                return {
+                    "ok": False,
+                    "error": f"daemon process exited immediately (code {proc.returncode})",
+                    "log_tail": _read_log_tail(log_path),
+                }
+            time.sleep(0.05)
+
+        token = secrets.token_hex(16)
+        (root / PID_FILE).write_text(f"{proc.pid}\n", encoding="utf-8")
+        (root / TOKEN_FILE).write_text(f"{token}\n", encoding="utf-8")
+        return {"ok": True, "pid": proc.pid, "interval_seconds": interval_seconds}
     finally:
-        log_fh.close()
-
-    # 短暂确认子进程没有立刻死掉（导入错误等）；失败如实带回日志尾部
-    for _ in range(40):
-        if proc.poll() is not None:
-            return {
-                "ok": False,
-                "error": f"daemon process exited immediately (code {proc.returncode})",
-                "log_tail": _read_log_tail(log_path),
-            }
-        time.sleep(0.05)
-
-    token = secrets.token_hex(16)
-    (root / PID_FILE).write_text(f"{proc.pid}\n", encoding="utf-8")
-    (root / TOKEN_FILE).write_text(f"{token}\n", encoding="utf-8")
-    return {"ok": True, "pid": proc.pid, "interval_seconds": interval_seconds}
+        os.close(lock_fd)
+        lock_path.unlink(missing_ok=True)
 
 
 def halt_daemon(root: Path, *, grace_seconds: float = STOP_GRACE_SECONDS) -> dict[str, Any]:
