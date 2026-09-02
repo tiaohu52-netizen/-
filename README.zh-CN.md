@@ -101,7 +101,8 @@ LHGP **不是**工作流引擎。Agent 可以在租约仍然有效时被换掉�
 你需要 Python 3.11+ 和 [`uv`](https://docs.astral.sh/uv/)（`pip install uv`）。
 
 ```bash
-git clone https://github.com/your-org/longtask-protocol
+# 将 <OWNER> 替换为实际托管本仓库的 GitHub 账户
+git clone https://github.com/<OWNER>/longtask-protocol
 cd longtask-protocol
 uv sync --extra dev
 uv run python scripts/quality_gate.py   # 约 10 秒，与 CI 跑的是同一道门
