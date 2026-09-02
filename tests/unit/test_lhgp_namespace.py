@@ -69,6 +69,7 @@ from lhgp.contracts.state_machine import (
 from lhgp.contracts.validation import validate_draft as canonical_validate_draft
 from lhgp.forecast import Forecast as CanonicalPackageForecast
 from lhgp.forecast.model import Forecast as CanonicalForecast
+from lhgp.persistence.decisions import set_next_decision_at as canonical_set_next_decision_at
 from lhgp.persistence.errors import StoreError as CanonicalStoreError
 from lhgp.persistence.events import EventType as CanonicalEventType
 from lhgp.persistence.events_query import append_event as canonical_append_event
@@ -125,6 +126,7 @@ from longtask.contracts.schema import ContractDraft as LegacySchemaContractDraft
 from longtask.contracts.state_machine import is_valid_transition as legacy_is_valid_transition
 from longtask.contracts.validation import validate_draft as legacy_validate_draft
 from longtask.forecast.model import Forecast as LegacyForecast
+from longtask.persistence.decisions import set_next_decision_at as legacy_set_next_decision_at
 from longtask.persistence.errors import StoreError as LegacyStoreError
 from longtask.persistence.events import EventType as LegacyEventType
 from longtask.persistence.events_query import append_event as legacy_append_event
@@ -182,6 +184,7 @@ def test_persistence_namespace_reexports_single_implementation() -> None:
     assert canonical_append_event is legacy_append_event
     assert CanonicalStoreError is LegacyStoreError
     assert canonical_default_data_root is legacy_default_data_root
+    assert canonical_set_next_decision_at is legacy_set_next_decision_at
 
 
 def test_adapter_namespace_reexports_single_implementation() -> None:
