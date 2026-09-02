@@ -91,7 +91,8 @@ LHGP **不是**工作流引擎。Agent 可以在租约仍然有效时被换掉�
 - 外部运行句柄（`external_run_id`、`session_locator`、`recovery_strategy`、`capability_snapshot`），守护进程无法接手它不拥有的 harness 派出的工作。
 - 六分量 forecast（queue / startup / remaining work / verification / retry reserve / safety margin）驱动事件式唤醒。
 - 类型化的验收 checks 与 `evidence` 实体，以及结构化的 repair brief。
-- 完整的插件 / MCP 工具迁移 / `lhgp` 改名 / 全新机器分发流程（目前仍是 `longtask` / `longtaskd` / `~/.longtask`；改名在 ROADMAP P6 阶段）。
+- 完整的跨主机插件分发与全新机器 dogfood（P6 双轨入口、MCP 工具迁移和
+  `~/.lhgp` 默认目录已上线；剩余工作见 ROADMAP）。
 
 这些差距在 [`docs/LHGP-ROADMAP.md`](docs/LHGP-ROADMAP.md) 中被显式跟踪。
 
@@ -113,12 +114,14 @@ uv run python -m longtask.cli.main doctor
 [gate] ALL PASS (7 gates)
 === longtask doctor (v0.1.0a0, protocol v1) ===
 [PASS] python_runtime: Python 3.13.x
-[PASS] storage_directory: ~/.longtask accessible
+[PASS] storage_directory: ~/.lhgp accessible
 [PASS] database_integrity: state.db healthy
 [PASS] executor_registry: registry accessible (0 enabled / 0 registered)
 ```
 
-这样你就装好了一份本地可用的 LHGP。（CLI 暂时还叫 `longtask` / `longtaskd`，数据目录仍是 `~/.longtask`，因为改名窗口尚未关闭 —— 见 ROADMAP P6。）
+这样你就装好了一份本地可用的 LHGP。新入口是 `lhgp` / `lhgpd` / `lhgp-mcp`；
+旧的 `longtask` / `longtaskd` / `longtask-mcp` 仍作为兼容别名保留，数据目录
+默认使用 `~/.lhgp`，旧安装会继续读取 `~/.longtask`。
 
 ### 端到端走一遍你的第一份合同
 
