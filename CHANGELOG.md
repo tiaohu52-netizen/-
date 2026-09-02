@@ -11,8 +11,8 @@ follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
 - MCP tool safety annotations (`readOnlyHint`, `destructiveHint`,
   `openWorldHint`) and strict JSON argument validation.
 - Read-only `notifications` CLI audit command with status/limit filters and
-  opt-in payload output; the MCP notification tool remains payload-redacted
-  by default.
+  goal filtering and opt-in payload output; the MCP notification tool remains
+  payload-redacted by default.
 - LHGP dual-track entrypoint polish (`lhgp --version`, `lhgp-mcp`) and updated
   plugin/roadmap documentation.
 
