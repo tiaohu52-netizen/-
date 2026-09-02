@@ -16,6 +16,11 @@ REQUIRED = {
     "skills/longtask-contract/MANIFEST.json",
     "skills/longtask-contract/SKILL.md",
 }
+CANONICAL_ENTRYPOINTS = {
+    "lhgp = lhgp.cli.main:entrypoint",
+    "lhgpd = lhgp.cli.daemon_proc:lhgpd_entrypoint",
+    "lhgp-mcp = lhgp.mcp_server:main",
+}
 _STRICT_SEMVER = re.compile(
     r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
     r"(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
@@ -68,6 +73,25 @@ def _validate_companion_metadata(path: Path) -> str | None:
     return None
 
 
+def _validate_wheel_entrypoints(path: Path) -> str | None:
+    if path.suffix != ".whl":
+        return None
+    try:
+        with zipfile.ZipFile(path) as archive:
+            metadata_name = next(
+                name for name in archive.namelist() if name.endswith(".dist-info/entry_points.txt")
+            )
+            entries = {
+                line.strip()
+                for line in archive.read(metadata_name).decode("utf-8").splitlines()
+                if " = " in line
+            }
+    except (StopIteration, UnicodeDecodeError, zipfile.BadZipFile) as exc:
+        return f"wheel entry-point metadata is invalid: {exc}"
+    missing = CANONICAL_ENTRYPOINTS - entries
+    return f"wheel missing canonical entry points: {sorted(missing)}" if missing else None
+
+
 def main() -> int:
     dist = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("dist")
     artifacts = sorted((*dist.glob("*.whl"), *dist.glob("*.tar.gz")))
@@ -82,6 +106,10 @@ def main() -> int:
         metadata_error = _validate_companion_metadata(artifact)
         if metadata_error:
             print(f"{artifact}: {metadata_error}", file=sys.stderr)
+            return 1
+        entrypoint_error = _validate_wheel_entrypoints(artifact)
+        if entrypoint_error:
+            print(f"{artifact}: {entrypoint_error}", file=sys.stderr)
             return 1
         print(f"{artifact}: companion resources OK")
     return 0
