@@ -19,6 +19,9 @@ Environment: new CPython 3.13 virtual environment created with `uv venv`
 7. Ran `examples/dsh-dogfood-v4/dogfood_v4.py probe` twice on Windows. Both runs
    selected only `dsh-headless` for the executor role and only `kimi-code` for the
    verifier role, rejecting the enabled `codex-cli` interference entry.
+8. Ran the complete `tests/integration/test_reconcile.py` suite: 20 tests passed,
+   covering real subprocess handles, restart/reattach, orphan grace, fencing,
+   redispatch, and post-reap settlement.
 
 ## Scope and remaining work
 
