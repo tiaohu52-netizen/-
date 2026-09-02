@@ -53,7 +53,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--data-dir",
         type=str,
         default=None,
-        help="覆盖默认数据存储目录 (~/.longtask)",
+        help="覆盖默认数据存储目录 (~/.lhgp；未迁移旧安装回退到 ~/.longtask)",
     )
     parser.add_argument(
         "--dry-run",
