@@ -117,6 +117,8 @@ path and the pinned commit for every claim.
 | Ephemeral context + cross-checking verifier | Verified | `ephemeral-context-and-verifier` |
 | Executor-side RPC (status / renew / write-back) | Verified | `executor-session-rpc` |
 | Authenticated local Unix-socket RPC (daemon + `rpc-call` client) | Verified | `local-rpc-transport` |
+| Durable notification outbox (idempotency, retry, quiet hours) | Verified | `notification-outbox` |
+| State and risk notifications (`need_user` / `satisfied` / `missed` / `risk_red`) | Verified | `notification-routing` |
 | Daemon lifecycle + attempt runner (real subprocess) | Verified | `daemon-lifecycle-and-attempt-runner` |
 
 What this list **does not** claim:
@@ -130,6 +132,8 @@ What this list **does not** claim:
   machine and one user; L2/L3 wakeup remains accepted design debt.
 - A network or multi-host JSON-RPC transport. The current socket is local-only
   and authenticated with the token in `daemon.token`.
+- External notification channels (email, webhook, or mobile push). The current
+  `local` channel is a durable callback/log sink intended for adapters to extend.
 
 These gaps are tracked explicitly in [`docs/LHGP-ROADMAP.md`](docs/LHGP-ROADMAP.md).
 
