@@ -220,8 +220,8 @@ src/longtask/             参考实现，Python 3.11+，零运行时依赖
   promoter/               紧迫度、升级阶梯、租约与 fencing
   adapters/               怎么包一个 CLI Runner（Codex / Claude / DSH / ...）
   rpc/                    JSON-RPC 控制面
-  cli/                    `longtask` 命令 + `longtaskd` 守护进程
-  mcp_server.py           `longtask-mcp` 模型侧入口
+  cli/                    `lhgp` 命令 + `lhgpd` 守护进程（旧名兼容）
+  mcp_server.py           `lhgp-mcp` 模型侧入口（旧名兼容）
 src/lhgp/                 canonical 命名空间 facade（与上述实现共享状态）
 
 skills/longtask-contract/ 让 AI 学会使用本协议
