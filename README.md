@@ -113,7 +113,7 @@ path and the pinned commit for every claim.
 | File projections + handover.md schema | Verified | `file-projections-and-handover` |
 | CLI + daemon control plane + dry-run | Verified | `cli-and-daemon-control-plane` |
 | Strict-deadline layered wakeup (L0/L1 done; L2/L3 designed, not deployed) | Accepted debt (review by 2026-12-01) | `strict-deadline-wakeup-design` |
-| MCP server + model-facing skill (7 tools, not a 1:1 RPC tunnel) | Verified | `mcp-server-and-skill` |
+| MCP server + model-facing skill (core tools plus LHGP aliases, audit, and control extensions) | Verified | `mcp-server-and-skill` |
 | Ephemeral context + cross-checking verifier | Verified | `ephemeral-context-and-verifier` |
 | Executor-side RPC (status / renew / write-back) | Verified | `executor-session-rpc` |
 | Authenticated local Unix-socket RPC (daemon + `rpc-call` client) | Verified | `local-rpc-transport` |
@@ -238,8 +238,9 @@ The whole story of the run — `contract/prepared` → `contract/approved` →
 ### If your agent is an MCP-compatible LLM
 
 The package also installs `longtask-mcp`, a thin [MCP](https://modelcontextprotocol.io)
-server that exposes 7 task-flow tools to your model (not a 1:1 tunnel onto
-the 24 RPC methods — see the spec on §11.1). Point your harness at it
+server that exposes the core task-flow tools plus LHGP-named aliases, audit,
+and control extensions (not a 1:1 tunnel onto the 24 RPC methods — see the
+spec on §11.1). Point your harness at it
 (usually one line in your MCP config) and the model can discover and use
 the protocol directly — see [`skills/longtask-contract/SKILL.md`](skills/longtask-contract/SKILL.md)
 for the model-side onboarding.
