@@ -34,6 +34,7 @@ from longtask.cli.doctor import run_doctor
 from longtask.cli.paths import default_data_root, migrate_data_dir
 from longtask.persistence.projections import rebuild_projection, revert_projection
 from longtask.persistence.store import StoreConfig, connect, ensure_schema
+from longtask.rpc.client import call_unix_socket
 from longtask.rpc.errors import RpcError
 from longtask.rpc.methods import Method
 from longtask.rpc.server import RequestEnvelope, route
@@ -72,6 +73,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="调度扫描间隔秒数（默认 60）",
     )
     sub.add_parser("stop", help="停止 longtaskd 调度守护进程")
+    rpc_p = sub.add_parser("rpc-call", help="通过 daemon 本机 socket 调用 JSON-RPC 方法")
+    rpc_p.add_argument("method", type=str, help="方法名，例如 attempt/status")
+    rpc_p.add_argument("--params", default="{}", help="JSON 参数对象")
+    rpc_p.add_argument("--request-id", default=None, help="幂等请求 ID（默认自动生成）")
+    rpc_p.add_argument("--client-id", default="longtask-cli", help="客户端标识")
     # P6：数据目录迁移——安全默认：不带 --execute 只打印计划不动数据
     migrate_p = sub.add_parser(
         "migrate",
@@ -285,6 +291,28 @@ def main(argv: list[str] | None = None) -> int:
         res = halt_daemon(root)
         print(json.dumps(res, ensure_ascii=False, indent=2))
         return 0 if res["ok"] else 1
+
+    if args.command == "rpc-call":
+        try:
+            params = json.loads(args.params)
+            if not isinstance(params, dict):
+                raise ValueError("--params must be a JSON object")
+            token_path = root / "daemon.token"
+            token = token_path.read_text(encoding="utf-8").strip()
+            response = call_unix_socket(
+                root / "daemon.sock",
+                token=token,
+                method=args.method,
+                request_id=args.request_id
+                or f"cli-req-{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}",
+                client_id=args.client_id,
+                params=params,
+            )
+            print(json.dumps(response.get("result", response), ensure_ascii=False, indent=2))
+            return 0
+        except (OSError, ValueError, json.JSONDecodeError, RpcError) as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
 
     if args.command == "_daemon-run":
         res = run_daemon_loop(root, interval_seconds=args.interval, emit_fn=print)
