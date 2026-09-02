@@ -26,6 +26,7 @@ from longtask.cli.daemon import (
     get_daemon_status,
     halt_daemon,
     is_kill_switch_active,
+    rpc_socket_path,
     run_daemon_loop,
     set_kill_switch,
     spawn_daemon,
@@ -300,7 +301,7 @@ def main(argv: list[str] | None = None) -> int:
             token_path = root / "daemon.token"
             token = token_path.read_text(encoding="utf-8").strip()
             response = call_unix_socket(
-                root / "daemon.sock",
+                rpc_socket_path(root),
                 token=token,
                 method=args.method,
                 request_id=args.request_id
