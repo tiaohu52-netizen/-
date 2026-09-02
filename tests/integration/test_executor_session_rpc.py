@@ -166,6 +166,32 @@ class TestLeaseRenew:
 
 
 class TestAttemptWriteBack:
+    def test_verifier_terminal_write_back_requires_structured_evidence(self, store: Any) -> None:
+        acquired(store)
+        store.execute(
+            """INSERT INTO attempts
+               (attempt_id, goal_id, contract_revision, role, state, admitted_at,
+                payload_json, updated_at)
+               VALUES ('att-1', 'goal-execsess01', 1, 'verifier', 'running', ?, '{}', ?)""",
+            (NOW.isoformat(), NOW.isoformat()),
+        )
+        with pytest.raises(RpcError) as exc_info:
+            route(
+                make_envelope(
+                    Method.ATTEMPT_WRITE_BACK,
+                    {
+                        "contract_id": CID,
+                        "attempt_id": "att-1",
+                        "write_generation": 1,
+                        "attempt_state": "succeeded",
+                    },
+                    "req-verifier-evidence-required",
+                ),
+                conn=store,
+                now=NOW,
+            )
+        assert exc_info.value.code == ErrorCode.VALIDATION_FAILED
+
     def test_progress_and_terminal_events(self, store: Any) -> None:
         acquired(store)
         resp = route(
