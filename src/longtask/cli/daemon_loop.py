@@ -23,6 +23,7 @@ from longtask.cli.daemon_proc import (
 )
 from longtask.cli.runner import AttemptRunner
 from longtask.cli.tick import run_daemon_tick
+from longtask.persistence.decisions import earliest_next_decision_at
 from longtask.persistence.events import EventType
 from longtask.persistence.projections import rebuild_projection
 from longtask.persistence.store import (
@@ -132,7 +133,18 @@ def run_daemon_loop(
             if max_cycles is not None and cycles >= max_cycles:
                 break
             if interval_seconds > 0:
-                sleep_fn(interval_seconds)
+                # P4：按最早决策点自适应休眠（SPEC §9 next_decision_at）。
+                # 有活 attempt 时保底心跳节奏（续约/回收观察不能停）；
+                # 全部空闲时睡到「下一个必须回头看」的时刻，不做 60s 盲轮询。
+                # 用本轮已取的 now_val 计算时长，不二次调用 clock()（可注入
+                # 有限迭代器，多调一次就 StopIteration）。
+                sleep_seconds = interval_seconds
+                if runner.is_idle():
+                    next_at = earliest_next_decision_at(conn, now=now_val)
+                    if next_at is not None:
+                        until = (next_at - now_val).total_seconds()
+                        sleep_seconds = min(interval_seconds, max(0.5, until))
+                sleep_fn(sleep_seconds)
     finally:
         if stopped:
             (root / DAEMON_STOP_FILE).unlink(missing_ok=True)

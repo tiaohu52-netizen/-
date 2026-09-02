@@ -205,6 +205,10 @@ class AttemptRunner:
         """本进程是否仍持有该 attempt 的活句柄（reconcile 据此让路）。"""
         return attempt_id in self._running
 
+    def is_idle(self) -> bool:
+        """本进程无活 attempt（主循环据此决定能否睡到下一个决策点）。"""
+        return not self._running
+
     def _persist_handle(
         self,
         adapter: ExecutorAdapter,

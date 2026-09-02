@@ -185,8 +185,10 @@ class RtcAlarm:
     """L1 计划任务唤醒：为 active 合同注册带 wake 位的一次性任务。
 
     每个 active 合同一个 task_id（longtask-wakeup-<cid>）；目标时刻取
-    max(next_wakeup_at, deadline_at - safety_margin)。注册/注销失败记
-    wakeup/degraded(layer=L1)，绝不静默假装已注册。
+    max(next_wakeup_at, next_decision_at, deadline_at - safety_margin)。
+    P4：next_decision_at 是调度层算出的下一决策点，纳入目标让 RTC
+    唤醒对齐真实决策节奏。注册/注销失败记 wakeup/degraded(layer=L1)，
+    绝不静默假装已注册。
     """
 
     def __init__(self, schedule: SchedulePort, safety_margin: timedelta = DEFAULT_SAFETY_MARGIN):
@@ -222,8 +224,12 @@ class RtcAlarm:
             cid = contract.contract_id
             wakeup = contract.next_wakeup_at
             deadline_minus_margin = contract.draft.deadline_at - self._safety_margin
-            # max(next_wakeup_at, deadline - margin)：两者都缺就不注册
-            candidates = [t for t in (wakeup, deadline_minus_margin) if t is not None]
+            # P4：next_decision_at（下一决策点）也纳入目标
+            candidates = [
+                t
+                for t in (wakeup, contract.next_decision_at, deadline_minus_margin)
+                if t is not None
+            ]
             if not candidates:
                 continue
             targets[cid] = max(candidates)

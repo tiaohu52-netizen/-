@@ -520,6 +520,13 @@ def update_contract_state(
             acceptance_status if acceptance_status is not None else current.acceptance_status
         )
 
+        # next_wakeup_at/next_decision_at 未显式给出时保留现值：
+        # 两者是调度簿记（P4 决策点由 set_next_decision_at 轻量维护），
+        # 状态迁移不得顺手清空它们。
+        new_next_wakeup = next_wakeup_at if next_wakeup_at is not None else current.next_wakeup_at
+        new_next_decision = (
+            next_decision_at if next_decision_at is not None else current.next_decision_at
+        )
         conn.execute(
             """
             UPDATE contracts
@@ -540,8 +547,8 @@ def update_contract_state(
                 new_acceptance_status.value,
                 blocked_reason.value if blocked_reason else None,
                 now.isoformat(),
-                next_wakeup_at.isoformat() if next_wakeup_at else None,
-                next_decision_at.isoformat() if next_decision_at else None,
+                new_next_wakeup.isoformat() if new_next_wakeup else None,
+                new_next_decision.isoformat() if new_next_decision else None,
                 contract_id,
             ),
         )

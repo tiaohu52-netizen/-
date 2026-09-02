@@ -18,6 +18,7 @@ from longtask.adapters.factory import build_adapter
 from longtask.adapters.registry import ExecutorRegistry, RegistryEntry
 from longtask.cli.dispatch import _dispatch_attempt
 from longtask.contracts.schema import BlockReason, ContractState
+from longtask.persistence.decisions import set_next_decision_at
 from longtask.persistence.events import EventType
 from longtask.persistence.projections import rebuild_projection
 from longtask.persistence.store import (
@@ -207,6 +208,21 @@ def run_daemon_tick(
             estimate_stalled=estimate_stalled_by_contract.get(cid, False),
             partitions_allowed=allow_parallel,
         )
+
+        # P4：真实决策点计算 + 落库（不递增 revision，纯调度簿记）
+        next_at = _compute_next_decision_at(
+            c, now=now, lease=active_lease, decision_tier=decision.tier
+        )
+        if next_at is not None:
+            set_next_decision_at(
+                conn,
+                contract_id=cid,
+                when=next_at,
+                now=now,
+                reason=_next_decision_reason(decision.tier, lease_alive, budget_dispatches_left),
+                goal_id=c.goal_id,
+                contract_revision=c.revision,
+            )
 
         match decision.tier:
             case UrgencyTier.RESPAWN | UrgencyTier.PARALLEL:
@@ -486,3 +502,72 @@ def _safe_json(text: str) -> dict[str, Any]:
     if isinstance(result, dict):
         return result
     return {}
+
+
+# ── P4：next_decision_at 计算（SPEC §9、§10）──
+# 决策点是「下一次调度层必须重新审视这份合同的最早时刻」。纯函数，
+# 时间/租约注入，无 IO——落库由 set_next_decision_at 负责。
+
+# 各决策档的复核间隔：档位越高（越紧迫），复核越勤
+_TIER_RECHECK_MINUTES: dict[UrgencyTier, float] = {
+    UrgencyTier.QUEUED: 60.0,
+    UrgencyTier.REMIND: 15.0,
+    UrgencyTier.STEER: 10.0,
+    UrgencyTier.RESPAWN: 5.0,
+    UrgencyTier.PARALLEL: 5.0,
+    UrgencyTier.HAND_TO_USER: 30.0,
+}
+# 租约健康时的复核间隔：持有者在推进，只须盯租约到期前的续约/回收窗口
+_LEASE_RECHECK_MINUTES = 5.0
+# 决策点不得晚于 deadline（过了 deadline 就没有决策可做了）
+_DEADLINE_HARD_CAP = timedelta(seconds=1)
+
+
+def _compute_next_decision_at(
+    contract: Any,
+    *,
+    now: datetime,
+    lease: Any,
+    decision_tier: UrgencyTier | None,
+) -> datetime | None:
+    """计算该合同的下一个决策点（P4，SPEC §9）。
+
+    取三个信号的最小值（最早需要回头看的时间）：
+    1. 租约到期点：租约死了才谈接管/重派——到期前一刻必须回头看；
+    2. 档位复核点：紧迫度档位决定复核节奏（QUEUED 1h / RESPAWN 5m）；
+    3. deadline：越界仲裁是不可错过的事件，硬上限。
+
+    租约活着时档位被 cap 在 REMIND，但租约到期点才是真正的决策点
+    ——不是按档位傻等。deadline 永远封顶（决策点晚于 deadline 无意义）。
+    """
+    deadline = contract.draft.deadline_at
+    candidates: list[datetime] = []
+
+    if lease is not None:
+        lease_expiry = lease.heartbeat_at + lease.timeout
+        if lease_expiry > now:
+            candidates.append(lease_expiry)
+    if decision_tier is not None:
+        recheck_minutes = _TIER_RECHECK_MINUTES.get(decision_tier, 15.0)
+        candidates.append(now + timedelta(minutes=recheck_minutes))
+    if deadline > now:
+        candidates.append(deadline - _DEADLINE_HARD_CAP)
+
+    if not candidates:
+        return None
+    return min(candidates)
+
+
+def _next_decision_reason(
+    decision_tier: UrgencyTier | None,
+    lease_alive: bool,
+    budget_dispatches_left: int,
+) -> str:
+    """决策点归因（落进事件 payload，审计可读）。"""
+    if budget_dispatches_left < 1:
+        return "dispatch budget exhausted: only user action can move this contract"
+    if lease_alive:
+        return "lease healthy: re-check at lease expiry or tier recheck, whichever first"
+    if decision_tier is None:
+        return "past deadline: arbitration owns this contract"
+    return f"u-tier {int(decision_tier)}: re-check at tier cadence"
