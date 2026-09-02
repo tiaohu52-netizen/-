@@ -353,6 +353,7 @@ def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
     _add_column_if_missing("attempts", "session_locator TEXT")
     _add_column_if_missing("attempts", "recovery_strategy TEXT")
     _add_column_if_missing("attempts", "process_identity_json TEXT")
+    _add_column_if_missing("attempts", "capability_snapshot_json TEXT")
     _add_column_if_missing("attempts", "handle_registered_at TEXT")
     _add_column_if_missing("attempts", "orphaned_at TEXT")
 
