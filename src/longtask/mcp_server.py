@@ -201,6 +201,8 @@ def tool_notifications(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, A
     """只读通知队列状态；默认不返回 payload 内容。"""
     status = args.get("status")
     limit = int(args.get("limit", 50))
+    if not 1 <= limit <= 200:
+        raise ValueError("limit must be between 1 and 200")
     include_payload = bool(args.get("include_payload", False))
     rows = list_notifications(ctx["conn"], status=str(status) if status else None, limit=limit)
     return {
