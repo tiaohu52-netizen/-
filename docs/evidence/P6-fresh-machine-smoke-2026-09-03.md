@@ -35,6 +35,9 @@ Environment: new CPython 3.13 virtual environment created with `uv venv`
 13. Ran `longtask doctor` against an empty data directory; Python runtime,
     storage, database integrity, executor registry, and kill-switch checks all
     reported `PASS` (`ALL SYSTEMS GO`).
+14. Ran the official Skill structure validator for both
+    `skills/long-horizon-goals` and `skills/longtask-contract` in Python UTF-8
+    mode; both reported `Skill is valid!`.
 
 ## Scope and remaining work
 
