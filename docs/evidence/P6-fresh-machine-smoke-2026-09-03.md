@@ -56,7 +56,7 @@ Environment: new CPython 3.13 virtual environment created with `uv venv`
     process; every canonical facade imported successfully with zero failures.
 21. Ran the release artifact gate after adding canonical entry-point assertions;
     rebuilt wheel and sdist both passed, and the full quality gate completed with
-    492 tests passing at 80.37% coverage.
+    492 tests passing at 80.39% coverage.
 
 ## Scope and remaining work
 

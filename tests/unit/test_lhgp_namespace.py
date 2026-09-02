@@ -79,6 +79,7 @@ from lhgp.persistence.types import StoredLease as CanonicalStoredLease
 from lhgp.promoter.urgency import classify as canonical_classify
 from lhgp.rpc.errors import ErrorCode as CanonicalErrorCode
 from lhgp.rpc.methods import Method as CanonicalMethod
+from lhgp.scheduler.ticker import run_tick as canonical_run_tick
 from lhgp.scheduler.wakeup import guard_needed as canonical_guard_needed
 from longtask.acceptance.checks import CheckSpec as LegacyCheckSpec
 from longtask.adapters.registry import ExecutorRegistry as LegacyExecutorRegistry
@@ -136,6 +137,7 @@ from longtask.persistence.types import StoredLease as LegacyStoredLease
 from longtask.promoter.urgency import classify as legacy_classify
 from longtask.rpc.errors import ErrorCode as LegacyErrorCode
 from longtask.rpc.methods import Method as LegacyMethod
+from longtask.scheduler.ticker import run_tick as legacy_run_tick
 from longtask.scheduler.wakeup import guard_needed as legacy_guard_needed
 
 
@@ -205,6 +207,7 @@ def test_scheduler_and_promoter_namespaces_reexport_functions() -> None:
 
     assert canonical_guard_needed is legacy_guard_needed
     assert canonical_classify is legacy_classify
+    assert canonical_run_tick is legacy_run_tick
 
 
 def test_cli_namespace_reexports_pure_helpers() -> None:
