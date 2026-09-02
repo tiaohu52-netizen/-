@@ -165,6 +165,31 @@ def mark_failed(
         )
 
 
+def prune_sent(
+    conn: sqlite3.Connection,
+    *,
+    before: datetime,
+    keep_latest: int = 1000,
+) -> int:
+    """删除过旧的 sent 记录，保留最近 ``keep_latest`` 条审计窗口。"""
+    if keep_latest < 0:
+        raise ValueError("keep_latest must be non-negative")
+    with transaction(conn):
+        conn.execute(
+            """
+            DELETE FROM notification_outbox
+            WHERE status = 'sent'
+              AND updated_at < ?
+              AND notification_id NOT IN (
+                SELECT notification_id FROM notification_outbox
+                WHERE status = 'sent' ORDER BY notification_id DESC LIMIT ?
+              )
+            """,
+            (before.isoformat(), keep_latest),
+        )
+        return int(conn.execute("SELECT changes()").fetchone()[0])
+
+
 def drain_notifications(
     conn: sqlite3.Connection,
     *,
@@ -207,4 +232,5 @@ __all__ = [
     "get_by_key",
     "mark_failed",
     "mark_sent",
+    "prune_sent",
 ]

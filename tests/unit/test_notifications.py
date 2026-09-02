@@ -8,6 +8,7 @@ from longtask.persistence.notifications import (
     enqueue_notification,
     mark_failed,
     mark_sent,
+    prune_sent,
 )
 from longtask.persistence.store import (
     StoreConfig,
@@ -130,3 +131,23 @@ def test_state_transition_routes_notification_by_attention(tmp_path) -> None:
         ("notify-goal",),
     ).fetchall()
     assert [row[0] for row in queued] == ["satisfied"]
+
+
+def test_prune_sent_keeps_recent_audit_window(tmp_path) -> None:
+    conn = connect(StoreConfig(db_path=tmp_path / "state.db"))
+    ensure_schema(conn)
+    now = datetime(2026, 9, 3, tzinfo=UTC)
+    for index in range(3):
+        item = enqueue_notification(
+            conn,
+            idempotency_key=f"prune-{index}",
+            event_type="satisfied",
+            channel="local",
+            payload={},
+            now=now - timedelta(days=60 - index),
+        )
+        claim = claim_notifications(conn, now=now - timedelta(days=60 - index))
+        assert claim and claim[0].notification_id == item.notification_id
+        mark_sent(conn, notification_id=item.notification_id, now=now - timedelta(days=60 - index))
+    assert prune_sent(conn, before=now - timedelta(days=30), keep_latest=1) == 2
+    assert conn.execute("SELECT COUNT(*) FROM notification_outbox").fetchone()[0] == 1
