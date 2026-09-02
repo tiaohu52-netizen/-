@@ -99,7 +99,7 @@ def _row_to_attempt(data: dict[str, Any]) -> StoredAttempt:
         contract_revision=int(data["contract_revision"]),
         role=str(data["role"]),
         executor_id=data["executor_id"],
-        model_id=data["model_id"],
+        model_id=data.get("model_id"),
         state=str(data["state"]),
         lease_generation=data["lease_generation"],
         admitted_at=datetime.fromisoformat(admitted_raw),
