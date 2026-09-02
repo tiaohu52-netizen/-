@@ -243,8 +243,8 @@ The whole story of the run — `contract/prepared` → `contract/approved` →
 
 ### If your agent is an MCP-compatible LLM
 
-The package also installs `longtask-mcp`, a thin [MCP](https://modelcontextprotocol.io)
-server that exposes the core task-flow tools plus LHGP-named aliases, audit,
+The package installs `lhgp-mcp` (with the legacy `longtask-mcp` alias), a thin
+[MCP](https://modelcontextprotocol.io) server that exposes the core task-flow tools plus LHGP-named aliases, audit,
 and control extensions (not a 1:1 tunnel onto the 24 RPC methods — see the
 spec on §11.1). Point your harness at it
 (usually one line in your MCP config) and the model can discover and use
@@ -281,8 +281,8 @@ src/longtask/             the reference implementation, Python 3.11+, zero runti
   promoter/               urgency, escalation ladder, lease + fencing
   adapters/               how to wrap a CLI runner (Codex / Claude / DSH / ...)
   rpc/                    JSON-RPC control plane
-  cli/                    the `longtask` command + `longtaskd` daemon
-  mcp_server.py           the `longtask-mcp` model-facing entry
+  cli/                    the `lhgp` command + `lhgpd` daemon (legacy names remain)
+  mcp_server.py           the `lhgp-mcp` model-facing entry (legacy name remains)
 src/lhgp/                 canonical namespace facades (migration-safe, same implementation)
 
 skills/longtask-contract/ onboards an AI to use the protocol
