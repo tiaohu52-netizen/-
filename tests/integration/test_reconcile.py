@@ -912,3 +912,109 @@ class TestLegacyCompat:
             assert outcome_map(results) == {"att-r15": ReconcileBranch.ORPHAN_GRACED.value}
         finally:
             conn.close()
+
+
+class TestPostReapSettlement:
+    """收尸后窗口：reattach 拒绝（start_time 读不到）但 pid 确认消失 → 分支 2 如实结算。
+
+    场景：runner 进程死亡后外部 run 也退出且已被系统收尸——身份不可证
+    （start_time None），但「进程不在」这个事实可以判。直接结算 failed
+    （退出码不可得），不白烧 5 分钟 orphan grace。
+    """
+
+    def test_dead_pid_after_reattach_refusal_settles_immediately(self, tmp_path: Path) -> None:
+        import subprocess
+        import sys as _sys
+
+        # 真实子进程：退出 + wait 收尸 → start_time 读不到 + pid（大概率）复用前
+        proc = subprocess.Popen(  # noqa: S603 —— 测试固定 argv
+            (_sys.executable, "-c", "pass"),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        proc.wait(timeout=15)
+        dead_pid = proc.pid
+
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        cid = "lt-20260902-r18"
+        make_contract(data_dir, cid)
+        # 种 attempt：句柄指向已收尸死进程（身份字段齐全但已失效）
+        seed_attempt(
+            data_dir,
+            cid=cid,
+            attempt_id="att-r18",
+            state="running",
+            handle={
+                "external_run_id": str(dead_pid),
+                "session_locator": "att-r18",
+            },
+        )
+        # process_identity 需要带 pid（无 start_time 或已失效值都行）
+        conn = connect(StoreConfig(db_path=data_dir / "state.db"))
+        try:
+            from longtask.persistence.attempts import register_attempt_handle
+
+            register_attempt_handle(
+                conn,
+                attempt_id="att-r18",
+                external_run_id=str(dead_pid),
+                session_locator="att-r18",
+                recovery_strategy="reattach",
+                process_identity={"pid": float(dead_pid), "start_time": 1.0},
+                capability_snapshot={},
+                now=NOW,
+            )
+            conn.commit()
+            # SubprocessAdapter.reattach 因启动时间对不上拒绝（pid 已收尸）
+            from longtask.adapters.manifest import Capabilities, ExecutorManifest, SandboxCapability
+            from longtask.adapters.subprocess_adapter import LaunchSpec, SubprocessAdapter
+            from longtask.contracts.schema import Enforcement
+
+            reborn = SubprocessAdapter(
+                ExecutorManifest(
+                    executor_id="exec-sub",
+                    adapter_version="0",
+                    transport="subprocess",
+                    capabilities=Capabilities(
+                        spawn=True,
+                        observe=True,
+                        cancel=True,
+                        notify=False,
+                        followup=False,
+                        steer=False,
+                        interrupt=True,
+                        context="optional",
+                        sandbox=SandboxCapability(
+                            file_effects="workspace-write",
+                            network="unsupported",
+                            process="unsupported",
+                            enforcement=Enforcement.PARTIAL,
+                        ),
+                        acceptance_evidence=True,
+                    ),
+                ),
+                launch=LaunchSpec(argv=(_sys.executable,)),
+            )
+            # pid 死活探测是分支语义的决定因素（真实世界两种都可能）：
+            # - False（确认消失）→ 分支 2 立即结算，退出码不可得不猜；
+            # - None/True（pid 被复用或权限读不到）→ 身份不可证 → 分支 3。
+            from longtask.adapters.processes import process_alive as _pa
+
+            results = reconcile_attempts(
+                data_dir,
+                conn,
+                now=NOW + timedelta(minutes=1),
+                resolve_adapter=lambda _eid: reborn,
+            )
+            if _pa(dead_pid) is False:
+                assert outcome_map(results) == {"att-r18": ReconcileBranch.COLLECTED.value}
+                attempt = get_attempt(conn, "att-r18")
+                assert attempt is not None and attempt.state == "failed"
+                assert attempt.return_code is None  # 退出码不可得，不猜
+                assert get_lease(conn, cid) is None  # 租约释放，让位重派
+            else:
+                # pid 被复用/读不到：身份不可证 → orphan grace（正确语义）
+                assert outcome_map(results) == {"att-r18": ReconcileBranch.ORPHAN_GRACED.value}
+        finally:
+            conn.close()
