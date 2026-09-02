@@ -24,6 +24,7 @@ from lhgp.contracts.contract_view import (
     from_state_dict,
     to_state_dict,
 )
+from lhgp.contracts.validation import validate_draft, validate_raw
 
 __all__ = [
     "ALLOWED_CONTROLS",
@@ -50,4 +51,6 @@ __all__ = [
     "QuietHours",
     "from_state_dict",
     "to_state_dict",
+    "validate_draft",
+    "validate_raw",
 ]
