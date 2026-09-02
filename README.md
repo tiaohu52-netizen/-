@@ -230,6 +230,8 @@ uv run python -m longtask.cli.main get lt-hello
 uv run python -m longtask.cli.main status    # daemon / kill-switch
 # inspect durable notification delivery (payload is hidden by default)
 uv run python -m longtask.cli.main notifications --status pending
+# narrow the audit to one long-horizon goal when several run in parallel
+uv run python -m longtask.cli.main notifications --goal-id lt-hello
 # add --include-payload only when the audit needs notification details
 cat ~/.longtask/contracts/lt-hello/contract.yaml
 ```
