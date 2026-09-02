@@ -173,6 +173,39 @@ def tool_list_contracts(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, 
     return route(envelope, conn=ctx["conn"], now=_now(), registry=ctx["registry"])
 
 
+def _mcp_route(method: Method, args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
+    """为控制类工具构造统一的模型侧 RPC envelope。"""
+    return route(
+        parse_envelope(
+            {
+                "method": method.value,
+                "request_id": args.get("request_id", _now().isoformat()),
+                "client_id": "mcp",
+                "protocol_version": PROTOCOL_VERSION,
+                "params": dict(args),
+            }
+        ),
+        conn=ctx["conn"],
+        now=_now(),
+        registry=ctx["registry"],
+    )
+
+
+def tool_attempt_status(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
+    """读取执行 attempt 的事件、租约和当前状态。"""
+    return _mcp_route(Method.ATTEMPT_STATUS, args, ctx)
+
+
+def tool_interrupt_attempt(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
+    """排队中断执行中的 attempt，由 daemon 兑现实际取消。"""
+    return _mcp_route(Method.CONTROL_INTERRUPT, args, ctx)
+
+
+def tool_write_back(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
+    """写回进度、终态、结构化验收证据和实际模型身份。"""
+    return _mcp_route(Method.ATTEMPT_WRITE_BACK, args, ctx)
+
+
 def tool_attach_to_executor(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
     """执行者侧：模型被协议拉起时认领自己的 attempt 上下文 + 报告结果。
 
@@ -467,6 +500,59 @@ for _new_name, _legacy_name in _RENAMED_TOOLS.items():
         _handler,
         {**_metadata, "description": f"[LHGP] {_metadata['description']}"},
     )
+
+TOOLS.update(
+    {
+        "lhgp_attempt_status": (
+            tool_attempt_status,
+            {
+                "description": "读取 attempt 当前状态、事件历史和租约信息。",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["contract_id", "attempt_id"],
+                    "properties": {
+                        "contract_id": {"type": "string"},
+                        "attempt_id": {"type": "string"},
+                    },
+                },
+            },
+        ),
+        "lhgp_interrupt_attempt": (
+            tool_interrupt_attempt,
+            {
+                "description": "请求 daemon 中断指定 attempt。",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["contract_id", "attempt_id"],
+                    "properties": {
+                        "contract_id": {"type": "string"},
+                        "attempt_id": {"type": "string"},
+                        "reason": {"type": "string"},
+                    },
+                },
+            },
+        ),
+        "lhgp_write_back": (
+            tool_write_back,
+            {
+                "description": "写回进度、终态、验收 evidence 和实际 model_id。",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["contract_id", "attempt_id", "write_generation"],
+                    "properties": {
+                        "contract_id": {"type": "string"},
+                        "attempt_id": {"type": "string"},
+                        "write_generation": {"type": "integer"},
+                        "attempt_state": {"enum": ["succeeded", "failed"]},
+                        "progress_note": {"type": "string"},
+                        "model_id": {"type": "string"},
+                        "evidence": {"type": "array", "items": {"type": "object"}},
+                    },
+                },
+            },
+        ),
+    }
+)
 TOOL_NAMES = sorted(TOOLS.keys())
 
 

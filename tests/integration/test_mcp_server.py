@@ -87,6 +87,12 @@ class TestMCPDiscovery:
                 "longtask_attach_to_executor",
             }
             assert expected.issubset(names)
+            assert {
+                "lhgp_prepare_goal",
+                "lhgp_attempt_status",
+                "lhgp_interrupt_attempt",
+                "lhgp_write_back",
+            }.issubset(names)
         finally:
             proc.terminate()
             proc.wait(timeout=5)
