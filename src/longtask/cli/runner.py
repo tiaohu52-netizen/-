@@ -44,6 +44,7 @@ from longtask.persistence.projections import (
     contract_dir,
     rebuild_projection,
 )
+from longtask.persistence.schema import transaction
 from longtask.persistence.store import (
     LeaseFencedError,
     acquire_lease,
@@ -429,19 +430,22 @@ class AttemptRunner:
             payload["collect_error"] = str(exc)
 
         succeeded = payload["state"] == AttemptState.SUCCEEDED.value
-        append_event(
-            self._conn,
-            contract_id=contract_id,
-            attempt_id=attempt_id,
-            event_type=EventType.ATTEMPT_SUCCEEDED if succeeded else EventType.ATTEMPT_FAILED,
-            payload=payload,
-            now=now,
-            actor="daemon",
-            role=role,
-            contract_revision=info.get("contract_revision"),
-        )
-        # P1：更新 attempts 行状态（DESIGN §7 attempt 轴）
-        self._conn.execute(
+        # 事件、attempt 行、租约和投影必须在同一数据库事务中收口。
+        # collect 在事务外执行，避免长时间占用 SQLite 写锁。
+        with transaction(self._conn):
+            append_event(
+                self._conn,
+                contract_id=contract_id,
+                attempt_id=attempt_id,
+                event_type=EventType.ATTEMPT_SUCCEEDED if succeeded else EventType.ATTEMPT_FAILED,
+                payload=payload,
+                now=now,
+                actor="daemon",
+                role=role,
+                contract_revision=info.get("contract_revision"),
+            )
+            # P1：更新 attempts 行状态（DESIGN §7 attempt 轴）
+            self._conn.execute(
             """
             UPDATE attempts
             SET state = ?, terminal_at = ?, updated_at = ?,
@@ -457,9 +461,9 @@ class AttemptRunner:
                 json.dumps(payload, ensure_ascii=False),
                 attempt_id,
             ),
-        )
-        self._release_lease_if_held(now, contract_id, attempt_id)
-        rebuild_projection(self._root, contract_id, self._conn)
+            )
+            self._release_lease_if_held(now, contract_id, attempt_id)
+            rebuild_projection(self._root, contract_id, self._conn)
         executor_id = str(info["executor_id"])
         del self._running[attempt_id]
         self.finished_count += 1
