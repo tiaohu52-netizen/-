@@ -308,7 +308,7 @@ scripts/                  the 7-gate quality runner (local == CI)
 
 ## Maturity
 
-This is the **0.1.0 "Developer Preview"** release. The specification is
+This is the **0.1.0a0 "Developer Preview"** release. The specification is
 ahead of the implementation; the implementation roadmap
 ([`docs/LHGP-ROADMAP.md`](docs/LHGP-ROADMAP.md)) tracks the gap. The
 real-world validation so far is a few test runs of "write a palindrome

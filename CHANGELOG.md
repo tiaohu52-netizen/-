@@ -21,7 +21,7 @@ follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
 - Detached daemon and subprocess test lifecycle cleanup, including parent
   pipe closure after child exit.
 
-## [0.1.0] - 2026-09-01
+## [0.1.0a0] - 2026-09-01
 
 ### Added — Developer Preview release
 
@@ -98,7 +98,7 @@ expands to ubuntu + macOS.
 - L2 / L3 require external infrastructure and remain `accepted_debt` (see
   `quality/claims.json#strict-deadline-wakeup-design`).
 
-### Known limitations (accepted debt, not blockers for v0.1.0)
+### Known limitations (accepted debt, not blockers for v0.1.0a0)
 
 - L2 / L3 wakeup not implemented (cloud + relay, external infra).
 - Headless harness subprocess lifetime vs. `Popen` handle alignment
