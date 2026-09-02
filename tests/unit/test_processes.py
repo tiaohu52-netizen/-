@@ -51,8 +51,8 @@ class TestProcessAlive:
         """真实子进程退出后：确认不存活（False），不是未知。"""
         proc = subprocess.Popen(  # noqa: S603 —— 测试固定 argv，无不可信输入
             (sys.executable, "-c", "pass"),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
         proc.wait(timeout=15)
         # 进程已退出且已被本进程收尸：pid 探测应报 False
@@ -95,8 +95,8 @@ class TestTerminatePid:
         """对真实存活的子进程 terminate 生效；已退出的不抛错。"""
         proc = subprocess.Popen(  # noqa: S603 —— 测试固定 argv，无不可信输入
             (sys.executable, "-c", "import time; time.sleep(30)"),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
         try:
             assert terminate_pid(proc.pid) is True
