@@ -632,8 +632,12 @@ def _dispatch(
             {"tools": [{"name": name, **schema} for name, (_fn, schema) in TOOLS.items()]},
         )
     if method == "tools/call":
+        if not isinstance(params, dict):
+            return _make_error(req_id, -32602, "invalid arguments: params must be an object")
         tool_name = params.get("name")
         args = params.get("arguments") or {}
+        if not isinstance(args, dict):
+            return _make_error(req_id, -32602, "invalid arguments: arguments must be an object")
         if tool_name not in TOOLS:
             return _make_error(req_id, -32602, f"unknown tool: {tool_name}")
         try:

@@ -38,7 +38,7 @@ def _spawn_mcp(data_dir: Path) -> subprocess.Popen[bytes]:
 
 
 def _roundtrip(
-    proc: subprocess.Popen[bytes], method: str, params: dict[str, Any] | None = None, _id: int = 1
+    proc: subprocess.Popen[bytes], method: str, params: Any = None, _id: int = 1
 ) -> dict[str, Any]:
     assert proc.stdin is not None and proc.stdout is not None
     req = {"jsonrpc": "2.0", "id": _id, "method": method, "params": params or {}}
@@ -259,6 +259,37 @@ class TestMCPErrors:
             )
             assert "error" in resp
             assert resp["error"]["code"] == -32602
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+    def test_non_object_arguments_return_invalid_params(self, data_dir: Path) -> None:
+        proc = _spawn_mcp(data_dir)
+        try:
+            resp = _roundtrip(
+                proc,
+                "tools/call",
+                {"name": "lhgp_notifications", "arguments": ["unexpected"]},
+            )
+            assert resp["error"]["code"] == -32602
+            assert "arguments" in resp["error"]["message"]
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
+
+    def test_unknown_notification_status_returns_invalid_params(self, data_dir: Path) -> None:
+        proc = _spawn_mcp(data_dir)
+        try:
+            resp = _roundtrip(
+                proc,
+                "tools/call",
+                {
+                    "name": "lhgp_notifications",
+                    "arguments": {"status": "queued"},
+                },
+            )
+            assert resp["error"]["code"] == -32602
+            assert "unknown notification status" in resp["error"]["message"]
         finally:
             proc.terminate()
             proc.wait(timeout=5)
