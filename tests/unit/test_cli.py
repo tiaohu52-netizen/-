@@ -31,6 +31,7 @@ from longtask.cli.daemon import (
 from longtask.cli.doctor import run_doctor
 from longtask.cli.main import main
 from longtask.contracts.schema import Acceptance, Budget, ContractDraft, ContractState, Enforcement
+from longtask.persistence.notifications import enqueue_notification
 from longtask.persistence.store import (
     StoreConfig,
     connect,
@@ -125,6 +126,39 @@ class TestCliBasics:
     ) -> None:
         assert main(["--data-dir", str(tmp_path), "notifications", "--limit", "201"]) == 1
         assert "between 1 and 200" in capsys.readouterr().err
+
+    def test_notifications_filters_and_redacts_payload_by_default(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        conn = connect(StoreConfig(db_path=tmp_path / "state.db"))
+        try:
+            ensure_schema(conn)
+            enqueue_notification(
+                conn,
+                idempotency_key="cli-goal-a",
+                goal_id="goal-a",
+                event_type="need_user",
+                channel="local",
+                payload={"secret": "do-not-leak"},
+                now=NOW,
+            )
+            enqueue_notification(
+                conn,
+                idempotency_key="cli-goal-b",
+                goal_id="goal-b",
+                event_type="satisfied",
+                channel="local",
+                payload={"other": True},
+                now=NOW,
+            )
+        finally:
+            conn.close()
+
+        assert main(["--data-dir", str(tmp_path), "notifications", "--goal-id", "goal-a"]) == 0
+        output = json.loads(capsys.readouterr().out)
+        assert len(output["notifications"]) == 1
+        assert output["notifications"][0]["goal_id"] == "goal-a"
+        assert "payload" not in output["notifications"][0]
 
     def test_doctor_report(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         report = run_doctor(tmp_path)
