@@ -47,6 +47,9 @@ Environment: new CPython 3.13 virtual environment created with `uv venv`
 17. Opened a database with `user_version=2` but missing P3 additive columns;
     `ensure_schema` repaired it in place, and the daemon completed one scan
     without an `OperationalError`.
+18. Rebuilt the wheel and inspected its `entry_points.txt`: canonical scripts
+    point to `lhgp.*`, legacy scripts remain on `longtask.*`, and the wheel
+    contains the complete `lhgp/` package tree.
 
 ## Scope and remaining work
 
