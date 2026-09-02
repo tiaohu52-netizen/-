@@ -28,6 +28,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT.parent / "src"))
 
+# Windows consoles may still use a legacy code page; keep the evidence script
+# runnable there without changing the protocol or the captured event format.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 CID = "lt-dogfood-v04"
 
 NOW = datetime(2026, 9, 2, 18, 0, 0, tzinfo=UTC)
@@ -280,11 +285,16 @@ def phase1() -> None:
 
 def probe() -> None:
     """考验点 1 单测：default-deny——不真跑 LLM，只验候选筛选。"""
+    import shutil
+
     from longtask.adapters.registry import ExecutorRegistry
     from longtask.contracts.schema import ContractState
     from longtask.persistence.store import StoreConfig, connect, get_contract
 
     build_registry()
+    for victim in ("state.db", "contracts", "ws"):
+        shutil.rmtree(ROOT / victim, ignore_errors=True)
+        (ROOT / victim).unlink(missing_ok=True)
     setup_contract()
     conn = connect(StoreConfig(db_path=ROOT / "state.db"))
     try:
