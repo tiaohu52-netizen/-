@@ -10,6 +10,7 @@ from lhgp.contracts.attention import VALID_NOTIFY_ON, Attention, QuietHours
 from lhgp.contracts.authority import ALLOWED_CONTROLS, Authority, AuthorityBinding
 from lhgp.contracts.budget import DEFAULT_VERIFICATION_RESERVED, Budget
 from lhgp.contracts.continuity import Continuity
+from lhgp.contracts.contract_draft import SCHEMA_VERSION, ContractDraft
 from lhgp.contracts.contract_view import (
     FROZEN_FIELDS,
     AcceptanceStatus,
@@ -28,6 +29,7 @@ __all__ = [
     "ALLOWED_CONTROLS",
     "DEFAULT_VERIFICATION_RESERVED",
     "FROZEN_FIELDS",
+    "SCHEMA_VERSION",
     "VALID_NOTIFY_ON",
     "VALID_VERIFIER_KINDS",
     "Acceptance",
@@ -40,6 +42,7 @@ __all__ = [
     "BlockReason",
     "Budget",
     "Continuity",
+    "ContractDraft",
     "ContractState",
     "DeadlineStatus",
     "Enforcement",
