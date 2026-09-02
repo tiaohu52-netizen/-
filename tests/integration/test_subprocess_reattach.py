@@ -219,6 +219,9 @@ class TestDetachedObservation:
         assert obs["returncode"] is None
         assert obs["exit_code_known"] is False
         assert obs["error_class"] == "external-run-exit-unrecoverable"
+        # The original adapter still owns the Popen wrapper; collect closes its
+        # streams even though the process was terminated out-of-band.
+        adapter.collect("att-h8")
 
     def test_detached_collect_raises_not_fabricates(self, tmp_path: Path) -> None:
         """detached collect：管道已丢，如实抛错，绝不编退出码或空输出。"""

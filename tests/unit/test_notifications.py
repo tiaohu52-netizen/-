@@ -58,6 +58,7 @@ def test_outbox_is_idempotent_and_retryable(tmp_path) -> None:
     assert retried[0].attempts == 2
     mark_sent(conn, notification_id=first.notification_id, now=now)
     assert claim_notifications(conn, now=now + timedelta(hours=1)) == []
+    conn.close()
 
 
 def test_list_notifications_filters_by_goal_id(tmp_path) -> None:
@@ -117,6 +118,7 @@ def test_drain_retries_channel_failure(tmp_path) -> None:
     assert drain_notifications(conn, now=now, deliver=fail_delivery) == 0
     assert claim_notifications(conn, now=now) == []
     assert claim_notifications(conn, now=now + timedelta(seconds=60))
+    conn.close()
 
 
 def test_quiet_hours_delay_non_bypass_and_allow_bypass() -> None:
@@ -158,6 +160,7 @@ def test_state_transition_routes_notification_by_attention(tmp_path) -> None:
         ("notify-goal",),
     ).fetchall()
     assert [row[0] for row in queued] == ["satisfied"]
+    conn.close()
 
 
 def test_prune_sent_keeps_recent_audit_window(tmp_path) -> None:
@@ -178,3 +181,4 @@ def test_prune_sent_keeps_recent_audit_window(tmp_path) -> None:
         mark_sent(conn, notification_id=item.notification_id, now=now - timedelta(days=60 - index))
     assert prune_sent(conn, before=now - timedelta(days=30), keep_latest=1) == 2
     assert conn.execute("SELECT COUNT(*) FROM notification_outbox").fetchone()[0] == 1
+    conn.close()
