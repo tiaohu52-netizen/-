@@ -3,6 +3,7 @@
 import longtask
 from lhgp import PROTOCOL_VERSION, __version__
 from lhgp.adapters.registry import ExecutorRegistry as CanonicalExecutorRegistry
+from lhgp.cli.formatting import format_eta as canonical_format_eta
 from lhgp.contracts.contract_draft import ContractDraft as CanonicalContractDraft
 from lhgp.persistence.store import connect as canonical_connect
 from lhgp.promoter.urgency import classify as canonical_classify
@@ -10,6 +11,7 @@ from lhgp.rpc.errors import ErrorCode as CanonicalErrorCode
 from lhgp.rpc.methods import Method as CanonicalMethod
 from lhgp.scheduler.wakeup import guard_needed as canonical_guard_needed
 from longtask.adapters.registry import ExecutorRegistry as LegacyExecutorRegistry
+from longtask.cli.formatting import format_eta as legacy_format_eta
 from longtask.contracts.contract_draft import ContractDraft as LegacyContractDraft
 from longtask.persistence.store import connect as legacy_connect
 from longtask.promoter.urgency import classify as legacy_classify
@@ -55,3 +57,9 @@ def test_scheduler_and_promoter_namespaces_reexport_functions() -> None:
 
     assert canonical_guard_needed is legacy_guard_needed
     assert canonical_classify is legacy_classify
+
+
+def test_cli_namespace_reexports_pure_helpers() -> None:
+    """CLI facades must preserve helper identity without changing entrypoints."""
+
+    assert canonical_format_eta is legacy_format_eta
