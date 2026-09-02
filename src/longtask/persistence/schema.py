@@ -278,6 +278,31 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
         """
     )
 
+    # P4：通知 outbox（至少一次投递 + 幂等键；渠道本身不在存储层实现）
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS notification_outbox (
+            notification_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            idempotency_key TEXT NOT NULL UNIQUE,
+            goal_id TEXT,
+            event_type TEXT NOT NULL,
+            channel TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            attempts INTEGER NOT NULL DEFAULT 0,
+            available_at TEXT NOT NULL,
+            lease_until TEXT,
+            last_error TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_notification_outbox_due "
+        "ON notification_outbox(status, available_at, notification_id)"
+    )
+
     # ── 迁移：v1 → v2 ──
     _migrate_v1_to_v2(conn)
 
