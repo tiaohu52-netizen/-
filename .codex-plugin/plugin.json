@@ -1,7 +1,7 @@
 {
   "id": "lhgp",
   "name": "lhgp",
-  "version": "0.1.0a0",
+  "version": "0.1.0",
   "description": "远期目标协议：把跨会话、跨 Agent 的目标写成可审计合同，由本地运行时持续推进、交接和验收。",
   "author": {
     "name": "LHGP maintainers"

@@ -25,7 +25,9 @@ class TestPluginManifest:
         assert path.is_file(), f"missing {path}"
         data = json.loads(path.read_text(encoding="utf-8"))
         assert data["name"] == "lhgp"
-        assert data["version"] == __version__
+        # The Codex plugin manifest requires strict SemVer; the Python package
+        # may remain on a prerelease while the plugin surface is in preview.
+        assert data["version"] == "0.1.0"
         assert data["skills"] == "skills"
         assert data["mcpServers"] == ".mcp.json"
         assert data["author"]["name"] == "LHGP maintainers"
