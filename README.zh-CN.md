@@ -144,13 +144,13 @@ cat > /tmp/my-runners.json <<'EOF'
 }
 EOF
 # 指给它（路径随意，这是配置数据，不是 CLI flag）
-cp /tmp/my-runners.json ~/.longtask/registry.json
+cp /tmp/my-runners.json ~/.lhgp/registry.json
 ```
 
 写合同：
 
 ```bash
-uv run python -m longtask.cli.main prepare \
+lhgp prepare \
   --contract-id lt-20260903-hello \
   --title "第一份合同" \
   --objective "在工作区写下 hello.txt，内容是 'hi from LHGP'。" \
@@ -160,32 +160,32 @@ uv run python -m longtask.cli.main prepare \
 批准：
 
 ```bash
-uv run python -m longtask.cli.main approve lt-20260903-hello
+lhgp approve lt-20260903-hello
 ```
 
 在另一个终端启动守护进程：
 
 ```bash
-uv run python -m longtask.cli.main start --interval 30
+lhgp start --interval 30
 # 留着它跑；它会接合同、跑 echo、核验、完成。
 ```
 
 查看：
 
 ```bash
-uv run python -m longtask.cli.main get lt-20260903-hello
-uv run python -m longtask.cli.main status    # 守护进程 / 紧急熔断
+lhgp get lt-20260903-hello
+lhgp status    # 守护进程 / 紧急熔断
 # 查看持久化通知投递状态（默认隐藏 payload）
-uv run python -m longtask.cli.main notifications --status pending
+lhgp notifications --status pending
 # 多个目标并行时，可按目标 ID 缩小审计范围
-uv run python -m longtask.cli.main notifications --goal-id lt-20260903-hello
+lhgp notifications --goal-id lt-20260903-hello
 # 只有审计确实需要时才加 --include-payload
-cat ~/.longtask/contracts/lt-20260903-hello/contract.yaml
+cat ~/.lhgp/contracts/lt-20260903-hello/contract.yaml
 ```
 
 整段运行的故事 —— `contract/prepared` → `contract/approved` →
 `attempt/started` → `attempt/succeeded` → `contract/completed` —— 都在
-`state.db` 里，也镜像到 `~/.longtask/contracts/lt-20260903-hello/` 下。
+`state.db` 里，也镜像到 `~/.lhgp/contracts/lt-20260903-hello/` 下。
 
 ### 如果你的 Agent 是兼容 MCP 的 LLM
 
