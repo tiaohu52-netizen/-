@@ -147,7 +147,7 @@ git clone https://github.com/<OWNER>/longtask-protocol
 cd longtask-protocol
 uv sync --extra dev
 uv run python scripts/quality_gate.py   # ~10s; the same gate CI runs
-uv run python -m longtask.cli.main doctor
+uv run lhgp doctor
 ```
 
 You should see something like:
@@ -300,10 +300,10 @@ scripts/                  the 7-gate quality runner (local == CI)
 
 ## Help, it's not working
 
-- **First stop**: `uv run python -m longtask.cli.main doctor`. It runs 4 sanity checks and tells you which one failed.
-- **Stuck contract**: `uv run python -m longtask.cli.main get <id>`. Look at `state`, `blocked_reason`, and the events.
-- **Kill switch**: `uv run python -m longtask.cli.main kill-switch --activate` halts all dispatching immediately. Re-arming is `--deactivate`.
-- **Daemon wedged**: `uv run python -m longtask.cli.main stop`, then `start` again. State is preserved.
+- **First stop**: `uv run lhgp doctor`. It runs 4 sanity checks and tells you which one failed.
+- **Stuck contract**: `uv run lhgp get <id>`. Look at `state`, `blocked_reason`, and the events.
+- **Kill switch**: `uv run lhgp kill-switch --activate` halts all dispatching immediately. Re-arming is `--deactivate`.
+- **Daemon wedged**: `uv run lhgp stop`, then `start` again. State is preserved.
 - **Found a bug?** File it via the [bug report template](../../issues/new?template=bug_report.md). Include `uv run python scripts/quality_gate.py` output if you ran it.
 - **Asking a design question**: check [`docs/LHGP-SPEC.md`](docs/LHGP-SPEC.md) first (it's 1100+ lines but searchable). If still unclear, use the [documentation template](../../issues/new?template=documentation.md).
 
