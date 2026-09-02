@@ -36,6 +36,10 @@ jobs:
       - name: Install project + dev
         run: uv sync --extra dev
 
+      - name: Build distributable artifacts
+        # Catch hatch/force-include regressions before a release is tagged.
+        run: uv build
+
       - name: Run authoritative 7-gate quality check
         # scripts/quality_gate.py is the single source of truth (CONTRIBUTING.md).
         # The CI environment matrix proves the gate works on all three OSes;
