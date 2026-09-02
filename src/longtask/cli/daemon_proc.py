@@ -53,6 +53,8 @@ def get_daemon_status(root: Path) -> dict[str, Any]:
         "running": running,
         "pid": pid,
         "token_available": token is not None,
+        "rpc_socket": str(root / RPC_SOCKET_FILE) if (root / RPC_SOCKET_FILE).exists() else None,
+        "rpc_socket_available": (root / RPC_SOCKET_FILE).exists() and token is not None,
         "kill_switch": ks_active,
     }
 
