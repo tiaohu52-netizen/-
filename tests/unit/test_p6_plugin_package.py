@@ -43,6 +43,15 @@ class TestPluginManifest:
         mcp_path = REPO_ROOT / data["mcpServers"]
         assert mcp_path.is_file(), f"missing mcp config at {mcp_path}"
 
+    def test_legacy_skill_manifest_matches_protocol(self) -> None:
+        manifest = json.loads(
+            (REPO_ROOT / "skills" / "longtask-contract" / "MANIFEST.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        assert manifest["version"] == __version__
+        assert manifest["protocol_version"] == "lhgp/v1alpha1"
+
 
 class TestMcpConfig:
     def test_mcp_json_valid_with_lhgp_server(self) -> None:
