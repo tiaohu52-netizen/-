@@ -32,7 +32,7 @@ Environment: new CPython 3.13 virtual environment created with `uv venv`
 12. Rebuilt the wheel and sdist, verified both with `scripts/check_artifacts.py`,
     reran the plugin validator, and inspected the wheel to confirm its embedded
     `.codex-plugin/plugin.json` also reports version `0.1.0`.
-13. Ran `longtask doctor` against an empty data directory; Python runtime,
+13. Ran `lhgp doctor` against an empty data directory; Python runtime,
     storage, database integrity, executor registry, and kill-switch checks all
     reported `PASS` (`ALL SYSTEMS GO`).
 14. Ran the official Skill structure validator for both

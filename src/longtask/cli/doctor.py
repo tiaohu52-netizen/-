@@ -1,4 +1,4 @@
-"""longtask doctor 系统自检（DESIGN §15.2）。
+"""LHGP doctor 系统自检（DESIGN §15.2）。
 
 自检项目：
 1. Python 解释器大版本（>= 3.11）；
@@ -41,7 +41,7 @@ class DoctorReport:
 
     def format_text(self) -> str:
         lines: list[str] = [
-            f"=== longtask doctor (v{self.package_version}, protocol v{self.protocol_version}) ===",
+            f"=== LHGP doctor (v{self.package_version}, protocol v{self.protocol_version}) ===",
         ]
         for c in self.checks:
             mark = "[PASS]" if c.ok else "[FAIL]"
