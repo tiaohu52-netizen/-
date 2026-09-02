@@ -51,6 +51,7 @@ from longtask.persistence.store import (
     release_lease,
     renew_lease,
 )
+from longtask.promoter.records import _count_verifier_attempts
 
 # 事件 payload 内 stdout/stderr 截断上限：审计够用，不撑爆 log.jsonl
 OUTPUT_TAIL_CHARS = 2000
@@ -525,6 +526,27 @@ class AttemptRunner:
             (contract_id,),
         ).fetchone()
         if existing_verifier is not None:
+            return False
+        # P5 验证预算独立记账（§12.4）：verifier 派发消耗
+        # verification_attempts_reserved 而非 max_dispatches——否则一轮
+        # 验证就能吃光执行预算，repair 闭环直接饿死。计数源是 attempts
+        # 表 role='verifier' 的行（可审计），兜底 reserved=1。
+        reserved = contract.draft.budget.verification_attempts_reserved
+        used = _count_verifier_attempts(self._conn, contract_id)
+        if used >= reserved:
+            append_event(
+                self._conn,
+                contract_id=contract_id,
+                event_type=EventType.ESCALATION_HANDED_TO_USER,
+                payload={
+                    "reason": (
+                        f"verification budget exhausted: {used}/{reserved} "
+                        "verifier attempts used (§12.4): user arbitration needed"
+                    ),
+                },
+                now=now,
+                actor="daemon",
+            )
             return False
         # 选择候选：排除执行者本身，按执行器匹配规则排序；
         # requested_role='verifier' → 合同 authority 设了绑定时，

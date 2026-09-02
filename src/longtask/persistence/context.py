@@ -104,6 +104,7 @@ def _handover_data(root: Path, contract_id: str) -> dict[str, str]:
         "next_action": data.next_action,
         "estimate_remaining_hours": str(data.estimate_remaining_hours),
         "source_attempt_id": data.source_attempt_id,
+        "open_risks": "\n".join(f"- {item}" for item in data.open_risks),
     }
 
 
@@ -239,9 +240,10 @@ class CapacityRefusedError(Exception):
 def handover_prompt_addendum(root: Path, contract_id: str) -> str:
     """交接摘要的任务文本附言（修复再派 attempt 缺上下文的缺口）。
 
-    优先级：handover.remaining/next_action（跨 attempt 现场）>
+    优先级：handover.remaining/next_action/open_risks（跨 attempt 现场）>
     最近 attempt 失败原因。截断到 HANDOVER_IN_PROMPT_CHARS——
-    任务文本是准入面不是全文搬运面。
+    任务文本是准入面不是全文搬运面。open_risks 是 §12.4 RepairBrief
+    落进交接的失败证据（verifier 为什么判 fail），修复 attempt 须可见。
     """
     handover = _handover_data(root, contract_id)
     parts: list[str] = []
@@ -249,6 +251,8 @@ def handover_prompt_addendum(root: Path, contract_id: str) -> str:
         parts.append(f"交接指引（上一 attempt 留下）：{handover['next_action']}")
     if handover.get("remaining"):
         parts.append(f"剩余工作：{handover['remaining']}")
+    if handover.get("open_risks"):
+        parts.append(f"失败证据：{handover['open_risks']}")
     if not parts:
         return ""
     text = " ".join(parts)
