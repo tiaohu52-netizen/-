@@ -208,7 +208,15 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
             return_code INTEGER,
             error_class TEXT,
             payload_json TEXT NOT NULL DEFAULT '{}',
-            updated_at TEXT NOT NULL
+            updated_at TEXT NOT NULL,
+            -- P3：持久外部句柄（SPEC §11.3）——外部 run 身份与恢复策略
+            external_run_id TEXT,
+            session_locator TEXT,
+            recovery_strategy TEXT,  -- reattach | poll | nonrecoverable
+            process_identity_json TEXT,  -- 提示，不得单独作为身份真相
+            capability_snapshot_json TEXT,
+            handle_registered_at TEXT,
+            orphaned_at TEXT  -- 进入 orphan grace 的起点（§11.3 分支 3）
         )
         """
     )
@@ -222,6 +230,13 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
         """
         CREATE INDEX IF NOT EXISTS idx_attempts_role_state
         ON attempts(role, state)
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_attempts_orphaned
+        ON attempts(state)
+        WHERE state = 'orphaned'
         """
     )
 
@@ -300,6 +315,14 @@ def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
     _add_column_if_missing("events", "contract_revision INTEGER")
     _add_column_if_missing("events", "role TEXT")
     _add_column_if_missing("events", "payload_schema_version INTEGER NOT NULL DEFAULT 1")
+
+    # P3：attempts 表外部句柄列（SPEC §11.3）——v2 早期 attempts 表无这些列
+    _add_column_if_missing("attempts", "external_run_id TEXT")
+    _add_column_if_missing("attempts", "session_locator TEXT")
+    _add_column_if_missing("attempts", "recovery_strategy TEXT")
+    _add_column_if_missing("attempts", "process_identity_json TEXT")
+    _add_column_if_missing("attempts", "handle_registered_at TEXT")
+    _add_column_if_missing("attempts", "orphaned_at TEXT")
 
     # 回填 goal_id
     conn.execute("UPDATE contracts SET goal_id = contract_id WHERE goal_id IS NULL OR goal_id = ''")

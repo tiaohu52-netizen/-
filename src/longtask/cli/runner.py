@@ -27,6 +27,10 @@ from longtask.adapters.base import (
 from longtask.adapters.factory import build_adapter
 from longtask.adapters.registry import ExecutorRegistry, RegistryEntry
 from longtask.contracts.schema import AttemptRole, AttemptState, ContractDraft, ContractView
+from longtask.persistence.attempts import (
+    register_attempt_handle,
+    set_attempt_state,
+)
 from longtask.persistence.context import (
     CapacityRefusedError,
     compile_context_snapshot,
@@ -158,6 +162,67 @@ class AttemptRunner:
         self._adapters[executor_id] = adapter
         return adapter
 
+    def adapter_for(self, executor_id: str | None) -> ExecutorAdapter | None:
+        """公开取适配器入口：reconcile 必须与执行桥接共用同一实例。
+
+        共用实例是硬要求——reattach 把外部 run 重新绑进适配器内部表，
+        若 reconcile 用另一个实例，绑定结果执行层看不见，等于没绑。
+        """
+        if executor_id is None:
+            return None
+        return self._adapter_for(executor_id)
+
+    def is_tracking(self, attempt_id: str) -> bool:
+        """本进程是否仍持有该 attempt 的活句柄（reconcile 据此让路）。"""
+        return attempt_id in self._running
+
+    def _persist_handle(
+        self,
+        adapter: ExecutorAdapter,
+        contract: ContractView,
+        attempt_id: str,
+        now: datetime,
+    ) -> None:
+        """spawn 成功立刻持久化外部句柄（§11.3 MUST 持久返回）。
+
+        句柄不落库，守护进程重启后就无法确认外部 run 死活，只能一律当作
+        状态未知——那等于把「跨重启连续性」交给了运气。这是内存 Popen 的
+        根本缺陷，必须在 spawn 后立刻补上。
+        """
+        handle = adapter.run_handle(attempt_id)
+        if handle is None:
+            # 适配器拿不出句柄：如实记账，不伪造一个可恢复的假象
+            self._emit(f"runner/handle-unavailable:{contract.contract_id}:{attempt_id}")
+            return
+        register_attempt_handle(
+            self._conn,
+            attempt_id=attempt_id,
+            external_run_id=handle.external_run_id,
+            session_locator=handle.session_locator,
+            recovery_strategy=handle.recovery_strategy,
+            process_identity=handle.process_identity,
+            capability_snapshot=handle.capability_snapshot,
+            now=now,
+        )
+        set_attempt_state(
+            self._conn,
+            attempt_id=attempt_id,
+            state=AttemptState.RUNNING.value,
+            now=now,
+        )
+        append_event(
+            self._conn,
+            contract_id=contract.contract_id,
+            attempt_id=attempt_id,
+            event_type=EventType.HANDLE_REGISTERED,
+            payload=handle.to_dict(),
+            now=now,
+            actor="daemon",
+            goal_id=contract.goal_id,
+            contract_revision=contract.revision,
+            role="executor",
+        )
+
     def start_attempt(
         self, now: datetime, *, contract_id: str, attempt_id: str, executor_id: str
     ) -> bool:
@@ -185,6 +250,7 @@ class AttemptRunner:
         except OSError as exc:
             self._fail_attempt(now, contract_id, attempt_id, f"spawn failed: {exc}")
             return False
+        self._persist_handle(adapter, contract, attempt_id, now)
         lease = get_lease(self._conn, contract_id)
         self._running[attempt_id] = {
             "contract_id": contract_id,
@@ -526,6 +592,7 @@ class AttemptRunner:
                 now.isoformat(),
             ),
         )
+        self._persist_handle(adapter, contract, verifier_id, now)
         lease = get_lease(self._conn, contract_id)
         self._running[verifier_id] = {
             "contract_id": contract_id,

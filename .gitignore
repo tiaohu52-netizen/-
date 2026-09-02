@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 工具缓存
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# uv：独立成仓后应提交 uv.lock（DESIGN §13.1 锁定依赖），现阶段不生成
+
+# 运行时状态目录（本机部署产生，绝不入库）
+.longtask/
+
+# 编辑器
+.idea/
+.vscode/
+*.swp
+
+# OS
+Thumbs.db
+Desktop.ini
+
+# 运行时数据目录（真实注册表/工作区/数据库不入库；归档走 examples/）
+runtime/
+runtime/contents:
+runtime-mcp/

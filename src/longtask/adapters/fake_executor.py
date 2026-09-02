@@ -21,6 +21,7 @@ from longtask.adapters.base import (
     PreparedLaunch,
     PrepareRefusedError,
 )
+from longtask.adapters.handles import RECOVERY_NONRECOVERABLE, ExternalRunHandle
 from longtask.adapters.manifest import (
     Capabilities,
     ExecutorManifest,
@@ -89,12 +90,21 @@ class FakeExecutor(ExecutorAdapter):
         self,
         scripts: Mapping[str, FakeAttemptScript] | None = None,
         default_script: FakeAttemptScript | None = None,
+        reattachable_runs: Mapping[str, str] | None = None,
     ) -> None:
+        """构造假执行器。
+
+        reattachable_runs：external_run_id → session_locator 映射，模拟
+        「守护进程重启后仍联系得到的外部 run」。默认为空 —— 纯内存适配器
+        重启后本来就无法证明任何东西，reattach 必须失败并走 orphan grace；
+        想走通 reattach 分支必须显式声明，不白给能力（§9 绝不静默降级）。
+        """
         self._scripts: dict[str, FakeAttemptScript] = dict(scripts) if scripts else {}
         for script in self._scripts.values():
             script.validate()
         self._default_script = default_script if default_script is not None else FakeAttemptScript()
         self._default_script.validate()
+        self._reattachable: dict[str, str] = dict(reattachable_runs or {})
         self._spawned: set[str] = set()
         self._cancelled: set[str] = set()
         self._cancel_rejected: set[str] = set()
@@ -169,6 +179,30 @@ class FakeExecutor(ExecutorAdapter):
             raise ValueError(f"attempt 已拉起，拒绝重复 spawn: {input_.attempt_id}")
         self._spawned.add(input_.attempt_id)
         return f"fake:{input_.attempt_id}"
+
+    def run_handle(self, attempt_id: str) -> ExternalRunHandle | None:
+        """持久返回句柄（§11.3）。
+
+        纯内存适配器：spawn 期间能给出句柄，但 recovery_strategy 如实声明
+        nonrecoverable —— 进程一退就再也联系不上，reconcile 不许假装能重绑。
+        """
+        if attempt_id not in self._spawned:
+            return None
+        return ExternalRunHandle(
+            external_run_id=f"fake-run-{attempt_id}",
+            session_locator=attempt_id,
+            recovery_strategy=RECOVERY_NONRECOVERABLE,
+            capability_snapshot={"transport": "fake", "observe": "in-memory"},
+            process_identity={},
+        )
+
+    def reattach(self, handle: ExternalRunHandle) -> bool:
+        """按句柄重新绑定（§11.3 分支 1）；只有显式声明过的 run 才认。"""
+        locator = self._reattachable.get(handle.external_run_id)
+        if locator is None or locator != handle.session_locator:
+            return False
+        self._spawned.add(handle.session_locator)
+        return True
 
     def observe(self, attempt_id: str) -> dict[str, object]:
         """观察脚本化状态：运行中/已收尾/已取消，附心跳线索。"""

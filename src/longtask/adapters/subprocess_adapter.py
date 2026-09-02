@@ -20,7 +20,18 @@ from longtask.adapters.base import (
     PreparedLaunch,
     PrepareRefusedError,
 )
+from longtask.adapters.handles import (
+    EXTERNAL_STATE_UNKNOWN,
+    RECOVERY_REATTACH,
+    ExternalRunHandle,
+)
 from longtask.adapters.manifest import ExecutorManifest
+from longtask.adapters.processes import (
+    identity_matches,
+    process_alive,
+    process_start_time,
+    terminate_pid,
+)
 from longtask.adapters.registry import LaunchSpec
 from longtask.contracts.schema import AttemptState, Enforcement
 
@@ -28,6 +39,49 @@ from longtask.contracts.schema import AttemptState, Enforcement
 DEFAULT_GRACE_SECONDS = 5.0
 # collect 默认等待上限：超时抛 subprocess.TimeoutExpired（如实回收失败）。
 DEFAULT_COLLECT_TIMEOUT_SECONDS = 60.0
+
+# 重绑后能力诚实声明（SPEC §11.3 capability_snapshot）：管道与退出码随原
+# Popen 丢失，只能观察存活；collect 会如实报错而不是编一个退出码。
+_DETACHED_CAPABILITY = {
+    "transport": "subprocess",
+    "reattach": "pid+start-time",
+    "observe": "liveness",
+    "collect": "unavailable",
+    "cancel": "terminate",
+}
+
+
+class _DetachedProcess:
+    """重启后按持久句柄重新绑定的外部进程观察器（SPEC §11.3 reattach）。
+
+    与 Popen 的区别（诚实声明，不掩饰）：
+    - 存活可观察：每次都用「pid + 启动时间」双重比对，pid 被复用可检出；
+    - 退出码不可得：非子进程，退出状态已随原进程回收丢失，绝不猜 0；
+    - stdout/stderr 不可回收：管道随原 Popen 一并消失。
+    """
+
+    def __init__(self, pid: int, start_time: float) -> None:
+        self.pid = pid
+        self.start_time = start_time
+
+    def check(self) -> bool | None:
+        """三态判定：True 同一 run 仍活着 / False 已终止或 pid 复用 / None 无法确认。
+
+        身份比对只回答「是不是同一 run」（pid 复用检出），不回答死活——
+        Windows 下已退出的进程句柄仍可打开、启动时间仍可读，身份比对
+        对死进程照样返回 True。死活必须再问 process_alive：身份已证明时
+        存活即「同一 run 活着」、不存活即「该 run 已终止」。
+        """
+        if identity_matches(self.pid, self.start_time) is False:
+            return False  # pid 复用：确认不是同一 run
+        # 身份证明通过（或启动时间读不到）：以存活探测为准。
+        # 读不到启动时间的退化路径不再声称「确认同一 run」——由观察层
+        # 按 unknown 处理（reattach 已拒绝过这种句柄，此为防御兜底）。
+        return process_alive(self.pid)
+
+    def terminate(self) -> bool:
+        """尽力终止（拿不到句柄如实返回 False，不假装成功）。"""
+        return terminate_pid(self.pid)
 
 
 class SubprocessAdapter(ExecutorAdapter):
@@ -58,8 +112,11 @@ class SubprocessAdapter(ExecutorAdapter):
         self._launch = launch if launch is not None else LaunchSpec()
         self._grace_period_seconds = grace_period_seconds
         self._collect_timeout_seconds = collect_timeout_seconds
-        # attempt_id → 进程映射：observe/cancel/collect 都以 attempt 为键
-        self._procs: dict[str, subprocess.Popen[bytes]] = {}
+        # attempt_id → 进程映射：observe/cancel/collect 都以 attempt 为键。
+        # 值可能是本进程 spawn 的 Popen，也可能是重启后按句柄重绑的 _DetachedProcess。
+        self._procs: dict[str, subprocess.Popen[bytes] | _DetachedProcess] = {}
+        # attempt_id → spawn 时记录的进程身份（pid + 启动时间），供 run_handle 持久返回
+        self._identities: dict[str, dict[str, float]] = {}
         self._cancelled: set[str] = set()
 
     @property
@@ -146,11 +203,66 @@ class SubprocessAdapter(ExecutorAdapter):
             stderr=subprocess.PIPE,
         )
         self._procs[input_.attempt_id] = proc
+        # §11.3：spawn 后立刻取进程身份（pid + 启动时间）。取不到就如实留空，
+        # 之后 reattach 会因无法证明身份而失败，走 orphan grace——不假装可恢复。
+        start_time = process_start_time(proc.pid)
+        identity: dict[str, float] = {"pid": float(proc.pid)}
+        if start_time is not None:
+            identity["start_time"] = start_time
+        self._identities[input_.attempt_id] = identity
         return f"subprocess:{input_.attempt_id}:{proc.pid}"
 
+    def run_handle(self, attempt_id: str) -> ExternalRunHandle | None:
+        """持久返回外部运行句柄（SPEC §11.3）。
+
+        recovery_strategy='reattach'：该适配器能用「pid + 启动时间」双重比对
+        在守护进程重启后确认同一外部 run。若 spawn 时取不到启动时间，这里
+        如实退化 —— 句柄仍返回，但 process_identity 只有 pid，身份无法证明，
+        reattach 会拒绝（不因为「有 pid」就声称能恢复）。
+        """
+        identity = self._identities.get(attempt_id)
+        if identity is None:
+            return None
+        return ExternalRunHandle(
+            external_run_id=str(int(identity["pid"])),
+            session_locator=attempt_id,
+            recovery_strategy=RECOVERY_REATTACH,
+            capability_snapshot=dict(_DETACHED_CAPABILITY),
+            process_identity=dict(identity),
+        )
+
+    def reattach(self, handle: ExternalRunHandle) -> bool:
+        """按持久句柄重新绑定观察关系（SPEC §11.3 分支 1/2 的入口）。
+
+        身份证明通过即绑定并返回 True——无论该 run 活着还是已终止：
+        活着走分支 1（observe 报 running），已终止走分支 2（observe 报
+        failed，由 reconcile collect 结算）。绝不因「已终止」就拒绝绑定：
+        那会把确认的终态降级成「状态未知」，白白烧掉一整轮 orphan grace。
+        - 缺 pid 或启动时间 → 无法证明身份，返回 False；
+        - pid 存在但启动时间对不上 → pid 复用，返回 False；
+        返回 False 一律按「状态未知」处理，绝不据此判定外部 run 已终止。
+        """
+        raw_pid = handle.process_identity.get("pid")
+        if raw_pid is None:
+            return False
+        try:
+            pid = int(raw_pid)
+        except (TypeError, ValueError):
+            return False
+        start_time = handle.process_identity.get("start_time")
+        if not isinstance(start_time, (int, float)):
+            # 只有 pid：规范明令 PID 不得单独作为身份真相，拒绝绑定
+            return False
+        if identity_matches(pid, float(start_time)) is not True:
+            return False
+        self._procs[handle.session_locator] = _DetachedProcess(pid, float(start_time))
+        return True
+
     def observe(self, attempt_id: str) -> dict[str, object]:
-        """观察进程状态：存活与退出码（骨架期返回结构由 Developer Preview 定稿）。"""
+        """观察进程状态：存活与退出码。重绑进程退出码不可得，如实标注。"""
         proc = self._require(attempt_id)
+        if isinstance(proc, _DetachedProcess):
+            return self._observe_detached(attempt_id, proc)
         returncode = proc.poll()
         if returncode is None:
             state = AttemptState.RUNNING
@@ -160,11 +272,52 @@ class SubprocessAdapter(ExecutorAdapter):
             state = AttemptState.SUCCEEDED
         else:
             state = AttemptState.FAILED
-        return {"state": state.value, "alive": returncode is None, "returncode": returncode}
+        return {
+            "state": state.value,
+            "alive": returncode is None,
+            "returncode": returncode,
+            "exit_code_known": True,
+        }
+
+    def _observe_detached(self, attempt_id: str, proc: _DetachedProcess) -> dict[str, object]:
+        """观察重绑进程（§11.3）：三态——存活/确认非同一 run/无法确认。"""
+        status = proc.check()
+        if status is None:
+            # 无法确认 ≠ 已终止：如实报 unknown，由 reconcile 走 orphan grace
+            return {
+                "state": EXTERNAL_STATE_UNKNOWN,
+                "alive": None,
+                "returncode": None,
+                "exit_code_known": False,
+                "reason": "external run identity unverifiable (§11.3)",
+            }
+        if status is True:
+            return {
+                "state": AttemptState.RUNNING.value,
+                "alive": True,
+                "returncode": None,
+                "exit_code_known": False,
+            }
+        # 退出码不可得：不可得 ≠ 成功 —— fail-closed 判 failed 并写明原因，
+        # 由验收/repair 闭环复核，不把「不知道」伪装成 succeeded。
+        state = AttemptState.CANCELLED if attempt_id in self._cancelled else AttemptState.FAILED
+        return {
+            "state": state.value,
+            "alive": False,
+            "returncode": None,
+            "exit_code_known": False,
+            "error_class": "external-run-exit-unrecoverable",
+        }
 
     def cancel(self, attempt_id: str, reason: str) -> None:
         """取消 attempt：terminate 后有宽限期，仍存活才升级 kill。"""
         proc = self._require(attempt_id)
+        if isinstance(proc, _DetachedProcess):
+            # 重绑进程：只能尽力 terminate，无法等待其退出（非子进程）
+            if proc.check() is not False:
+                proc.terminate()
+                self._cancelled.add(attempt_id)
+            return
         if proc.poll() is not None:
             # 已自行退出：无可取消对象，保留原终态（不伪装成 cancelled）
             return
@@ -179,6 +332,11 @@ class SubprocessAdapter(ExecutorAdapter):
     def collect(self, attempt_id: str) -> dict[str, object]:
         """回收结果：退出码 + stdout/stderr；未退出抛 TimeoutExpired（不伪造结果）。"""
         proc = self._require(attempt_id)
+        if isinstance(proc, _DetachedProcess):
+            # 管道与退出状态随原 Popen 丢失：如实报错，绝不编一个退出码或空输出
+            raise RuntimeError(
+                "detached run: exit code and output unrecoverable after reattach (§11.3)"
+            )
         stdout_bytes, stderr_bytes = proc.communicate(timeout=self._collect_timeout_seconds)
         returncode = proc.returncode
         if returncode is None:
@@ -197,7 +355,7 @@ class SubprocessAdapter(ExecutorAdapter):
             "stderr": stderr_bytes.decode("utf-8", errors="replace"),
         }
 
-    def _require(self, attempt_id: str) -> subprocess.Popen[bytes]:
+    def _require(self, attempt_id: str) -> subprocess.Popen[bytes] | _DetachedProcess:
         """按 attempt 取进程；未知 attempt 用 KeyError 如实报告。"""
         try:
             return self._procs[attempt_id]
