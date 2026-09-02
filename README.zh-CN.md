@@ -173,6 +173,8 @@ uv run python -m longtask.cli.main get lt-hello
 uv run python -m longtask.cli.main status    # 守护进程 / 紧急熔断
 # 查看持久化通知投递状态（默认隐藏 payload）
 uv run python -m longtask.cli.main notifications --status pending
+# 多个目标并行时，可按目标 ID 缩小审计范围
+uv run python -m longtask.cli.main notifications --goal-id lt-hello
 # 只有审计确实需要时才加 --include-payload
 cat ~/.longtask/contracts/lt-hello/contract.yaml
 ```
