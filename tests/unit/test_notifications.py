@@ -2,6 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 from longtask.persistence.notifications import (
     claim_notifications,
+    drain_notifications,
     enqueue_notification,
     mark_failed,
     mark_sent,
@@ -46,3 +47,35 @@ def test_outbox_is_idempotent_and_retryable(tmp_path) -> None:
     assert retried[0].attempts == 2
     mark_sent(conn, notification_id=first.notification_id, now=now)
     assert claim_notifications(conn, now=now + timedelta(hours=1)) == []
+
+
+def test_drain_retries_channel_failure(tmp_path) -> None:
+    conn = connect(StoreConfig(db_path=tmp_path / "state.db"))
+    ensure_schema(conn)
+    now = datetime(2026, 9, 3, tzinfo=UTC)
+    enqueue_notification(
+        conn,
+        idempotency_key="goal-2:need-user",
+        event_type="need_user",
+        channel="local",
+        payload={"text": "action required"},
+        now=now,
+    )
+    delivered = []
+    assert drain_notifications(conn, now=now, deliver=delivered.append) == 1
+    assert delivered[0].event_type == "need_user"
+
+    enqueue_notification(
+        conn,
+        idempotency_key="goal-3:need-user",
+        event_type="need_user",
+        channel="local",
+        payload={},
+        now=now,
+    )
+    def fail_delivery(_):
+        raise RuntimeError("offline")
+
+    assert drain_notifications(conn, now=now, deliver=fail_delivery) == 0
+    assert claim_notifications(conn, now=now) == []
+    assert claim_notifications(conn, now=now + timedelta(seconds=60))
