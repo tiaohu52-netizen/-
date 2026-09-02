@@ -1,6 +1,7 @@
 from datetime import UTC, datetime, timedelta
 
 from longtask.contracts.attention import Attention, QuietHours
+from longtask.contracts.schema import Acceptance, Budget, ContractDraft, ContractState
 from longtask.persistence.notifications import (
     claim_notifications,
     drain_notifications,
@@ -13,6 +14,8 @@ from longtask.persistence.store import (
     _notification_available_at,
     connect,
     ensure_schema,
+    save_contract,
+    update_contract_state,
 )
 
 
@@ -97,3 +100,32 @@ def test_quiet_hours_delay_non_bypass_and_allow_bypass() -> None:
     delayed = _notification_available_at(attention, "need_user", now)
     assert delayed.hour == 8 and delayed.day == 4
     assert _notification_available_at(attention, "satisfied", now) == now
+
+
+def test_state_transition_routes_notification_by_attention(tmp_path) -> None:
+    conn = connect(StoreConfig(db_path=tmp_path / "state.db"))
+    ensure_schema(conn)
+    now = datetime(2026, 9, 3, tzinfo=UTC)
+    draft = ContractDraft(
+        title="notify",
+        objective="test",
+        deadline_at=now + timedelta(days=1),
+        hard_constraints={"file_effects": {"mode": "workspace-write"}},
+        acceptance=Acceptance(standard="done", checks=("check",)),
+        workload_initial_hours=1,
+        budget=Budget(1, 1, 1, 10, 1000),
+        attention=Attention(notify_on=("satisfied",)),
+    )
+    save_contract(conn, contract_id="notify-goal", draft=draft, now=now)
+    update_contract_state(conn, contract_id="notify-goal", new_state=ContractState.ACTIVE, now=now)
+    update_contract_state(
+        conn,
+        contract_id="notify-goal",
+        new_state=ContractState.COMPLETE,
+        now=now,
+    )
+    queued = conn.execute(
+        "SELECT event_type FROM notification_outbox WHERE goal_id = ?",
+        ("notify-goal",),
+    ).fetchall()
+    assert [row[0] for row in queued] == ["satisfied"]
