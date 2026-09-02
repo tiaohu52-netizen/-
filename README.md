@@ -198,13 +198,13 @@ cat > /tmp/my-runners.json <<'EOF'
 }
 EOF
 # point at it (path can be anything; it's config data, not a CLI flag)
-cp /tmp/my-runners.json ~/.longtask/registry.json
+cp /tmp/my-runners.json ~/.lhgp/registry.json
 ```
 
 Write a contract:
 
 ```bash
-uv run python -m longtask.cli.main prepare \
+lhgp prepare \
   --contract-id lt-20260903-hello \
   --title "First contract" \
   --objective "Write hello.txt with 'hi from LHGP' in my workspace." \
@@ -214,32 +214,32 @@ uv run python -m longtask.cli.main prepare \
 Approve it:
 
 ```bash
-uv run python -m longtask.cli.main approve lt-20260903-hello
+lhgp approve lt-20260903-hello
 ```
 
 Start the daemon in another terminal:
 
 ```bash
-uv run python -m longtask.cli.main start --interval 30
+lhgp start --interval 30
 # leave it running; it'll pick up the contract, run echo, verify, complete.
 ```
 
 Check:
 
 ```bash
-uv run python -m longtask.cli.main get lt-20260903-hello
-uv run python -m longtask.cli.main status    # daemon / kill-switch
+lhgp get lt-20260903-hello
+lhgp status    # daemon / kill-switch
 # inspect durable notification delivery (payload is hidden by default)
-uv run python -m longtask.cli.main notifications --status pending
+lhgp notifications --status pending
 # narrow the audit to one long-horizon goal when several run in parallel
-uv run python -m longtask.cli.main notifications --goal-id lt-20260903-hello
+lhgp notifications --goal-id lt-20260903-hello
 # add --include-payload only when the audit needs notification details
-cat ~/.longtask/contracts/lt-20260903-hello/contract.yaml
+cat ~/.lhgp/contracts/lt-20260903-hello/contract.yaml
 ```
 
 The whole story of the run — `contract/prepared` → `contract/approved` →
 `attempt/started` → `attempt/succeeded` → `contract/completed` — is in
-`state.db` and mirrored into `~/.longtask/contracts/lt-20260903-hello/`.
+`state.db` and mirrored into `~/.lhgp/contracts/lt-20260903-hello/`.
 
 ### If your agent is an MCP-compatible LLM
 
