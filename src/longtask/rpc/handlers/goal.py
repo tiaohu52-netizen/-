@@ -35,6 +35,7 @@ from longtask.admission.offer import (
     ExecutorCandidateView,
     Offer,
 )
+from longtask.contracts.authority import binding_for_executor
 from longtask.contracts.contract_draft import from_dict
 from longtask.contracts.validation import validate_draft
 from longtask.persistence.events import EventType
@@ -77,14 +78,28 @@ def _build_admission_offer(
             budget_available=bool(cand.get("budget_available", True)),
             verifier_independent=bool(cand.get("verifier_independent", True)),
         )
-        requested_model = str(cand.get("requested_model", "*"))
         requested_role = str(cand.get("requested_role", "executor"))
-        verdict = evaluate_eligibility(
-            authority=draft.authority,
-            facts=facts,
-            requested_model=requested_model,
-            requested_role=requested_role,
-        )
+        raw_models = cand.get("models") or [cand.get("requested_model", "*")]
+        models = tuple(str(model) for model in raw_models if str(model).strip()) or ("*",)
+        if "*" in models:
+            binding = binding_for_executor(draft.authority, facts.executor_id)
+            if binding is not None and binding.models != ("*",):
+                models = binding.models
+
+        verdict = None
+        requested_model = models[0]
+        for model in models:
+            candidate_verdict = evaluate_eligibility(
+                authority=draft.authority,
+                facts=facts,
+                requested_model=model,
+                requested_role=requested_role,
+            )
+            if candidate_verdict.eligible:
+                verdict = candidate_verdict
+                requested_model = model
+                break
+            verdict = candidate_verdict
         view = ExecutorCandidateView(
             executor_id=facts.executor_id,
             models=(requested_model,),
@@ -94,7 +109,7 @@ def _build_admission_offer(
                 else f"failed: {','.join(verdict.failed)}"
             ),
         )
-        if verdict.eligible:
+        if verdict is not None and verdict.eligible:
             eligible.append(view)
         else:
             rejected.append(view)
@@ -188,7 +203,7 @@ def handle_goal_prepare(
     # admission offer：若调用方注入了 registry，提供候选视图
     registry_view = None
     if registry is not None and hasattr(registry, "snapshot_for_admission"):
-        registry_view = registry.snapshot_for_admission()
+        registry_view = registry.snapshot_for_admission(contract=draft)
     offer = _build_admission_offer(
         draft_dict=view.draft.to_dict(),
         registry_view=registry_view,
@@ -245,7 +260,7 @@ def handle_goal_admission_check(
 
     registry_view = None
     if registry is not None and hasattr(registry, "snapshot_for_admission"):
-        registry_view = registry.snapshot_for_admission()
+        registry_view = registry.snapshot_for_admission(contract=existing.draft)
 
     offer = _build_admission_offer(
         draft_dict=existing.draft.to_dict(),

@@ -1,7 +1,7 @@
 """P6 插件包（SPEC §14）冒烟测试。
 
 只验证静态清单：.codex-plugin/plugin.json 与 .mcp.json 存在、合法
-JSON、引用到的 entry_points 命令名与已装 entry_points 对得上。
+JSON，并符合官方插件清单的 companion path 形状。
 不改 pyproject 也不动代码（警惕累赘）。
 """
 
@@ -23,18 +23,19 @@ class TestPluginManifest:
         assert path.is_file(), f"missing {path}"
         data = json.loads(path.read_text(encoding="utf-8"))
         assert data["name"] == "lhgp"
-        assert data["entrypoints"]["cli"]["command"] == "longtask"
-        assert data["entrypoints"]["mcp_server"]["command"] == "longtask-mcp"
+        assert data["skills"] == "skills"
+        assert data["mcpServers"] == ".mcp.json"
+        assert data["author"]["name"] == "LHGP maintainers"
+        assert data["interface"]["displayName"] == "远期目标协议"
 
     def test_plugin_referenced_skill_path_exists(self) -> None:
         data = json.loads((REPO_ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))
-        for skill in data["skills"]:
-            skill_path = REPO_ROOT / skill["path"]
-            assert skill_path.is_file(), f"missing skill at {skill_path}"
+        skill_path = REPO_ROOT / data["skills"] / "long-horizon-goals" / "SKILL.md"
+        assert skill_path.is_file(), f"missing skill at {skill_path}"
 
     def test_plugin_referenced_mcp_config_exists(self) -> None:
         data = json.loads((REPO_ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))
-        mcp_path = REPO_ROOT / data["mcp_config"]
+        mcp_path = REPO_ROOT / data["mcpServers"]
         assert mcp_path.is_file(), f"missing mcp config at {mcp_path}"
 
 

@@ -29,5 +29,10 @@ Desktop.ini
 
 # 运行时数据目录（真实注册表/工作区/数据库不入库；归档走 examples/）
 runtime/
+
+# 本地 dogfood、规划与工作记忆（可能包含凭证、会话内容和状态数据库）
+.dogfood/
+.planning/
+.workbuddy/
 runtime/contents:
 runtime-mcp/

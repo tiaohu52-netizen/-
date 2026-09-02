@@ -47,6 +47,7 @@ from longtask.persistence.store import (
     acquire_lease,
     append_event,
     get_contract,
+    get_events,
     get_lease,
     release_lease,
     renew_lease,
@@ -148,6 +149,7 @@ def build_attempt_input(
         budget_remaining={
             "max_dispatches": draft.budget.max_dispatches,
             "max_escalations": draft.budget.max_escalations,
+            "max_output_bytes": draft.budget.max_output_bytes,
         },
         task_prompt=task_prompt,
         context_snapshot_path=context_snapshot_path,
@@ -289,6 +291,8 @@ class AttemptRunner:
         self._running[attempt_id] = {
             "contract_id": contract_id,
             "executor_id": executor_id,
+            "role": AttemptRole.EXECUTOR.value,
+            "contract_revision": contract.revision,
             "session_ref": session_ref,
             "generation": lease.generation if lease else None,
         }
@@ -350,12 +354,37 @@ class AttemptRunner:
     ) -> None:
         """终态回收：collect 结果落事件（截断），释放租约，停止跟踪。"""
         contract_id = str(info["contract_id"])
-        payload: dict[str, Any] = {"session_ref": info["session_ref"], "state": state}
+        role = str(info.get("role", AttemptRole.EXECUTOR.value))
+        payload: dict[str, Any] = {
+            "session_ref": info["session_ref"],
+            "state": state,
+            "role": role,
+        }
         try:
             collected = adapter.collect(attempt_id)
             payload["returncode"] = collected.get("returncode")
             payload["stdout_tail"] = _tail_text(collected.get("stdout"))
             payload["stderr_tail"] = _tail_text(collected.get("stderr"))
+            # verifier 必须通过结构化 write-back 提供验收结果；仅凭进程
+            # 退出码无法证明 acceptance.checks 已被逐条核验。
+            verifier_written_back = any(
+                event.attempt_id == attempt_id
+                and event.event_type
+                in (EventType.ATTEMPT_SUCCEEDED, EventType.ATTEMPT_FAILED)
+                and (
+                    (event.payload_json or "").find('"role": "verifier"') >= 0
+                    or (event.payload_json or "").find('"checks"') >= 0
+                )
+                for event in get_events(self._conn, contract_id=contract_id)
+            )
+            if (
+                role == AttemptRole.VERIFIER.value
+                and not collected.get("finished_by_event")
+                and not verifier_written_back
+            ):
+                payload["state"] = AttemptState.FAILED.value
+                payload["error_class"] = "verification-evidence-missing"
+                payload["reason"] = "verifier exited without structured acceptance evidence"
         except Exception as exc:  # 回收失败也要如实收尾，不悬挂租约
             payload["state"] = AttemptState.FAILED.value
             payload["collect_error"] = str(exc)
@@ -369,6 +398,8 @@ class AttemptRunner:
             payload=payload,
             now=now,
             actor="daemon",
+            role=role,
+            contract_revision=info.get("contract_revision"),
         )
         # P1：更新 attempts 行状态（DESIGN §7 attempt 轴）
         self._conn.execute(
@@ -491,6 +522,13 @@ class AttemptRunner:
             payload={"reason": reason},
             now=now,
             actor="user",
+        )
+        set_attempt_state(
+            self._conn,
+            attempt_id=attempt_id,
+            state=AttemptState.CANCELLED.value,
+            now=now,
+            error_class="cancelled-by-user",
         )
         self._release_lease_if_held(now, contract_id, attempt_id)
         rebuild_projection(self._root, contract_id, self._conn)
@@ -654,6 +692,8 @@ class AttemptRunner:
         self._running[verifier_id] = {
             "contract_id": contract_id,
             "executor_id": verifier_entry.id,
+            "role": AttemptRole.VERIFIER.value,
+            "contract_revision": contract.revision,
             "session_ref": session_ref,
             "generation": lease.generation if lease else None,
         }

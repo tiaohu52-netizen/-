@@ -77,11 +77,15 @@ def evaluate(
 
     # 条件 2：contract_explicitly_allows(executor, model, role)
     binding = binding_for_executor(authority, facts.executor_id)
-    explicit_allowed = (
-        binding is not None
-        and models_allow(authority, binding=binding, model=requested_model)
-        and roles_allow(authority, binding=binding, role=requested_role)
-    )
+    if binding is None and authority.executor_policy == "closed" and not authority.executors:
+        # 存量合同兼容：没有任何绑定表示尚未设防，而不是把历史合同全部拒绝。
+        explicit_allowed = True
+    else:
+        explicit_allowed = (
+            binding is not None
+            and models_allow(authority, binding=binding, model=requested_model)
+            and roles_allow(authority, binding=binding, role=requested_role)
+        )
     conditions["contract_explicitly_allows"] = explicit_allowed
 
     # 条件 3：capability_satisfies

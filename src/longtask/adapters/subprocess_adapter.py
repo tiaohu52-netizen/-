@@ -117,8 +117,11 @@ class _MonitoredProcess:
     退出前最后一段输出由 _drain_final 兜底收全。
     """
 
-    def __init__(self, proc: subprocess.Popen[bytes]) -> None:
+    def __init__(self, proc: subprocess.Popen[bytes], max_output_bytes: int | None = None) -> None:
         self._proc = proc
+        self._output_limit = max(0, int(max_output_bytes or 0)) or None
+        self._output_bytes = 0
+        self.output_truncated = False
         self.stdout_buf: list[bytes] = []
         self.stderr_buf: list[bytes] = []
         self.finished_event: dict[str, Any] | None = None
@@ -179,13 +182,25 @@ def _start_reader(
             chunk = stream.readline()
             if not chunk:
                 break
-            buf.append(chunk)
+            # 始终排空管道防止子进程死锁，但只保留预算允许的字节数。
+            # 终态事件先扫描完整 chunk，再截断审计缓冲，确保兼容性事件
+            # 不会因输出预算而丢失。
             if which == "out":
                 line_so_far += chunk
                 if len(line_so_far) > FINISHED_LINE_MAX:
                     line_so_far = line_so_far[-FINISHED_LINE_MAX:]
                 if _scan_finished(line_so_far, monitored) or chunk.endswith(b"\n"):
                     line_so_far = b""
+            if monitored._output_limit is None:
+                buf.append(chunk)
+            else:
+                remaining = monitored._output_limit - monitored._output_bytes
+                if remaining > 0:
+                    kept = chunk[:remaining]
+                    buf.append(kept)
+                    monitored._output_bytes += len(kept)
+                if len(chunk) > max(0, remaining):
+                    monitored.output_truncated = True
         stream.close()
 
     t = threading.Thread(target=_run, daemon=True)
@@ -348,7 +363,10 @@ class SubprocessAdapter(ExecutorAdapter):
             stderr=subprocess.PIPE,
         )
         # CLI 兼容性：包装成受监控进程（后台排水防管道死锁 + 终态事件扫描）
-        monitored = _MonitoredProcess(proc)
+        monitored = _MonitoredProcess(
+            proc,
+            max_output_bytes=input_.budget_remaining.get("max_output_bytes"),
+        )
         self._procs[input_.attempt_id] = monitored
         # §11.3：spawn 后立刻取进程身份（pid + 启动时间）。取不到就如实留空，
         # 之后 reattach 会因无法证明身份而失败，走 orphan grace——不假装可恢复。
@@ -547,6 +565,7 @@ class SubprocessAdapter(ExecutorAdapter):
                     "event_outcome": outcome,
                     "stdout": proc.stdout_text(),
                     "stderr": proc.stderr_text(),
+                    "output_truncated": proc.output_truncated,
                 }
             # 无事件：等进程退出（语义与旧版一致——不退出就不结算）
             try:
@@ -569,8 +588,9 @@ class SubprocessAdapter(ExecutorAdapter):
             return {
                 "state": state.value,
                 "returncode": returncode,
-                "stdout": proc.stdout_text(),
-                "stderr": proc.stderr_text(),
+                    "stdout": proc.stdout_text(),
+                    "stderr": proc.stderr_text(),
+                    "output_truncated": proc.output_truncated,
             }
 
     def _require(self, attempt_id: str) -> _MonitoredProcess | _DetachedProcess:

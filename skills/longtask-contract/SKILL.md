@@ -1,3 +1,8 @@
+---
+name: longtask-contract
+description: 教模型通过 LHGP CLI 或 MCP 起草、批准、跟踪和交接远期目标合同。
+---
+
 # longtask-contract（DESIGN §17）
 
 `longtask` 远期任务协议的契约 skill——**教会 AI 怎么用这个工具**。

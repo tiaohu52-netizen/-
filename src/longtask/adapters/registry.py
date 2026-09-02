@@ -107,7 +107,20 @@ def _authority_bindings(
             "models": {str(m) for m in binding.get("models") or ()},
             "roles": {str(r) for r in binding.get("roles") or ()},
         }
-    return allow, bool(allow)
+    # explicit_allow 本身就是一条安全边界：即使列表为空，也必须是空池，
+    # 不能因为没有有效 binding 就退回开放模式。closed + 空列表继续保留
+    # 存量合同的兼容语义（没有设防）。
+    policy = str(raw.get("executor_policy", "closed")) if isinstance(raw, dict) else "closed"
+    return allow, policy == "explicit_allow" or bool(allow)
+
+
+def _models_overlap(allowed: set[str], available: tuple[str, ...]) -> bool:
+    """判断合同模型 allowlist 与注册表模型声明是否有交集。"""
+    if not allowed:
+        return False
+    if "*" in allowed or "*" in available:
+        return True
+    return bool(allowed.intersection(available))
 
 
 def sandbox_capability_from_dict(data: dict[str, Any]) -> SandboxCapability:
@@ -152,6 +165,7 @@ class RegistryEntry:
     limits: dict[str, int] = field(default_factory=dict)
     cost_hint: CostHint = CostHint.MEDIUM
     enabled: bool = False  # 用户框定开关，默认全部 false（DESIGN §8.2）
+    models: tuple[str, ...] = ("*",)  # 可由该 CLI 配置/启动的模型族
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -182,6 +196,7 @@ class RegistryEntry:
             "limits": dict(self.limits),
             "cost_hint": self.cost_hint.value,
             "enabled": self.enabled,
+            "models": list(self.models),
         }
 
     @classmethod
@@ -198,6 +213,10 @@ class RegistryEntry:
             CostHint(raw_cost) if raw_cost in CostHint._value2member_map_ else CostHint.MEDIUM
         )
         enabled = bool(data.get("enabled", False))
+        raw_models = data.get("models", ("*",))
+        models = tuple(str(model).strip() for model in raw_models if str(model).strip())
+        if not models:
+            models = ("*",)
         return cls(
             id=raw_id,
             kind=kind,
@@ -206,6 +225,7 @@ class RegistryEntry:
             limits=limits,
             cost_hint=cost_hint,
             enabled=enabled,
+            models=models,
         )
 
     def to_manifest(self, adapter_version: str = "0.1.0") -> ExecutorManifest:
@@ -401,6 +421,8 @@ class ExecutorRegistry:
                 if binding is None or requested_role not in binding["roles"]:
                     # §6.3 条件 2：合同设了 allow 列表而该执行器/角色不在其中
                     continue
+                if not _models_overlap(binding["models"], entry.models):
+                    continue
 
             matched, _ = check_capability_match(entry, contract)
             if not matched:
@@ -418,6 +440,7 @@ class ExecutorRegistry:
     def snapshot_for_admission(
         self,
         *,
+        contract: ContractDraft | dict[str, Any] | None = None,
         running_attempts: dict[str, int] | None = None,
         requested_role: str = "executor",
         requested_model: str = "*",
@@ -436,11 +459,9 @@ class ExecutorRegistry:
         attempts_map = running_attempts or {}
         snapshot: list[dict[str, Any]] = []
         for entry in self._entries.values():
-            if not entry.enabled:
-                continue
-            # 简版 capability 评估：以 contract.budget / hard_constraints 形状为
-            # 输入返回 True/False；完整 7 条件由 admission.evaluate 用 authority
-            # 决策——这里只暴露「执行器是否在基本技术门槛上」的事实。
+            capability_satisfied = True
+            if contract is not None:
+                capability_satisfied, _ = check_capability_match(entry, contract)
             max_concurrent = entry.limits.get("max_concurrent_attempts", 1)
             running = attempts_map.get(entry.id, 0)
             try:
@@ -452,11 +473,12 @@ class ExecutorRegistry:
                     "executor_id": entry.id,
                     "enabled": True,
                     "concurrency_available": running < max_concurrent,
-                    "capability_satisfied": True,
+                    "capability_satisfied": capability_satisfied,
                     "constraint_enforcement_proven": enforcement != "none",
                     "budget_available": True,
                     "verifier_independent": True,
                     "requested_model": requested_model,
+                    "models": list(entry.models),
                     "requested_role": requested_role,
                 }
             )
