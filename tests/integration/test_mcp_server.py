@@ -293,3 +293,17 @@ class TestMCPErrors:
         finally:
             proc.terminate()
             proc.wait(timeout=5)
+
+    def test_boolean_notification_limit_returns_invalid_params(self, data_dir: Path) -> None:
+        proc = _spawn_mcp(data_dir)
+        try:
+            resp = _roundtrip(
+                proc,
+                "tools/call",
+                {"name": "lhgp_notifications", "arguments": {"limit": True}},
+            )
+            assert resp["error"]["code"] == -32602
+            assert "limit must be an integer" in resp["error"]["message"]
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
