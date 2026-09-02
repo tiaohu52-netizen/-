@@ -40,7 +40,7 @@
           "kind": "source_static",
           "path": "docs/LHGP-SPEC.md",
           "recorded_at": "2026-09-01",
-          "summary": "SPEC §7 明确四轴；§7.1「complete → satisfied」语义合并入 deadline 轴；现状差距见 ROADMAP §2.1 C1-C4 与 §P1。"
+          "summary": "SPEC §7 明确四轴；§7.1「complete → satisfied」语义合并入 deadline 轴；历史冲突项见 ROADMAP §2.3，当前实现与复验状态见 §2.1–§2.2。"
         }
       ]
     },
