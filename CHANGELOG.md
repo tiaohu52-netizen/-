@@ -15,11 +15,15 @@ follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
   payload-redacted by default.
 - LHGP dual-track entrypoint polish (`lhgp --version`, `lhgp-mcp`) and updated
   plugin/roadmap documentation.
+- Release artifacts now validate embedded plugin metadata (strict SemVer,
+  `lhgp` identity, and canonical `lhgp-mcp` command) during CI.
 
 ### Fixed
 
 - Detached daemon and subprocess test lifecycle cleanup, including parent
   pipe closure after child exit.
+- MCP canonical aliases now retain their safety annotations and report the
+  correct server identity when launched through `lhgp-mcp`.
 
 ## [0.1.0a0] - 2026-09-01
 
