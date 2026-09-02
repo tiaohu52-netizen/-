@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-SRC = REPO_ROOT / "src" / "longtask"
+SRC_ROOTS = (REPO_ROOT / "src" / "longtask", REPO_ROOT / "src" / "lhgp")
 
 # 存量基线（棘轮）。骨架期从零起步：任何违规都是新增。
 BASELINE = 0
@@ -97,7 +97,12 @@ def imported_modules(tree: ast.AST) -> list[tuple[str, int]]:
 
 
 def check_file(path: Path) -> list[Violation]:
-    layer = path.relative_to(SRC).parts[0]
+    relative = next(
+        (path.relative_to(root) for root in SRC_ROOTS if path.is_relative_to(root)), None
+    )
+    if relative is None:
+        raise ValueError(f"source file is outside configured package roots: {path}")
+    layer = relative.parts[0]
     forbidden = FORBIDDEN.get(layer, ("tests",))
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     violations: list[Violation] = []
@@ -117,18 +122,21 @@ def check_file(path: Path) -> list[Violation]:
 
 
 def main() -> int:
-    if not SRC.is_dir():
-        # fail-closed：找不到源码目录不假装无违规
-        print(f"[arch] src tree missing: {SRC}", file=sys.stderr)
+    missing_roots = [root for root in SRC_ROOTS if not root.is_dir()]
+    if missing_roots:
+        # fail-closed：找不到任一源码目录不假装无违规
+        for root in missing_roots:
+            print(f"[arch] src tree missing: {root}", file=sys.stderr)
         return 1
 
     violations: list[Violation] = []
     parse_errors: list[str] = []
-    for path in sorted(SRC.rglob("*.py")):
-        try:
-            violations.extend(check_file(path))
-        except SyntaxError as exc:
-            parse_errors.append(f"{path.relative_to(REPO_ROOT)}: {exc}")
+    for src_root in SRC_ROOTS:
+        for path in sorted(src_root.rglob("*.py")):
+            try:
+                violations.extend(check_file(path))
+            except SyntaxError as exc:
+                parse_errors.append(f"{path.relative_to(REPO_ROOT)}: {exc}")
 
     if parse_errors:
         print("[arch] parse failures (fail-closed):", file=sys.stderr)
