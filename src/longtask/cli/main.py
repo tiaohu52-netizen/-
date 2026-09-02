@@ -68,14 +68,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     # status / start / stop
     sub.add_parser("status", help="查看守护进程与全局熔断状态")
-    start_p = sub.add_parser("start", help="启动 longtaskd 调度守护进程（分离后台进程）")
+    start_p = sub.add_parser("start", help="启动 lhgpd 调度守护进程（兼容别名 longtaskd）")
     start_p.add_argument(
         "--interval",
         type=float,
         default=DEFAULT_TICK_INTERVAL_SECONDS,
         help="调度扫描间隔秒数（默认 60）",
     )
-    sub.add_parser("stop", help="停止 longtaskd 调度守护进程")
+    sub.add_parser("stop", help="停止 lhgpd 调度守护进程（兼容别名 longtaskd）")
     rpc_p = sub.add_parser("rpc-call", help="通过 daemon 本机 socket 调用 JSON-RPC 方法")
     rpc_p.add_argument("method", type=str, help="方法名，例如 attempt/status")
     rpc_p.add_argument("--params", default="{}", help="JSON 参数对象")
