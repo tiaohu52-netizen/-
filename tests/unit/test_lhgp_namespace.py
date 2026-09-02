@@ -29,6 +29,7 @@ from lhgp.contracts import Acceptance as CanonicalPackageAcceptance
 from lhgp.contracts import Attention as CanonicalPackageAttention
 from lhgp.contracts import Budget as CanonicalPackageBudget
 from lhgp.contracts import Continuity as CanonicalPackageContinuity
+from lhgp.contracts import ContractDraft as CanonicalPackageContractDraft
 from lhgp.contracts.acceptance import Acceptance as CanonicalAcceptance
 from lhgp.contracts.attention import Attention as CanonicalAttention
 from lhgp.contracts.authority import Authority as CanonicalAuthority
@@ -133,6 +134,7 @@ def test_contract_namespace_reexports_single_implementation() -> None:
     """Contract facades must preserve class identity during migration."""
 
     assert CanonicalContractDraft is LegacyContractDraft
+    assert CanonicalPackageContractDraft is CanonicalContractDraft
     assert CanonicalBudget is LegacyBudget
     assert CanonicalPackageBudget is CanonicalBudget
     assert CanonicalAcceptance is LegacyAcceptance
