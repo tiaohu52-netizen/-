@@ -16,6 +16,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -92,6 +93,127 @@ class _DetachedProcess:
         return terminate_pid(self.pid)
 
 
+# ── CLI 兼容性：harness 结构化终态事件（v2 归档候选路径的落地）──
+# harness（agent-cli/自研 CLI）在 stdout 写一行 JSON 声明终态：
+#   {"event":"attempt/finished","outcome":"succeeded|failed","returncode":0}
+# 适配器持续排水并扫描该行。价值（v2/v3/v4 实测教训）：
+# 1. 终态时机：agent-cli 主进程与内部 worker 生命周期不对齐——事件行让
+#    「干完了」由 harness 主动声明，不再等主进程退出；
+# 2. 成功语义：CLI 软失败也退 0——事件行的 outcome 是 harness 的显式
+#    判定，比裸退出码诚实（退出码仍如实并报，两者矛盾时以事件为准
+#    并标注 exit_code_conflict）。
+FINISHED_EVENT_PREFIX = '{"event":"attempt/finished"'
+FINISHED_LINE_MAX = 8192  # 事件行长度上限：防御性，超长截断不匹配
+
+
+class _MonitoredProcess:
+    """Popen 包装：后台排水 + stdout 终态事件扫描（CLI 兼容性核心）。
+
+    为什么必须排水（真 bug 级修复）：PIPE 缓冲区约 64KB，LLM CLI 的
+    长输出会写满管道 → 子进程 write() 阻塞 → 进程卡死永不退出。
+    后台线程持续读空管道，输出积累在内存（带上限，防 OOM）。
+
+    线程安全：reader 线程只 append buffer；主线程只在 join 后读。
+    退出前最后一段输出由 _drain_final 兜底收全。
+    """
+
+    def __init__(self, proc: subprocess.Popen[bytes]) -> None:
+        self._proc = proc
+        self.stdout_buf: list[bytes] = []
+        self.stderr_buf: list[bytes] = []
+        self.finished_event: dict[str, Any] | None = None
+        self._stdout_bytes = 0
+        self._t_out = _start_reader(proc.stdout, self.stdout_buf, self, "out")
+        self._t_err = _start_reader(proc.stderr, self.stderr_buf, self, "err")
+
+    # -- Popen 兼容面 --
+    @property
+    def pid(self) -> int:
+        return self._proc.pid
+
+    @property
+    def returncode(self) -> int | None:
+        return self._proc.returncode
+
+    def poll(self) -> int | None:
+        return self._proc.poll()
+
+    def wait(self, timeout: float | None = None) -> int | None:
+        return self._proc.wait(timeout=timeout)
+
+    def terminate(self) -> None:
+        self._proc.terminate()
+
+    def kill(self) -> None:
+        self._proc.kill()
+
+    # -- 监控面 --
+    def stdout_text(self) -> str:
+        return b"".join(self.stdout_buf).decode("utf-8", errors="replace")
+
+    def stderr_text(self) -> str:
+        return b"".join(self.stderr_buf).decode("utf-8", errors="replace")
+
+    def join_readers(self, timeout: float = 10.0) -> None:
+        """进程退出后收尾 reader 线程（管道 EOF 即自然结束）。"""
+        for t in (self._t_out, self._t_err):
+            t.join(timeout=timeout)
+
+    def _note_finished(self, event: dict[str, Any]) -> None:
+        """reader 线程回调：扫到 attempt/finished 事件行。"""
+        self.finished_event = event
+
+
+def _start_reader(
+    stream: Any,
+    buf: list[bytes],
+    monitored: _MonitoredProcess,
+    which: str,
+) -> threading.Thread:
+    """启动排水线程：读满即 append；扫描终态事件行。"""
+    import threading
+
+    def _run() -> None:
+        line_so_far = b""
+        while True:
+            chunk = stream.readline()
+            if not chunk:
+                break
+            buf.append(chunk)
+            if which == "out":
+                line_so_far += chunk
+                if len(line_so_far) > FINISHED_LINE_MAX:
+                    line_so_far = line_so_far[-FINISHED_LINE_MAX:]
+                if _scan_finished(line_so_far, monitored) or chunk.endswith(b"\n"):
+                    line_so_far = b""
+        stream.close()
+
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+    return t
+
+
+def _scan_finished(line_bytes: bytes, monitored: _MonitoredProcess) -> bool:
+    """尝试把累积的行解析成 attempt/finished 事件；成功即回调。"""
+    if FINISHED_EVENT_PREFIX.encode() not in line_bytes:
+        return False
+    text = line_bytes.decode("utf-8", errors="replace").strip()
+    start = text.find(FINISHED_EVENT_PREFIX)
+    if start < 0:
+        return False
+    candidate = text[start:]
+    try:
+        import json as _json
+
+        data = _json.loads(candidate)
+    except ValueError:
+        return False
+    if not isinstance(data, dict) or data.get("event") != "attempt/finished":
+        return False
+    monitored._note_finished(data)
+    return True
+
+
 class SubprocessAdapter(ExecutorAdapter):
     """结构化 argv 拉起的 CLI 执行器适配器。
 
@@ -121,8 +243,9 @@ class SubprocessAdapter(ExecutorAdapter):
         self._grace_period_seconds = grace_period_seconds
         self._collect_timeout_seconds = collect_timeout_seconds
         # attempt_id → 进程映射：observe/cancel/collect 都以 attempt 为键。
-        # 值可能是本进程 spawn 的 Popen，也可能是重启后按句柄重绑的 _DetachedProcess。
-        self._procs: dict[str, subprocess.Popen[bytes] | _DetachedProcess] = {}
+        # 值可能是本进程 spawn 的 _MonitoredProcess（排水+终态事件），
+        # 也可能是重启后按句柄重绑的 _DetachedProcess。
+        self._procs: dict[str, _MonitoredProcess | _DetachedProcess] = {}
         # attempt_id → spawn 时记录的进程身份（pid + 启动时间），供 run_handle 持久返回
         self._identities: dict[str, dict[str, float]] = {}
         self._cancelled: set[str] = set()
@@ -224,7 +347,9 @@ class SubprocessAdapter(ExecutorAdapter):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
-        self._procs[input_.attempt_id] = proc
+        # CLI 兼容性：包装成受监控进程（后台排水防管道死锁 + 终态事件扫描）
+        monitored = _MonitoredProcess(proc)
+        self._procs[input_.attempt_id] = monitored
         # §11.3：spawn 后立刻取进程身份（pid + 启动时间）。取不到就如实留空，
         # 之后 reattach 会因无法证明身份而失败，走 orphan grace——不假装可恢复。
         start_time = process_start_time(proc.pid)
@@ -281,10 +406,46 @@ class SubprocessAdapter(ExecutorAdapter):
         return True
 
     def observe(self, attempt_id: str) -> dict[str, object]:
-        """观察进程状态：存活与退出码。重绑进程退出码不可得，如实标注。"""
+        """观察进程状态：存活/退出码/harness 终态事件（CLI 兼容性）。
+
+        判定优先级（v2/v3/v4 实测教训的落地）：
+        1. harness 结构化事件 attempt/finished——「干完了」由 harness 主动
+           声明（agent-cli 主进程与 worker 生命周期不对齐的根治路径）：主进程
+           还活着但事件已到 → 按事件的 outcome 判终态，事件早于退出即
+           价值的全部所在；
+        2. 主进程退出码（既有语义，无事件的 CLI 走这里）。
+        事件 outcome 与最终退出码矛盾时以事件为准并标注（CLI 软失败退 0
+        的情形——harness 的显式判定比裸退出码诚实）。
+        """
         proc = self._require(attempt_id)
         if isinstance(proc, _DetachedProcess):
             return self._observe_detached(attempt_id, proc)
+        if isinstance(proc, _MonitoredProcess):
+            event = proc.finished_event
+            if event is not None:
+                outcome = str(event.get("outcome", ""))
+                if attempt_id in self._cancelled:
+                    state = AttemptState.CANCELLED
+                elif outcome == "succeeded":
+                    state = AttemptState.SUCCEEDED
+                else:
+                    state = AttemptState.FAILED
+                returncode = proc.poll()
+                conflict = (
+                    returncode is not None and returncode == 0 and state is AttemptState.FAILED
+                )
+                result: dict[str, object] = {
+                    "state": state.value,
+                    "alive": returncode is None,  # 事件已到但主进程可能仍在收尾
+                    "returncode": returncode,
+                    "exit_code_known": returncode is not None,
+                    "finished_by_event": True,
+                    "event_outcome": outcome,
+                }
+                if conflict:
+                    result["exit_code_conflict"] = True
+                    result["note"] = "harness declared failure but exit code is 0: event wins"
+                return result
         returncode = proc.poll()
         if returncode is None:
             state = AttemptState.RUNNING
@@ -352,32 +513,67 @@ class SubprocessAdapter(ExecutorAdapter):
         self._cancelled.add(attempt_id)
 
     def collect(self, attempt_id: str) -> dict[str, object]:
-        """回收结果：退出码 + stdout/stderr；未退出抛 TimeoutExpired（不伪造结果）。"""
+        """回收结果：退出码 + stdout/stderr；未退出抛 TimeoutExpired（不伪造结果）。
+
+        CLI 兼容性（v2/v3/v4 教训）：输出由后台 reader 线程持续积累——
+        collect 时不再 communicate()（它要求进程退出且阻塞等管道，观察
+        窗口错配就永远拿不到输出）。进程已退出 → join reader 收尾后从
+        累积缓冲取全文；终态事件已到但主进程未退 → 也允许 collect
+        （事件即 harness 的完成声明），退出码字段如实标不可得。
+        """
         proc = self._require(attempt_id)
         if isinstance(proc, _DetachedProcess):
             # 管道与退出状态随原 Popen 丢失：如实报错，绝不编一个退出码或空输出
             raise RuntimeError(
                 "detached run: exit code and output unrecoverable after reattach (§11.3)"
             )
-        stdout_bytes, stderr_bytes = proc.communicate(timeout=self._collect_timeout_seconds)
-        returncode = proc.returncode
-        if returncode is None:
-            # communicate 返回即已退出；防御性兜底，不伪造结果
-            raise RuntimeError(f"collect: 进程未退出: {attempt_id}")
-        if attempt_id in self._cancelled:
-            state = AttemptState.CANCELLED
-        elif returncode == 0:
-            state = AttemptState.SUCCEEDED
-        else:
-            state = AttemptState.FAILED
-        return {
-            "state": state.value,
-            "returncode": returncode,
-            "stdout": stdout_bytes.decode("utf-8", errors="replace"),
-            "stderr": stderr_bytes.decode("utf-8", errors="replace"),
-        }
+        if isinstance(proc, _MonitoredProcess):
+            event = proc.finished_event
+            if event is not None:
+                # harness 已声明完成：不等主进程退出（agent-cli 收尾期可长达分钟）
+                proc.join_readers(timeout=5.0)
+                outcome = str(event.get("outcome", ""))
+                if attempt_id in self._cancelled:
+                    state = AttemptState.CANCELLED
+                elif outcome == "succeeded":
+                    state = AttemptState.SUCCEEDED
+                else:
+                    state = AttemptState.FAILED
+                return {
+                    "state": state.value,
+                    "returncode": None,
+                    "exit_code_known": False,
+                    "finished_by_event": True,
+                    "event_outcome": outcome,
+                    "stdout": proc.stdout_text(),
+                    "stderr": proc.stderr_text(),
+                }
+            # 无事件：等进程退出（语义与旧版一致——不退出就不结算）
+            try:
+                proc.wait(timeout=self._collect_timeout_seconds)
+            except subprocess.TimeoutExpired as exc:
+                raise subprocess.TimeoutExpired(
+                    cmd="collect", timeout=self._collect_timeout_seconds
+                ) from exc
+            proc.join_readers(timeout=5.0)
+            returncode = proc.returncode
+            if returncode is None:
+                # 防御性兜底：wait 返回即已退出，不伪造结果
+                raise RuntimeError(f"collect: 进程未退出: {attempt_id}")
+            if attempt_id in self._cancelled:
+                state = AttemptState.CANCELLED
+            elif returncode == 0:
+                state = AttemptState.SUCCEEDED
+            else:
+                state = AttemptState.FAILED
+            return {
+                "state": state.value,
+                "returncode": returncode,
+                "stdout": proc.stdout_text(),
+                "stderr": proc.stderr_text(),
+            }
 
-    def _require(self, attempt_id: str) -> subprocess.Popen[bytes] | _DetachedProcess:
+    def _require(self, attempt_id: str) -> _MonitoredProcess | _DetachedProcess:
         """按 attempt 取进程；未知 attempt 用 KeyError 如实报告。"""
         try:
             return self._procs[attempt_id]
