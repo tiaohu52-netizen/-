@@ -17,6 +17,7 @@ from lhgp.admission import (
 from lhgp.admission import (
     Offer as CanonicalPackageOffer,
 )
+from lhgp.admission.eligibility import evaluate as canonical_evaluate_eligibility
 from lhgp.admission.offer import Offer as CanonicalOffer
 from lhgp.admission.refuse import (
     AdmissionRefuseCode as CanonicalModuleRefuseCode,
@@ -83,6 +84,7 @@ from lhgp.scheduler.ticker import run_tick as canonical_run_tick
 from lhgp.scheduler.wakeup import guard_needed as canonical_guard_needed
 from longtask.acceptance.checks import CheckSpec as LegacyCheckSpec
 from longtask.adapters.registry import ExecutorRegistry as LegacyExecutorRegistry
+from longtask.admission.eligibility import evaluate as legacy_evaluate_eligibility
 from longtask.admission.offer import Offer as LegacyOffer
 from longtask.admission.refuse import (
     AdmissionRefuseCode as LegacyRefuseCode,
@@ -222,6 +224,7 @@ def test_supporting_namespaces_reexport_single_implementation() -> None:
     assert CanonicalCheckSpec is LegacyCheckSpec
     assert CanonicalPackageCheckSpec is CanonicalCheckSpec
     assert CanonicalOffer is LegacyOffer
+    assert canonical_evaluate_eligibility is legacy_evaluate_eligibility
     assert CanonicalPackageOffer is CanonicalOffer
     assert CanonicalRefuseCode is CanonicalModuleRefuseCode is LegacyRefuseCode
     assert CanonicalRefusedError is CanonicalModuleRefusedError is LegacyRefusedError
