@@ -93,7 +93,7 @@ allowed-confusables = ["，", "（", "）", "：", "；", "？", "！", "、", "
 "src/longtask/persistence/**" = ["S608"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["longtask"]
+known-first-party = ["longtask", "lhgp"]
 
 # ── mypy（strict 起步；存量债走棘轮基线，见 scripts/quality_gate.py）──
 [tool.mypy]
