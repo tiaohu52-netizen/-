@@ -186,7 +186,7 @@ def run_daemon_tick(
 
         # 计算剩余时间与工作量
         time_left_hours = max(0.0, (c.draft.deadline_at - now).total_seconds() / 3600.0)
-        remaining_hours = c.draft.workload_initial_hours  # 可由交接滚动修正
+        remaining_hours = _remaining_workload_hours(root, c)
         u_val = urgency(remaining_hours, time_left_hours)
         u_tier = classify(u_val)
 
@@ -540,6 +540,23 @@ def _safe_json(text: str) -> dict[str, Any]:
     if isinstance(result, dict):
         return result
     return {}
+
+
+def _remaining_workload_hours(root: Path, contract: Any) -> float:
+    """读取最近一次可信 handover 估计，避免每轮重置为初始工作量。"""
+    initial = float(contract.draft.workload_initial_hours)
+    handover_path = root / "contracts" / contract.contract_id / "handover.md"
+    if not handover_path.is_file():
+        return initial
+    try:
+        from longtask.persistence.projections import parse_handover_markdown
+
+        data, violations = parse_handover_markdown(handover_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError):
+        return initial
+    if data is None or violations or not data.source_attempt_id.strip():
+        return initial
+    return max(0.0, float(data.estimate_remaining_hours))
 
 
 # ── P4：next_decision_at 计算（SPEC §9、§10）──

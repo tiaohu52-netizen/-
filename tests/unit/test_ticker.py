@@ -8,9 +8,12 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
+from longtask.cli.tick import _remaining_workload_hours
 from longtask.scheduler.ticker import ClockEntry, ContractClock, run_tick
 
 pytestmark = pytest.mark.unit
@@ -49,6 +52,41 @@ class Recorder:
 
     def run(self, now: datetime, entries: Sequence[ClockEntry]) -> tuple[ClockEntry, ...]:
         return run_tick(now, entries, self)
+
+
+def test_remaining_workload_prefers_valid_handover(tmp_path: Path) -> None:
+    contract_id = "lt-estimate-001"
+    contract_dir = tmp_path / "contracts" / contract_id
+    contract_dir.mkdir(parents=True)
+    (contract_dir / "handover.md").write_text(
+        """## current_stage
+executor
+
+## completed_evidence
+- c1
+
+## remaining
+- c2
+
+## estimate_remaining_hours
+0.75
+
+## next_action
+continue
+
+## constraints_digest
+{}
+
+## source_attempt_id
+att-1
+""",
+        encoding="utf-8",
+    )
+    contract = SimpleNamespace(
+        contract_id=contract_id,
+        draft=SimpleNamespace(workload_initial_hours=4.0),
+    )
+    assert _remaining_workload_hours(tmp_path, contract) == 0.75
 
 
 class TestExpired:
