@@ -598,6 +598,33 @@ TOOLS.update(
         ),
     }
 )
+
+# MCP tool annotations are advisory metadata consumed by hosts before execution.
+# Keep the policy explicit here so aliases and future tools cannot silently lose
+# the local-only trust boundary or be presented as harmless reads.
+_DESTRUCTIVE_TOOLS = {
+    "longtask_approve_contract",
+    "longtask_attach_to_executor",
+    "lhgp_interrupt_attempt",
+    "lhgp_write_back",
+}
+_READ_ONLY_TOOLS = {
+    "longtask_health",
+    "longtask_list_executors",
+    "longtask_get_contract",
+    "longtask_list_contracts",
+    "lhgp_attempt_status",
+    "lhgp_notifications",
+}
+for _tool_name, (_tool_fn, _tool_schema) in list(TOOLS.items()):
+    _tool_schema.setdefault(
+        "annotations",
+        {
+            "readOnlyHint": _tool_name in _READ_ONLY_TOOLS,
+            "destructiveHint": _tool_name in _DESTRUCTIVE_TOOLS,
+            "openWorldHint": False,
+        },
+    )
 TOOL_NAMES = sorted(TOOLS.keys())
 
 
