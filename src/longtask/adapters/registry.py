@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from longtask.adapters.manifest import Capabilities, ExecutorManifest, SandboxCapability
+from longtask.contracts.authority import to_dict as authority_to_dict
 from longtask.contracts.schema import ContractDraft, Enforcement
 
 
@@ -67,6 +68,46 @@ class LaunchSpec:
         cwd_str = str(cwd) if cwd is not None else None
         env_allowlist = tuple(str(x) for x in data.get("env_allowlist", ()))
         return cls(argv=argv, cwd=cwd_str, env_allowlist=env_allowlist)
+
+
+def _authority_bindings(
+    contract: ContractDraft | dict[str, Any],
+) -> tuple[dict[str, dict[str, Any]], bool]:
+    """提取合同的 authority 绑定表（SPEC §6.1、§6.3 条件 2）。
+
+    返回 (allow_by_executor, deny_all)：
+    - allow_by_executor: executor_id → {"models": set, "roles": set}；
+    - deny_all: 合同是否声明了 authority.executors 绑定。True 时 match
+      走 default-deny（不在 allow 列表即拒绝）；False（存量合同无绑定）
+      保持旧行为——语义是「没有设防」，不是「全部拒绝」。
+
+    dict 合同读 execution.authority（P1 前老形态）或 authority（SPEC §6.1）；
+    dataclass 合同读 draft.authority（P2 起 authority 是独立字段）。
+    """
+    raw: Any
+    if isinstance(contract, ContractDraft):
+        raw = authority_to_dict(contract.authority)
+    else:
+        raw = contract.get("authority")
+        if not isinstance(raw, dict) or not raw:
+            execution = contract.get("execution")
+            raw = execution.get("authority") if isinstance(execution, dict) else None
+
+    allow: dict[str, dict[str, Any]] = {}
+    bindings = raw.get("executors") if isinstance(raw, dict) else None
+    if not isinstance(bindings, list):
+        return allow, False
+    for binding in bindings:
+        if not isinstance(binding, dict):
+            continue
+        executor_id = str(binding.get("executor_id") or "").strip()
+        if not executor_id:
+            continue
+        allow[executor_id] = {
+            "models": {str(m) for m in binding.get("models") or ()},
+            "roles": {str(r) for r in binding.get("roles") or ()},
+        }
+    return allow, bool(allow)
 
 
 def sandbox_capability_from_dict(data: dict[str, Any]) -> SandboxCapability:
@@ -329,21 +370,37 @@ class ExecutorRegistry:
         self,
         contract: ContractDraft | dict[str, Any],
         running_attempts: dict[str, int] | None = None,
+        *,
+        requested_role: str = "executor",
     ) -> list[RegistryEntry]:
-        """筛选并按分发规则排序候选执行器（DESIGN §8.2、§8.3）。
+        """筛选并按分发规则排序候选执行器（DESIGN §8.2、§8.3、SPEC §6.3）。
 
         规则：
-        1. 必须已框定开启（enabled=True）；
-        2. 必须满足合同能力门槛（capabilities 匹配）；
-        3. 必须有空闲并发额度（running < max_concurrent_attempts）；
-        4. 排序：cost_hint 优先级（low < medium < high）、运行中任务数升序、id 字典序。
+        1. 必须已框定开启（enabled=True，§6.3 条件 1 globally_enabled）；
+        2. 必须被合同显式授权（§6.3 条件 2 contract_explicitly_allows）：
+           合同 authority.executors 声明了绑定 → 只允许绑定覆盖的
+           executor/role 入候选（default-deny：不在 allow 列表即拒绝）；
+           models 按 binding 校验（"*" 通配仅 Principal 显式选择）。
+           未声明任何绑定的存量合同保持旧行为（全部 enabled 候选）——
+           语义是「没有设防」而不是「全部拒绝」，SPEC §6.3 的
+           default-deny 指的是设了 authority 的合同；
+        3. 必须满足合同能力门槛（capabilities 匹配）；
+        4. 必须有空闲并发额度（running < max_concurrent_attempts）；
+        5. 排序：cost_hint 优先级（low < medium < high）、运行中任务数升序、id 字典序。
         """
         attempts_map = running_attempts or {}
         candidates: list[tuple[int, int, str, RegistryEntry]] = []
+        allow_by_executor, deny_all = _authority_bindings(contract)
 
         for entry in self._entries.values():
             if not entry.enabled:
                 continue
+
+            if deny_all:
+                binding = allow_by_executor.get(entry.id)
+                if binding is None or requested_role not in binding["roles"]:
+                    # §6.3 条件 2：合同设了 allow 列表而该执行器/角色不在其中
+                    continue
 
             matched, _ = check_capability_match(entry, contract)
             if not matched:
@@ -355,7 +412,6 @@ class ExecutorRegistry:
                 continue
 
             candidates.append((entry.cost_hint.priority, running, entry.id, entry))
-
         candidates.sort(key=lambda item: (item[0], item[1], item[2]))
         return [item[3] for item in candidates]
 

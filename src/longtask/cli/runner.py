@@ -493,8 +493,10 @@ class AttemptRunner:
         ).fetchone()
         if existing_verifier is not None:
             return False
-        # 选择候选：排除执行者本身，按执行器匹配规则排序
-        candidates = self._registry.match_candidates(contract.draft)
+        # 选择候选：排除执行者本身，按执行器匹配规则排序；
+        # requested_role='verifier' → 合同 authority 设了绑定时，
+        # roles 不含 verifier 的执行器不入候选（§6.3 条件 2）
+        candidates = self._registry.match_candidates(contract.draft, requested_role="verifier")
         verifier_entry: RegistryEntry | None = None
         for entry in candidates:
             if entry.id == executor_id:
