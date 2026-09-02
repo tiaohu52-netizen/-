@@ -24,6 +24,7 @@ def _record_attempt(
     contract_revision: int,
     role: str,
     executor_id: str | None,
+    model_id: str | None = None,
     state: str,
     admitted_at: datetime,
     started_at: datetime | None = None,
@@ -42,13 +43,14 @@ def _record_attempt(
         """
         INSERT INTO attempts (
             attempt_id, goal_id, contract_revision, role,
-            executor_id, state, lease_generation, partition_id,
+            executor_id, model_id, state, lease_generation, partition_id,
             admitted_at, started_at, terminal_at, return_code, error_class,
             payload_json, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (attempt_id) DO UPDATE SET
             state = excluded.state,
             lease_generation = excluded.lease_generation,
+            model_id = COALESCE(excluded.model_id, attempts.model_id),
             started_at = COALESCE(excluded.started_at, attempts.started_at),
             terminal_at = excluded.terminal_at,
             return_code = excluded.return_code,
@@ -62,6 +64,7 @@ def _record_attempt(
             contract_revision,
             role,
             executor_id,
+            model_id,
             state,
             admitted_at.isoformat(),
             started_at.isoformat() if started_at else None,

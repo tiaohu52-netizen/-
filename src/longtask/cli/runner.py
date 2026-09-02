@@ -710,10 +710,10 @@ class AttemptRunner:
             """
             INSERT INTO attempts (
                 attempt_id, goal_id, contract_revision, role,
-                executor_id, state, lease_generation, partition_id,
+                executor_id, model_id, state, lease_generation, partition_id,
                 admitted_at, started_at, terminal_at, return_code, error_class,
                 payload_json, updated_at
-            ) VALUES (?, ?, ?, 'verifier', ?, 'admitted', NULL, NULL, ?,
+            ) VALUES (?, ?, ?, 'verifier', ?, ?, 'admitted', NULL, NULL, ?,
                       NULL, NULL, NULL, NULL, ?, ?)
             ON CONFLICT (attempt_id) DO UPDATE SET
                 state = excluded.state,
@@ -725,6 +725,7 @@ class AttemptRunner:
                 contract.goal_id,
                 contract.revision,
                 verifier_entry.id,
+                next((m for m in verifier_entry.models if m != "*"), "*"),
                 now.isoformat(),
                 json.dumps({"verifier_for": executor_id, "executor_id": verifier_entry.id}),
                 now.isoformat(),
