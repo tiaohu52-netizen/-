@@ -1,7 +1,7 @@
 """Attention 字段（SPEC §6.1 attention + §10.5 通知策略）。
 
-P2 起独立模块。仅承载字段与最小校验；具体通知 outbox + 渠道集成留 P4
-（forecast-driven wakeup）。本期不实现 outbox，避免累赘与虚假引用。
+P2 起独立模块。承载字段与最小校验；通知 outbox 已在
+``longtask.persistence.notifications`` 实现，渠道适配仍由运行时注入。
 """
 
 from __future__ import annotations
