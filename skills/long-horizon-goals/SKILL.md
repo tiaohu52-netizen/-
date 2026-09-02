@@ -34,6 +34,19 @@ description: 将需要跨会话、跨 Agent 推进的用户目标转成 LHGP 合
 6. （等待 daemon 派 attempt；轮询 get_contract 或订阅 events）
 7. `list_contracts` — 复盘历史 + 审计事件链
 
+## 运行中审计与控制（扩展工具）
+
+- `lhgp_notifications` 是只读通知 outbox 视图；优先按 `goal_id` 或
+  `status` 缩小范围，默认不请求 `include_payload`，避免把上下文内容带回对话。
+- `lhgp_attempt_status` 用于查看某次 attempt 的事件、租约和当前状态。
+- `lhgp_interrupt_attempt` 仅在用户明确要求停止时调用；它只写入中断请求，
+  由 daemon 在安全仲裁点兑现。
+- `lhgp_write_back` 只接受执行者持有的 generation，并必须携带真实进度或
+  evidence；不要用它伪造完成状态。
+
+没有 MCP 时，可用等价的只读 CLI 审计：
+`lhgp notifications --goal-id <id>`（payload 默认隐藏）。
+
 ## 起草合同时必须写清
 
 - **objective** — 写验收，不是方法（"输出 result.txt 含 'hi'" 而非 "用 python 写"）
