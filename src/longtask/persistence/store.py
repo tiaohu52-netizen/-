@@ -57,6 +57,7 @@ from longtask.persistence.leases import (
     release_lease,
     renew_lease,
 )
+from longtask.persistence.notifications import enqueue_notification
 from longtask.persistence.schema import (
     STORE_SCHEMA_VERSION,
     connect,
@@ -597,7 +598,7 @@ def update_contract_state(
         if blocked_reason:
             payload["blocked_reason"] = blocked_reason.value
 
-        append_event(
+        event = append_event(
             conn,
             contract_id=contract_id,
             event_type=chosen_event_type,
@@ -611,11 +612,37 @@ def update_contract_state(
             role=actor,
             payload_schema_version=schema_version,
         )
+        notify_kind = _notification_kind(chosen_event_type, new_state)
+        if notify_kind in current.draft.attention.notify_on:
+            enqueue_notification(
+                conn,
+                idempotency_key=f"{contract_id}:event:{event.event_id}",
+                goal_id=current.goal_id,
+                event_type=notify_kind,
+                channel="local",
+                payload={"contract_id": contract_id, "event_id": event.event_id, **payload},
+                now=now,
+            )
 
     updated = get_contract(conn, contract_id)
     if updated is None:
         raise StoreError(f"contract {contract_id} disappeared after update")
     return updated
+
+
+def _notification_kind(event_type: EventType | str, state: ContractState) -> str | None:
+    """把状态事件映射为 attention.notify_on 的稳定类别。"""
+    raw = event_type.value if isinstance(event_type, EventType) else str(event_type)
+    if state == ContractState.EXPIRED or raw == EventType.CONTRACT_EXPIRED.value:
+        return "missed"
+    if state == ContractState.COMPLETE or raw in {
+        EventType.CONTRACT_COMPLETED.value,
+        EventType.CONTRACT_SATISFIED.value,
+    }:
+        return "satisfied"
+    if state == ContractState.BLOCKED or raw == EventType.ESCALATION_HANDED_TO_USER.value:
+        return "need_user"
+    return None
 
 
 def patch_contract(
