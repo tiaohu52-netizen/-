@@ -22,6 +22,7 @@ from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from longtask.contracts.schema import ContractState
+from longtask.persistence.attempts import get_attempt
 from longtask.persistence.events import EventType
 from longtask.persistence.store import (
     EventInput,
@@ -252,12 +253,38 @@ def handle_attempt_write_back(
     raw_attempt_state = params.get("attempt_state")
     if raw_attempt_state is not None:
         state_text = str(raw_attempt_state)
+        attempt = get_attempt(conn, attempt_id)
+        attempt_role = attempt.role if attempt is not None else "executor"
+        evidence = params.get("evidence")
+        if attempt_role == "verifier" and state_text in {"succeeded", "failed"}:
+            if not isinstance(evidence, list) or not evidence:
+                raise RpcError(
+                    code=ErrorCode.VALIDATION_FAILED,
+                    message="verifier terminal write-back requires a non-empty evidence list",
+                )
+            invalid = [
+                item
+                for item in evidence
+                if not isinstance(item, dict)
+                or not str(item.get("check_id", "")).strip()
+                or item.get("outcome") not in {"pass", "fail", "undetermined"}
+                or not str(item.get("source", "")).strip()
+            ]
+            if invalid:
+                raise RpcError(
+                    code=ErrorCode.VALIDATION_FAILED,
+                    message="each verifier evidence item requires check_id, outcome and source",
+                )
         match state_text:
             case "succeeded":
                 events.append(
                     EventInput(
                         event_type=EventType.ATTEMPT_SUCCEEDED,
-                        payload={"reported_by": "model"},
+                        payload={
+                            "reported_by": "model",
+                            "role": attempt_role,
+                            "evidence": evidence,
+                        },
                         attempt_id=attempt_id,
                     )
                 )
@@ -265,7 +292,12 @@ def handle_attempt_write_back(
                 events.append(
                     EventInput(
                         event_type=EventType.ATTEMPT_FAILED,
-                        payload={"reported_by": "model", "reason": str(note or "")},
+                        payload={
+                            "reported_by": "model",
+                            "role": attempt_role,
+                            "reason": str(note or ""),
+                            "evidence": evidence,
+                        },
                         attempt_id=attempt_id,
                     )
                 )
