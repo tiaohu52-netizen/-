@@ -70,7 +70,10 @@ def store(tmp_path: Path) -> Any:
         contract_id=CID,
         now=NOW,
     )
-    return conn
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 
 def acquired(conn: Any) -> None:
