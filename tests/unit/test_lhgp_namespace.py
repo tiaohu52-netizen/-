@@ -72,6 +72,7 @@ from lhgp.forecast.model import Forecast as CanonicalForecast
 from lhgp.persistence.errors import StoreError as CanonicalStoreError
 from lhgp.persistence.events import EventType as CanonicalEventType
 from lhgp.persistence.events_query import append_event as canonical_append_event
+from lhgp.persistence.paths import default_data_root as canonical_default_data_root
 from lhgp.persistence.store import connect as canonical_connect
 from lhgp.persistence.types import StoredLease as CanonicalStoredLease
 from lhgp.promoter.urgency import classify as canonical_classify
@@ -127,6 +128,7 @@ from longtask.forecast.model import Forecast as LegacyForecast
 from longtask.persistence.errors import StoreError as LegacyStoreError
 from longtask.persistence.events import EventType as LegacyEventType
 from longtask.persistence.events_query import append_event as legacy_append_event
+from longtask.persistence.paths import default_data_root as legacy_default_data_root
 from longtask.persistence.store import connect as legacy_connect
 from longtask.persistence.types import StoredLease as LegacyStoredLease
 from longtask.promoter.urgency import classify as legacy_classify
@@ -179,6 +181,7 @@ def test_persistence_namespace_reexports_single_implementation() -> None:
     assert CanonicalEventType is LegacyEventType
     assert canonical_append_event is legacy_append_event
     assert CanonicalStoreError is LegacyStoreError
+    assert canonical_default_data_root is legacy_default_data_root
 
 
 def test_adapter_namespace_reexports_single_implementation() -> None:
