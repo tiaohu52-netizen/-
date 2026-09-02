@@ -19,6 +19,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from longtask.acceptance.checks import CheckSpec
+from longtask.acceptance.evaluator import evaluate_check
 from longtask.adapters.base import (
     AttemptInput,
     ExecutorAdapter,
@@ -385,6 +387,35 @@ class AttemptRunner:
                 payload["state"] = AttemptState.FAILED.value
                 payload["error_class"] = "verification-evidence-missing"
                 payload["reason"] = "verifier exited without structured acceptance evidence"
+            if role == AttemptRole.VERIFIER.value:
+                contract = get_contract(self._conn, contract_id)
+                typed_checks = (
+                    [
+                        check
+                        for check in contract.draft.acceptance.checks
+                        if isinstance(check, CheckSpec)
+                    ]
+                    if contract is not None
+                    else []
+                )
+                if typed_checks:
+                    workspace = contract_workspace(contract.draft) if contract is not None else ""
+                    if workspace:
+                        results = [
+                            evaluate_check(check, workspace_root=Path(workspace))
+                            for check in typed_checks
+                        ]
+                        payload["evidence"] = [result.to_evidence() for result in results]
+                        mandatory_failed = any(
+                            result.outcome != "pass"
+                            for check, result in zip(typed_checks, results, strict=True)
+                            if check.mandatory
+                        )
+                        payload["state"] = (
+                            AttemptState.FAILED.value
+                            if mandatory_failed
+                            else AttemptState.SUCCEEDED.value
+                        )
         except Exception as exc:  # 回收失败也要如实收尾，不悬挂租约
             payload["state"] = AttemptState.FAILED.value
             payload["collect_error"] = str(exc)
