@@ -36,6 +36,25 @@ uv run python scripts/quality_gate.py
 | 6 | typecheck | `mypy --strict` | 类型债（strict 起步，无存量豁免） |
 | 7 | test + coverage | `pytest --cov`，覆盖率棘轮 | 测试失败或覆盖率低于基线 |
 
+## 发布前 P6 验收
+
+发布候选除质量门外，还必须从仓库根目录执行：
+
+```bash
+# 插件清单（Codex 官方 validator；Windows 建议强制 UTF-8）
+python -X utf8 <plugin-creator>/scripts/validate_plugin.py .
+
+# wheel/sdist 必须携带插件、MCP 与 Skill companion 资源
+uv build
+uv run python scripts/check_artifacts.py dist
+
+# 无密钥的多 CLI 授权探针
+uv run python examples/agent-cli-dogfood-v4/dogfood_v4.py probe
+```
+
+真实外部 CLI/API 的 daemon dogfood 仍需单独准备凭据，并把结果记录在
+`docs/evidence/`；没有这些证据不得把 Developer Preview 宣称为 Alpha。
+
 门的行为准则（继承自参考实践，三条铁律）：
 
 1. **fail-closed**：工具缺失、清单读不到、环境不对 → 门报错退出，
