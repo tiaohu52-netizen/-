@@ -19,6 +19,7 @@ from datetime import datetime, timedelta, UTC
 from pathlib import Path
 from typing import Any
 
+from longtask.cli.paths import default_data_root
 from longtask.persistence.events import EventType
 from longtask.persistence.store import StoreConfig, connect, ensure_schema, get_events
 
@@ -352,9 +353,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    root = (
-        Path(args.data_dir).expanduser().resolve() if args.data_dir else (Path.home() / ".longtask")
-    )
+    root = Path(args.data_dir).expanduser().resolve() if args.data_dir else default_data_root()
     if not (root / "state.db").is_file():
         print(
             f"longtask state.db not found at {root / 'state.db'}; nothing to watch", file=sys.stderr

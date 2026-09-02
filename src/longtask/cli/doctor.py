@@ -17,6 +17,7 @@ from pathlib import Path
 
 from longtask import PROTOCOL_VERSION, __version__
 from longtask.adapters.registry import ExecutorRegistry
+from longtask.cli.paths import default_data_root
 from longtask.persistence.store import STORE_SCHEMA_VERSION, StoreConfig, connect, ensure_schema
 
 
@@ -54,7 +55,7 @@ class DoctorReport:
 
 def run_doctor(root: Path | None = None) -> DoctorReport:
     """运行全套自检并产出报告（DESIGN §15.2）。"""
-    data_dir = root or (Path.home() / ".longtask")
+    data_dir = root or default_data_root()
     checks: list[CheckResult] = []
 
     # 1. 检查 Python 版本

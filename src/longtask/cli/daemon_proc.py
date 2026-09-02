@@ -217,3 +217,21 @@ def halt_daemon(root: Path, *, grace_seconds: float = STOP_GRACE_SECONDS) -> dic
     (root / TOKEN_FILE).unlink(missing_ok=True)
     (root / DAEMON_STOP_FILE).unlink(missing_ok=True)
     return {"ok": True, "was_running": was_running, "forced": forced, "pid": pid}
+
+
+def lhgpd_entrypoint() -> int:
+    """lhgpd 前台常驻入口（P6 新名）：等价 `lhgp _daemon-run`。
+
+    给习惯「专 daemon 命令」的用户一个直连入口：前台跑主循环，
+    Ctrl-C 即退。分离后台启动仍走 `lhgp start`（pid/token 通道不变）。
+    """
+    from longtask.cli.daemon_loop import run_daemon_loop
+    from longtask.cli.paths import default_data_root
+
+    root = default_data_root()
+    root.mkdir(parents=True, exist_ok=True)
+    res = run_daemon_loop(root, emit_fn=print)
+    import json as _json
+
+    print(_json.dumps(res, ensure_ascii=False))
+    return 0 if res.get("ok") else 1
