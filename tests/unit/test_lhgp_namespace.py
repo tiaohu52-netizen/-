@@ -100,3 +100,13 @@ def test_canonical_modules_preserve_module_execution_entrypoints() -> None:
         text=True,
     )
     assert "LHGP" in mcp.stdout
+
+
+def test_legacy_cli_alias_emits_deprecation_warning(monkeypatch, capsys) -> None:
+    """Legacy executable names remain usable but visibly announce migration."""
+
+    from longtask.cli.main import main
+
+    monkeypatch.setattr(sys, "argv", ["longtask"])
+    assert main(["--version"]) == 0
+    assert "deprecated" in capsys.readouterr().err

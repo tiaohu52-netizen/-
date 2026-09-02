@@ -770,6 +770,12 @@ def serve_stdio(root: Path) -> None:
 def main(argv: list[str] | None = None) -> int:
     import argparse
 
+    if _server_name() == "longtask-mcp":
+        print(
+            "warning: 'longtask-mcp' is deprecated; use 'lhgp-mcp' instead",
+            file=sys.stderr,
+        )
+
     parser = argparse.ArgumentParser(
         prog=_server_name(),
         description="LHGP Protocol MCP server (stdio JSON-RPC 2.0)",

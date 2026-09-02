@@ -259,6 +259,12 @@ def lhgpd_entrypoint() -> int:
     给习惯「专 daemon 命令」的用户一个直连入口：前台跑主循环，
     Ctrl-C 即退。分离后台启动仍走 `lhgp start`（pid/token 通道不变）。
     """
+    if Path(sys.argv[0]).stem.lower() == "longtaskd":
+        print(
+            "warning: 'longtaskd' is deprecated; use 'lhgpd' instead",
+            file=sys.stderr,
+        )
+
     from longtask.cli.daemon_loop import run_daemon_loop
     from longtask.cli.paths import default_data_root
 

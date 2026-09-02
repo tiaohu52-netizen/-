@@ -266,6 +266,11 @@ def _dispatch_rpc(
 
 
 def main(argv: list[str] | None = None) -> int:
+    if Path(sys.argv[0]).stem.lower() == "longtask":
+        print(
+            "warning: 'longtask' is deprecated; use 'lhgp' instead",
+            file=sys.stderr,
+        )
     parser = build_parser()
     args = parser.parse_args(argv)
 
