@@ -2,17 +2,23 @@
 
 import longtask
 from lhgp import PROTOCOL_VERSION, __version__
+from lhgp.acceptance.checks import CheckSpec as CanonicalCheckSpec
 from lhgp.adapters.registry import ExecutorRegistry as CanonicalExecutorRegistry
+from lhgp.admission.offer import Offer as CanonicalOffer
 from lhgp.cli.formatting import format_eta as canonical_format_eta
 from lhgp.contracts.contract_draft import ContractDraft as CanonicalContractDraft
+from lhgp.forecast.model import Forecast as CanonicalForecast
 from lhgp.persistence.store import connect as canonical_connect
 from lhgp.promoter.urgency import classify as canonical_classify
 from lhgp.rpc.errors import ErrorCode as CanonicalErrorCode
 from lhgp.rpc.methods import Method as CanonicalMethod
 from lhgp.scheduler.wakeup import guard_needed as canonical_guard_needed
+from longtask.acceptance.checks import CheckSpec as LegacyCheckSpec
 from longtask.adapters.registry import ExecutorRegistry as LegacyExecutorRegistry
+from longtask.admission.offer import Offer as LegacyOffer
 from longtask.cli.formatting import format_eta as legacy_format_eta
 from longtask.contracts.contract_draft import ContractDraft as LegacyContractDraft
+from longtask.forecast.model import Forecast as LegacyForecast
 from longtask.persistence.store import connect as legacy_connect
 from longtask.promoter.urgency import classify as legacy_classify
 from longtask.rpc.errors import ErrorCode as LegacyErrorCode
@@ -63,3 +69,11 @@ def test_cli_namespace_reexports_pure_helpers() -> None:
     """CLI facades must preserve helper identity without changing entrypoints."""
 
     assert canonical_format_eta is legacy_format_eta
+
+
+def test_supporting_namespaces_reexport_single_implementation() -> None:
+    """Acceptance, admission and forecast facades preserve class identity."""
+
+    assert CanonicalCheckSpec is LegacyCheckSpec
+    assert CanonicalOffer is LegacyOffer
+    assert CanonicalForecast is LegacyForecast
