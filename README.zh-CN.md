@@ -171,6 +171,9 @@ uv run python -m longtask.cli.main start --interval 30
 ```bash
 uv run python -m longtask.cli.main get lt-hello
 uv run python -m longtask.cli.main status    # 守护进程 / 紧急熔断
+# 查看持久化通知投递状态（默认隐藏 payload）
+uv run python -m longtask.cli.main notifications --status pending
+# 只有审计确实需要时才加 --include-payload
 cat ~/.longtask/contracts/lt-hello/contract.yaml
 ```
 
