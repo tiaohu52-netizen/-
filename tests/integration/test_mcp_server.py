@@ -115,6 +115,23 @@ class TestMCPDiscovery:
                 "destructiveHint": True,
                 "openWorldHint": False,
             }
+            for name in (
+                "lhgp_health",
+                "lhgp_list_executors",
+                "lhgp_get_goal",
+                "lhgp_list_goals",
+            ):
+                assert by_name[name]["annotations"] == {
+                    "readOnlyHint": True,
+                    "destructiveHint": False,
+                    "openWorldHint": False,
+                }
+            for name in ("lhgp_approve_goal", "lhgp_attach_executor"):
+                assert by_name[name]["annotations"] == {
+                    "readOnlyHint": False,
+                    "destructiveHint": True,
+                    "openWorldHint": False,
+                }
         finally:
             _stop_mcp(proc)
 

@@ -616,6 +616,8 @@ TOOLS.update(
 _DESTRUCTIVE_TOOLS = {
     "longtask_approve_contract",
     "longtask_attach_to_executor",
+    "lhgp_approve_goal",
+    "lhgp_attach_executor",
     "lhgp_interrupt_attempt",
     "lhgp_write_back",
 }
@@ -624,6 +626,10 @@ _READ_ONLY_TOOLS = {
     "longtask_list_executors",
     "longtask_get_contract",
     "longtask_list_contracts",
+    "lhgp_health",
+    "lhgp_list_executors",
+    "lhgp_get_goal",
+    "lhgp_list_goals",
     "lhgp_attempt_status",
     "lhgp_notifications",
 }
