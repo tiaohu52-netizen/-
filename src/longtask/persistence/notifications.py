@@ -92,6 +92,32 @@ def get_by_key(conn: sqlite3.Connection, key: str) -> Notification | None:
     return _row(row) if row else None
 
 
+def list_notifications(
+    conn: sqlite3.Connection,
+    *,
+    status: str | None = None,
+    limit: int = 50,
+) -> list[Notification]:
+    """只读列出通知，供控制面审计与 MCP 查看。"""
+    if limit <= 0:
+        raise ValueError("limit must be positive")
+    clauses: list[str] = []
+    params: list[Any] = []
+    if status is not None:
+        if status not in {"pending", "leased", "sent"}:
+            raise ValueError(f"unknown notification status: {status}")
+        clauses.append("status = ?")
+        params.append(status)
+    where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+    rows = conn.execute(
+        "SELECT notification_id, idempotency_key, goal_id, event_type, channel, "
+        "payload_json, status, attempts, available_at, lease_until, last_error "
+        f"FROM notification_outbox{where} ORDER BY notification_id DESC LIMIT ?",
+        (*params, limit),
+    ).fetchall()
+    return [_row(row) for row in rows]
+
+
 def claim_notifications(
     conn: sqlite3.Connection,
     *,
@@ -230,6 +256,7 @@ __all__ = [
     "drain_notifications",
     "enqueue_notification",
     "get_by_key",
+    "list_notifications",
     "mark_failed",
     "mark_sent",
     "prune_sent",

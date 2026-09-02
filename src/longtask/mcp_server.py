@@ -32,6 +32,7 @@ from typing import Any
 from longtask import PROTOCOL_VERSION, __version__
 from longtask.adapters.registry import ExecutorRegistry
 from longtask.cli.paths import default_data_root
+from longtask.persistence.notifications import list_notifications
 from longtask.persistence.store import (
     StoreConfig,
     connect,
@@ -194,6 +195,31 @@ def _mcp_route(method: Method, args: dict[str, Any], ctx: dict[str, Any]) -> dic
 def tool_attempt_status(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
     """读取执行 attempt 的事件、租约和当前状态。"""
     return _mcp_route(Method.ATTEMPT_STATUS, args, ctx)
+
+
+def tool_notifications(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
+    """只读通知队列状态；默认不返回 payload 内容。"""
+    status = args.get("status")
+    limit = int(args.get("limit", 50))
+    include_payload = bool(args.get("include_payload", False))
+    rows = list_notifications(ctx["conn"], status=str(status) if status else None, limit=limit)
+    return {
+        "notifications": [
+            {
+                "notification_id": item.notification_id,
+                "idempotency_key": item.idempotency_key,
+                "goal_id": item.goal_id,
+                "event_type": item.event_type,
+                "channel": item.channel,
+                "status": item.status,
+                "attempts": item.attempts,
+                "available_at": item.available_at.isoformat(),
+                "last_error": item.last_error,
+                **({"payload": item.payload} if include_payload else {}),
+            }
+            for item in rows
+        ]
+    }
 
 
 def tool_interrupt_attempt(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
@@ -513,6 +539,20 @@ TOOLS.update(
                     "properties": {
                         "contract_id": {"type": "string"},
                         "attempt_id": {"type": "string"},
+                    },
+                },
+            },
+        ),
+        "lhgp_notifications": (
+            tool_notifications,
+            {
+                "description": "查看通知 outbox 的投递状态（只读）。",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "status": {"enum": ["pending", "leased", "sent"]},
+                        "limit": {"type": "integer", "minimum": 1, "maximum": 200},
+                        "include_payload": {"type": "boolean"},
                     },
                 },
             },
