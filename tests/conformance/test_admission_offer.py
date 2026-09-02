@@ -102,6 +102,7 @@ def test_goal_prepare_returns_offer_with_seven_fields(tmp_path) -> None:
     assert adm["rejected_executors"] == []
     # 验收可执行（有 checks）
     assert adm["acceptance_executable"] is True
+    conn.close()
 
 
 def test_offer_with_forecast_requires_safe_start_by() -> None:
@@ -130,6 +131,7 @@ def test_goal_prepare_closed_authority_no_eligible(tmp_path) -> None:
     # 这是设计意图：caller 显式注入 registry.snapshot_for_admission 才会填充
     assert adm["eligible_executors"] == []
     assert adm["rejected_executors"] == []
+    conn.close()
 
 
 def test_goal_prepare_validates_draft_via_single_validator(tmp_path) -> None:
@@ -143,6 +145,7 @@ def test_goal_prepare_validates_draft_via_single_validator(tmp_path) -> None:
         handle_goal_prepare(env, conn=conn, now=NOW)
     assert exc.value.code == ErrorCode.VALIDATION_FAILED
     assert "deadline_at" in exc.value.message
+    conn.close()
 
 
 def test_goal_prepare_idempotent_replay_does_not_duplicate(tmp_path) -> None:
@@ -156,6 +159,7 @@ def test_goal_prepare_idempotent_replay_does_not_duplicate(tmp_path) -> None:
     r2 = handle_goal_prepare(env1, conn=conn, now=NOW)
     cid2 = r2["result"]["contract"]["contract_id"]
     assert cid1 == cid2
+    conn.close()
 
 
 def test_goal_prepare_with_registry_passes_executor_through_seven_conditions(tmp_path) -> None:
@@ -257,3 +261,4 @@ def test_goal_prepare_with_registry_passes_executor_through_seven_conditions(tmp
     rejected = [c["executor_id"] for c in adm["rejected_executors"]]
     assert "exec-a" in eligible
     assert "exec-b" in rejected
+    conn.close()
