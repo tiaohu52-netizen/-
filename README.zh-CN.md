@@ -222,6 +222,7 @@ src/longtask/             参考实现，Python 3.11+，零运行时依赖
   rpc/                    JSON-RPC 控制面
   cli/                    `longtask` 命令 + `longtaskd` 守护进程
   mcp_server.py           `longtask-mcp` 模型侧入口
+src/lhgp/                 canonical 命名空间 facade（与上述实现共享状态）
 
 skills/longtask-contract/ 让 AI 学会使用本协议
 quality/                  治理：声明注册表 + 7 道质量门
