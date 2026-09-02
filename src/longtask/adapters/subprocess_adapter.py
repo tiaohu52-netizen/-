@@ -4,6 +4,11 @@
 编译失败的默认行为是拒接（PrepareRefusedError），绝不静默降级。
 spawn 只收结构化 argv（列表参数、shell=False），模型输出是不可信数据，
 永不进入命令行（DESIGN §12.1、§14 注入防线）。
+
+任务文本位置（dogfood v4 教训：各 CLI 参数语法不同）：
+- 位置参数型（agent-cli headless）：argv 不含占位符 → task_prompt 追加为尾元素；
+- flag 值型（executor-cli -p "<task>"）：argv 含一个 {task} 占位符 → 原位替换。
+「prompt 插在哪」由此成为注册表配置数据，不再需要每个 CLI 手写包装器。
 """
 
 from __future__ import annotations
@@ -39,6 +44,9 @@ from longtask.contracts.schema import AttemptState, Enforcement
 DEFAULT_GRACE_SECONDS = 5.0
 # collect 默认等待上限：超时抛 subprocess.TimeoutExpired（如实回收失败）。
 DEFAULT_COLLECT_TIMEOUT_SECONDS = 60.0
+# 任务文本占位符（注册表 argv 内）：标记 task_prompt 的插入位置。
+# 固定词表的一部分，不是模型可控数据；替换是单元素原位换，无拼接面。
+TASK_PLACEHOLDER = "{task}"
 
 # 重绑后能力诚实声明（SPEC §11.3 capability_snapshot）：管道与退出码随原
 # Popen 丢失，只能观察存活；collect 会如实报错而不是编一个退出码。
@@ -149,6 +157,15 @@ class SubprocessAdapter(ExecutorAdapter):
         _check_context(input_, reasons)
         if not self._launch.argv:
             reasons.append("launch argv 未配置：没有结构化 argv 可拉起")
+        else:
+            # {task} 占位符唯一性（dogfood v4 教训：各 CLI 的任务文本位置
+            # 不同——位置参数 / -p 值 / 子命令——占位符把「插在哪」变成
+            # 注册表配置数据）。多于一个 → 拒接（歧义，fail-closed）。
+            placeholders = sum(1 for a in self._launch.argv if a == TASK_PLACEHOLDER)
+            if placeholders > 1:
+                reasons.append(
+                    f"launch.argv 含 {placeholders} 个 {TASK_PLACEHOLDER} 占位符：最多一个"
+                )
         if reasons:
             raise refuse("; ".join(reasons))
         if workspace is None:
@@ -187,13 +204,18 @@ class SubprocessAdapter(ExecutorAdapter):
             raise refuse("spawn 无法确定期望 workspace_root")
         # 环境白名单：只透显式列出的变量；模型输出永不进入 argv 或环境
         env = {name: os.environ[name] for name in launch.env_allowlist if name in os.environ}
-        # 任务文本作为单个 argv 尾元素（用户审定的冻结区数据，非模型输出；
-        # 列表参数 + shell=False，无 shell 拼接面，DESIGN §12.1/§14 注入防线）
+        # 任务文本注入（DESIGN §12.1）：{task} 占位符 → 原位替换；无占位符
+        # → 尾元素追加（向后兼容：agent-cli 等位置参数 CLI 的既有形态）。
+        # 文本是用户审定的冻结区数据，非模型输出；列表参数 + shell=False，
+        # 无 shell 拼接面（§14 注入防线）——占位符只是位置标记，不引入拼接。
         argv = list(launch.argv)
         if input_.task_prompt is not None:
             if not input_.task_prompt.strip():
                 raise refuse("task_prompt 为空白：没有可交付的任务文本")
-            argv.append(input_.task_prompt)
+            if TASK_PLACEHOLDER in argv:
+                argv = [input_.task_prompt if a == TASK_PLACEHOLDER else a for a in argv]
+            else:
+                argv.append(input_.task_prompt)
         proc = subprocess.Popen(  # noqa: S603 —— 结构化 argv + shell=False，DESIGN §12.1 注入防线
             argv,
             cwd=launch.cwd if launch.cwd is not None else str(expected),
@@ -524,6 +546,7 @@ def _check_context(input_: AttemptInput, reasons: list[str]) -> None:
 __all__ = [
     "DEFAULT_COLLECT_TIMEOUT_SECONDS",
     "DEFAULT_GRACE_SECONDS",
+    "TASK_PLACEHOLDER",
     "Enforcement",
     "LaunchSpec",
     "SubprocessAdapter",
