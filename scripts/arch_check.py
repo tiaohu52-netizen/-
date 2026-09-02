@@ -7,7 +7,7 @@
 
 棘轮：存量违规数 ≤ BASELINE 放行（存量不阻断），超基线即新增违规、门红。
 修复存量后必须下调 BASELINE，不得静默放宽（修改本值需在 commit 说明理由）。
-fail-closed：src 目录缺失或文件解析失败 → 报错退出。
+fail-closed：任一源码包目录缺失或文件解析失败 → 报错退出。
 """
 
 from __future__ import annotations
