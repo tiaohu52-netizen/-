@@ -6,7 +6,20 @@ follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
 
 ## [Unreleased]
 
-_(no changes yet)_
+### Added
+
+- MCP tool safety annotations (`readOnlyHint`, `destructiveHint`,
+  `openWorldHint`) and strict JSON argument validation.
+- Read-only `notifications` CLI audit command with status/limit filters and
+  opt-in payload output; the MCP notification tool remains payload-redacted
+  by default.
+- LHGP dual-track entrypoint polish (`lhgp --version`, `lhgp-mcp`) and updated
+  plugin/roadmap documentation.
+
+### Fixed
+
+- Detached daemon and subprocess test lifecycle cleanup, including parent
+  pipe closure after child exit.
 
 ## [0.1.0] - 2026-09-01
 
@@ -22,7 +35,8 @@ expands to ubuntu + macOS.
 - 24 JSON-RPC methods over the control plane, dispatched through
   `src/longtask/rpc/handlers.py` + `src/longtask/rpc/executor_api.py`.
 - MCP server thin layer (`longtask-mcp` script entry, `src/longtask/mcp_server.py`)
-  exposing 7 longtask_* tools to any MCP-compatible agent harness.
+  exposing core `longtask_*` tools plus LHGP aliases and audit/control
+  extensions to any MCP-compatible agent harness.
 - §17 `longtask-contract` skill (`skills/longtask-contract/SKILL.md`) teaching
   models how to draft contracts, write handovers, and avoid common pitfalls.
 
