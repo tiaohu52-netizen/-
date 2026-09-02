@@ -42,7 +42,7 @@
       "properties": {
         "file_effects": {
           "type": "object",
-          "required": ["mode", "workspace_root"],
+          "required": ["mode"],
           "properties": {
             "mode": { "enum": ["read-only", "workspace-write"] },
             "workspace_root": { "type": "string", "minLength": 1 },
@@ -89,7 +89,33 @@
         "checks": {
           "type": "array",
           "minItems": 1,
-          "items": { "type": "string", "minLength": 1 }
+          "items": {
+            "oneOf": [
+              { "type": "string", "minLength": 1 },
+              {
+                "type": "object",
+                "required": ["kind", "target"],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "file-exists",
+                      "file-content-matches",
+                      "command-exit-zero",
+                      "artifact-present",
+                      "structure-valid",
+                      "observable",
+                      "user-assertion"
+                    ]
+                  },
+                  "target": { "type": "string", "minLength": 1 },
+                  "args": { "type": "object" },
+                  "mandatory": { "type": "boolean", "default": true },
+                  "note": { "type": "string" }
+                },
+                "additionalProperties": false
+              }
+            ]
+          }
         },
         "verifier": {
           "enum": ["cross_check", "none"],
