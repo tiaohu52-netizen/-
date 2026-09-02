@@ -22,6 +22,8 @@ Environment: new CPython 3.13 virtual environment created with `uv venv`
 8. Ran the complete `tests/integration/test_reconcile.py` suite: 20 tests passed,
    covering real subprocess handles, restart/reattach, orphan grace, fencing,
    redispatch, and post-reap settlement.
+9. Ran `tests/integration/test_p5_repair_loop.py`: 8 tests passed, covering
+   verifier failure, structured repair, re-verification, and budget exhaustion.
 
 ## Scope and remaining work
 
