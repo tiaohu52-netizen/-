@@ -1,5 +1,8 @@
 """Canonical LHGP Python namespace compatibility tests (P6)."""
 
+import subprocess
+import sys
+
 import longtask
 from lhgp import PROTOCOL_VERSION, __version__
 from lhgp.acceptance.checks import CheckSpec as CanonicalCheckSpec
@@ -77,3 +80,23 @@ def test_supporting_namespaces_reexport_single_implementation() -> None:
     assert CanonicalCheckSpec is LegacyCheckSpec
     assert CanonicalOffer is LegacyOffer
     assert CanonicalForecast is LegacyForecast
+
+
+def test_canonical_modules_preserve_module_execution_entrypoints() -> None:
+    """Canonical module paths must behave like their installed console scripts."""
+
+    cli = subprocess.run(  # noqa: S603
+        [sys.executable, "-m", "lhgp.cli.main", "--version"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert cli.stdout.strip().startswith("lhgp ")
+
+    mcp = subprocess.run(  # noqa: S603
+        [sys.executable, "-m", "lhgp.mcp_server", "--help"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert "LHGP" in mcp.stdout
