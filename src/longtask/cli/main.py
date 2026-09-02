@@ -42,8 +42,10 @@ from longtask.rpc.server import RequestEnvelope, route
 
 
 def build_parser() -> argparse.ArgumentParser:
+    executable = Path(sys.argv[0]).stem.lower()
+    cli_name = "lhgp" if executable == "lhgp" else "longtask"
     parser = argparse.ArgumentParser(
-        prog="longtask",
+        prog=cli_name,
         description=f"远期任务协议控制面 CLI (v{__version__}, protocol v{PROTOCOL_VERSION})",
     )
     parser.add_argument("--version", action="store_true", help="打印包与协议版本")
@@ -253,7 +255,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.version:
-        print(f"longtask {__version__} (protocol v{PROTOCOL_VERSION})")
+        executable = Path(sys.argv[0]).stem.lower()
+        cli_name = "lhgp" if executable == "lhgp" else "longtask"
+        print(f"{cli_name} {__version__} (protocol v{PROTOCOL_VERSION})")
         return 0
 
     if not args.command:

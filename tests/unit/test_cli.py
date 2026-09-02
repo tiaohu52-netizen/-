@@ -99,6 +99,13 @@ class TestCliBasics:
         assert __version__ in out
         assert f"protocol v{PROTOCOL_VERSION}" in out
 
+    def test_lhgp_version_uses_new_entrypoint_name(
+        self, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("sys.argv", ["lhgp"])
+        assert main(["--version"]) == 0
+        assert capsys.readouterr().out.startswith("lhgp ")
+
     def test_no_args_prints_help(self, capsys: pytest.CaptureFixture[str]) -> None:
         assert main([]) == 0
         out = capsys.readouterr().out
