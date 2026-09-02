@@ -283,6 +283,7 @@ src/longtask/             the reference implementation, Python 3.11+, zero runti
   rpc/                    JSON-RPC control plane
   cli/                    the `longtask` command + `longtaskd` daemon
   mcp_server.py           the `longtask-mcp` model-facing entry
+src/lhgp/                 canonical namespace facades (migration-safe, same implementation)
 
 skills/longtask-contract/ onboards an AI to use the protocol
 quality/                  governance: claims registry + 7 quality gates
