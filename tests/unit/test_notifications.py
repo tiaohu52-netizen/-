@@ -82,6 +82,7 @@ def test_drain_retries_channel_failure(tmp_path) -> None:
         payload={},
         now=now,
     )
+
     def fail_delivery(_):
         raise RuntimeError("offline")
 

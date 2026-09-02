@@ -483,10 +483,7 @@ def _judge_verifier_outcomes(root: Path, conn: sqlite3.Connection, now: datetime
             )
             if not is_verifier:
                 continue
-            if (
-                event.contract_revision is not None
-                and event.contract_revision != contract.revision
-            ):
+            if event.contract_revision is not None and event.contract_revision != contract.revision:
                 continue
             if str(event.event_type) == EventType.ATTEMPT_SUCCEEDED.value:
                 last_verifier_state = "succeeded"

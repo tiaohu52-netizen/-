@@ -81,6 +81,7 @@ def run_daemon_loop(
     if token_path.is_file():
         token = token_path.read_text(encoding="utf-8").strip()
         if token:
+
             def dispatch_rpc(raw: dict[str, Any]) -> dict[str, Any]:
                 envelope = RequestEnvelope(
                     method=parse_envelope(raw).method,

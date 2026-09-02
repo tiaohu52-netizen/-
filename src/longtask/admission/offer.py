@@ -71,9 +71,7 @@ class Offer:
         """§10.4 缺一项即拒：合格执行器 + 可执行验收 + verification reserve + p90 ≤ deadline。"""
         # forecast 已计算但没有安全启动时刻，说明调用方无法证明在 Deadline
         # 前完成；未知 forecast 仍允许进入 offer，但不得把“不知道”当成已通过。
-        deadline_feasible = (
-            self.forecast_p90_minutes is None or self.safe_start_by is not None
-        )
+        deadline_feasible = self.forecast_p90_minutes is None or self.safe_start_by is not None
         return (
             bool(self.eligible_executors)
             and self.acceptance_executable

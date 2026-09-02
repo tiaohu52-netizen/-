@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from longtask.persistence.paths import default_data_root
+
 LEGACY_DIR_NAME = ".longtask"
 NEW_DIR_NAME = ".lhgp"
 
@@ -38,20 +40,6 @@ def _backup_dir() -> Path:
 LEGACY_DIR = _legacy_dir()
 NEW_DIR = _new_dir()
 BACKUP_DIR = _backup_dir()
-
-
-def default_data_root() -> Path:
-    """默认数据目录：优先 ~/.lhgp；不存在而 ~/.longtask 存在则回退旧路径。
-
-    双轨读取语义（SPEC §19.3「先双写后切读」的读侧）：
-    - 全新安装：只有 ~/.lhgp 会被创建/使用——新用户只见新名；
-    - 旧安装未迁移：~/.longtask 继续生效，行为与改名前完全一致；
-    - 迁移后：~/.lhgp 存在即优先生效（旧路径留作回滚窗口）。
-    """
-    new, legacy = _new_dir(), _legacy_dir()
-    if new.exists() or not legacy.exists():
-        return new
-    return legacy
 
 
 @dataclass(frozen=True, slots=True)

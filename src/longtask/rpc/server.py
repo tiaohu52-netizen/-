@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from longtask import PROTOCOL_VERSION
-from longtask.cli.paths import default_data_root
+from longtask.persistence.paths import default_data_root
 from longtask.persistence.store import StoreConfig, connect, ensure_schema
 from longtask.rpc.errors import ErrorCode, RpcError
 from longtask.rpc.handlers import HANDLERS
