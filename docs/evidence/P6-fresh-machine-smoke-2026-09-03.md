@@ -38,6 +38,10 @@ Environment: new CPython 3.13 virtual environment created with `uv venv`
 14. Ran the official Skill structure validator for both
     `skills/long-horizon-goals` and `skills/longtask-contract` in Python UTF-8
     mode; both reported `Skill is valid!`.
+15. Ran `lhgp migrate` with its default dry-run mode. It reported
+    `mode: dry-run (nothing changed)` and the checked temporary directory
+    remained empty; an already-populated target was correctly refused rather
+    than overwritten.
 
 ## Scope and remaining work
 
