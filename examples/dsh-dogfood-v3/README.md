@@ -67,12 +67,18 @@ confirmed gone...`）。
 - `palindrome.py` / `tests.py`：MiniMax-M2.7-highspeed 真实交付物；
 - `registry.example.json`：dsh headless 双执行器注册表（执行者+verifier）。
 
-## 复现
+## 复现说明
+
+本目录是 v3 的**结果归档**，当时使用的临时驱动脚本未随仓库提交，因而
+不能通过上面的历史命令直接重放；不要把它当作当前可执行 quickstart。
+可运行的无密钥 default-deny 探针见
+[`../dsh-dogfood-v4/dogfood_v4.py`](../dsh-dogfood-v4/dogfood_v4.py) 的
+`probe` 阶段：
 
 ```bash
-# 环境：临时 DSH_HOME（settings.yaml 的 agent-default-model 覆盖为
-# provider=minimax-cn, model=MiniMax-M2.7-highspeed）+ MINIMAX_CN_API_KEY
-python .dogfood/dogfood_run.py phase1   # 立合同+派工+拉起 dsh，进程退出
-python .dogfood/dogfood_run.py phase2   # 重启：reconcile 四分支 + 重派
-python .dogfood/dogfood_run.py phase3   # verifier 派生 + 裁决
+uv run python examples/dsh-dogfood-v4/dogfood_v4.py probe
 ```
+
+v3 的断裂、重派和事件链以本目录的 `events.jsonl` 为审计证据；要重做真实
+LLM 阶段，需要自行准备 DSH、临时 `DSH_HOME` 和 `MINIMAX_CN_API_KEY`，不在
+默认质量门范围内。
