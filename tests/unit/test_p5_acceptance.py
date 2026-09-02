@@ -9,6 +9,7 @@ from longtask.acceptance.checks import (
     CheckSpec,
     RepairBrief,
 )
+from longtask.acceptance.evaluator import evaluate_check
 
 pytestmark = pytest.mark.unit
 
@@ -66,3 +67,39 @@ class TestRepairBrief:
         assert d["failed_checks"] == ["file-exists:result.txt"]
         assert d["retry_strategy"] == "swap_executor"
         assert d["notes"] == ["尝试过 exec-a, exec-b 均失败"]
+
+
+class TestEvaluateCheck:
+    def test_file_exists_and_hash_are_deterministic(self, tmp_path) -> None:
+        target = tmp_path / "result.txt"
+        target.write_text("hello", encoding="utf-8")
+        exists = evaluate_check(
+            CheckSpec(kind=CheckKind.FILE_EXISTS, target="result.txt"), workspace_root=tmp_path
+        )
+        hashed = evaluate_check(
+            CheckSpec(
+                kind=CheckKind.FILE_CONTENT_MATCHES,
+                target="result.txt",
+                args={"contains": "ell"},
+            ),
+            workspace_root=tmp_path,
+        )
+        assert exists.outcome == "pass"
+        assert hashed.outcome == "pass"
+
+    def test_path_escape_fails_closed(self, tmp_path) -> None:
+        result = evaluate_check(
+            CheckSpec(kind=CheckKind.FILE_EXISTS, target="../outside"), workspace_root=tmp_path
+        )
+        assert result.outcome == "fail"
+
+    def test_command_uses_structured_argv(self, tmp_path) -> None:
+        result = evaluate_check(
+            CheckSpec(
+                kind=CheckKind.COMMAND_EXIT_ZERO,
+                target="python",
+                args={"argv": ["-c", "raise SystemExit(0)"]},
+            ),
+            workspace_root=tmp_path,
+        )
+        assert result.outcome == "pass"
