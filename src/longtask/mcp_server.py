@@ -449,6 +449,24 @@ TOOLS: dict[
         },
     ),
 }
+
+# P6 新命名与旧命名双轨并存：旧工具保持可发现，新增工具使用协议名
+# lhgp_*，避免升级时破坏已有 Agent 的工具缓存。
+_RENAMED_TOOLS = {
+    "lhgp_health": "longtask_health",
+    "lhgp_list_executors": "longtask_list_executors",
+    "lhgp_prepare_goal": "longtask_prepare_contract",
+    "lhgp_approve_goal": "longtask_approve_contract",
+    "lhgp_get_goal": "longtask_get_contract",
+    "lhgp_list_goals": "longtask_list_contracts",
+    "lhgp_attach_executor": "longtask_attach_to_executor",
+}
+for _new_name, _legacy_name in _RENAMED_TOOLS.items():
+    _handler, _metadata = TOOLS[_legacy_name]
+    TOOLS[_new_name] = (
+        _handler,
+        {**_metadata, "description": f"[LHGP] {_metadata['description']}"},
+    )
 TOOL_NAMES = sorted(TOOLS.keys())
 
 
