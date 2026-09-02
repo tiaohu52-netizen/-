@@ -50,6 +50,8 @@ Environment: new CPython 3.13 virtual environment created with `uv venv`
 18. Rebuilt the wheel and inspected its `entry_points.txt`: canonical scripts
     point to `lhgp.*`, legacy scripts remain on `longtask.*`, and the wheel
     contains the complete `lhgp/` package tree.
+19. Rebuilt the source distribution and inspected its tar members; it also
+    contains the complete `src/lhgp/` tree and `src/lhgp/py.typed` marker.
 
 ## Scope and remaining work
 
