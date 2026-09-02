@@ -62,6 +62,7 @@ from lhgp.contracts.contract_view import (
     EventActor as CanonicalEventActor,
 )
 from lhgp.contracts.contract_view_entity import ContractView as CanonicalContractView
+from lhgp.contracts.schema import ContractDraft as CanonicalSchemaContractDraft
 from lhgp.contracts.state_machine import (
     is_valid_transition as canonical_is_valid_transition,
 )
@@ -115,6 +116,7 @@ from longtask.contracts.contract_view import (
     EventActor as LegacyEventActor,
 )
 from longtask.contracts.contract_view_entity import ContractView as LegacyContractView
+from longtask.contracts.schema import ContractDraft as LegacySchemaContractDraft
 from longtask.contracts.state_machine import is_valid_transition as legacy_is_valid_transition
 from longtask.contracts.validation import validate_draft as legacy_validate_draft
 from longtask.forecast.model import Forecast as LegacyForecast
@@ -158,6 +160,7 @@ def test_contract_namespace_reexports_single_implementation() -> None:
     assert CanonicalContractView is LegacyContractView
     assert canonical_is_valid_transition is legacy_is_valid_transition
     assert canonical_validate_draft is legacy_validate_draft
+    assert CanonicalSchemaContractDraft is LegacySchemaContractDraft is CanonicalContractDraft
 
 
 def test_persistence_namespace_reexports_single_implementation() -> None:
