@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
@@ -164,9 +165,44 @@ def mark_failed(
         )
 
 
+def drain_notifications(
+    conn: sqlite3.Connection,
+    *,
+    now: datetime,
+    deliver: Callable[[Notification], None],
+    limit: int = 20,
+    retry_delay_seconds: int = 60,
+) -> int:
+    """领取并投递一批通知；返回成功发送数量。
+
+    ``deliver`` 是渠道适配器，抛异常表示渠道未接受，通知会回到 pending。
+    outbox 本身提供至少一次语义，因此渠道必须使用 notification.idempotency_key
+    去重；本函数不吞掉失败事实。
+    """
+
+    claimed = claim_notifications(conn, now=now, limit=limit)
+    sent = 0
+    for notification in claimed:
+        try:
+            deliver(notification)
+        except Exception as exc:  # channel failures are retryable facts
+            mark_failed(
+                conn,
+                notification_id=notification.notification_id,
+                now=now,
+                error=str(exc),
+                retry_at=now + timedelta(seconds=retry_delay_seconds),
+            )
+        else:
+            mark_sent(conn, notification_id=notification.notification_id, now=now)
+            sent += 1
+    return sent
+
+
 __all__ = [
     "Notification",
     "claim_notifications",
+    "drain_notifications",
     "enqueue_notification",
     "get_by_key",
     "mark_failed",

@@ -27,6 +27,7 @@ from longtask.cli.runner import AttemptRunner
 from longtask.cli.tick import run_daemon_tick
 from longtask.persistence.decisions import earliest_next_decision_at
 from longtask.persistence.events import EventType
+from longtask.persistence.notifications import drain_notifications
 from longtask.persistence.projections import rebuild_projection
 from longtask.persistence.store import (
     StoreConfig,
@@ -142,6 +143,23 @@ def run_daemon_loop(
             # 消费 control/interrupt 请求（用户通过 RPC 打断执行中的 attempt）
             _consume_interrupt_requests(root, conn, runner, now_val)
             res = run_daemon_tick(root, conn, registry, now=now_val, emit_fn=emit_fn)
+            if emit_fn is not None:
+                drain_notifications(
+                    conn,
+                    now=now_val,
+                    deliver=lambda notification: emit_fn(
+                        _json.dumps(
+                            {
+                                "notification": notification.event_type,
+                                "channel": notification.channel,
+                                "goal_id": notification.goal_id,
+                                "payload": notification.payload,
+                                "idempotency_key": notification.idempotency_key,
+                            },
+                            ensure_ascii=False,
+                        )
+                    ),
+                )
             total_dispatched += int(res.get("dispatched", 0))
             total_expired += int(res.get("expired", 0))
             for started in res.get("attempts_started", []):
