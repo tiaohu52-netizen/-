@@ -133,16 +133,20 @@ class TestMigrate:
 
 
 class TestEntrypoints:
-    def test_lhgp_shares_longtask_entrypoint(self) -> None:
-        """双轨：lhgp 与 longtask 指向同一 entrypoint（行为零漂移）。"""
+    def test_lhgp_uses_canonical_entrypoint_and_legacy_shim_remains(self) -> None:
+        """Canonical names use the new namespace; legacy names remain shims."""
         import tomllib
 
         pyproject = tomllib.loads(
             (Path(__file__).resolve().parents[2] / "pyproject.toml").read_text(encoding="utf-8")
         )
         scripts = pyproject["project"]["scripts"]
-        assert scripts["lhgp"] == scripts["longtask"]
-        assert scripts["lhgp-mcp"] == scripts["longtask-mcp"]
+        assert scripts["lhgp"] == "lhgp.cli.main:entrypoint"
+        assert scripts["lhgpd"] == "lhgp.cli.daemon_proc:lhgpd_entrypoint"
+        assert scripts["lhgp-mcp"] == "lhgp.mcp_server:main"
+        assert scripts["longtask"] == "longtask.cli.main:entrypoint"
+        assert scripts["longtaskd"] == "longtask.cli.daemon_proc:lhgpd_entrypoint"
+        assert scripts["longtask-mcp"] == "longtask.mcp_server:main"
         assert "lhgpd" in scripts
 
     def test_lhgpd_entrypoint_runs_loop_foreground(
