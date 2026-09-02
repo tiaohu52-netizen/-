@@ -612,9 +612,7 @@ def _make_error(req_id: Any, code: Any, message: str, data: Any = None) -> dict[
     return {"jsonrpc": "2.0", "id": req_id, "error": err}
 
 
-def _dispatch(
-    ctx: dict[str, Any], method: str, params: dict[str, Any], req_id: Any
-) -> dict[str, Any]:
+def _dispatch(ctx: dict[str, Any], method: str, params: Any, req_id: Any) -> dict[str, Any]:
     if method == "initialize":
         return _make_response(
             req_id,
