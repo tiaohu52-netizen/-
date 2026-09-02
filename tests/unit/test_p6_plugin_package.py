@@ -48,7 +48,7 @@ class TestMcpConfig:
         assert "lhgp" in data["mcpServers"]
         server = data["mcpServers"]["lhgp"]
         assert server["type"] == "stdio"
-        assert server["command"] == "longtask-mcp"
+        assert server["command"] == "lhgp-mcp"
 
 
 class TestEntryPointAlignment:
