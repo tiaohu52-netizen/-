@@ -55,6 +55,16 @@ def _result_text(resp: dict[str, Any]) -> dict[str, Any]:
     return json.loads(text)
 
 
+def _stop_mcp(proc: subprocess.Popen[bytes]) -> None:
+    """停止 MCP 子进程并关闭父端管道，避免测试句柄泄漏。"""
+    if proc.poll() is None:
+        proc.terminate()
+    proc.wait(timeout=5)
+    for stream in (proc.stdin, proc.stdout, proc.stderr):
+        if stream is not None:
+            stream.close()
+
+
 @pytest.fixture()
 def data_dir(tmp_path: Path) -> Path:
     """每个测试一个临时数据目录（不污染 ~/.longtask）。"""
@@ -106,8 +116,7 @@ class TestMCPDiscovery:
                 "openWorldHint": False,
             }
         finally:
-            proc.terminate()
-            proc.wait(timeout=5)
+            _stop_mcp(proc)
 
 
 class TestMCPHealth:
@@ -120,8 +129,7 @@ class TestMCPHealth:
             assert "protocol_version" in result
             assert "longtask_prepare_contract" in result["tools"]
         finally:
-            proc.terminate()
-            proc.wait(timeout=5)
+            _stop_mcp(proc)
 
 
 class TestMCPLifecycle:
@@ -239,8 +247,7 @@ class TestMCPLifecycle:
             assert "hint" in snapshot
             assert snapshot.get("active_content") is None
         finally:
-            proc.terminate()
-            proc.wait(timeout=5)
+            _stop_mcp(proc)
 
 
 class TestMCPErrors:
@@ -257,8 +264,7 @@ class TestMCPErrors:
             assert "error" in resp
             assert resp["error"]["code"] == -32602
         finally:
-            proc.terminate()
-            proc.wait(timeout=5)
+            _stop_mcp(proc)
 
     def test_missing_required_argument(self, data_dir: Path) -> None:
         proc = _spawn_mcp(data_dir)
@@ -271,8 +277,7 @@ class TestMCPErrors:
             assert "error" in resp
             assert resp["error"]["code"] == -32602
         finally:
-            proc.terminate()
-            proc.wait(timeout=5)
+            _stop_mcp(proc)
 
     def test_non_object_arguments_return_invalid_params(self, data_dir: Path) -> None:
         proc = _spawn_mcp(data_dir)
@@ -285,8 +290,7 @@ class TestMCPErrors:
             assert resp["error"]["code"] == -32602
             assert "arguments" in resp["error"]["message"]
         finally:
-            proc.terminate()
-            proc.wait(timeout=5)
+            _stop_mcp(proc)
 
     def test_unknown_notification_status_returns_invalid_params(self, data_dir: Path) -> None:
         proc = _spawn_mcp(data_dir)
@@ -302,8 +306,7 @@ class TestMCPErrors:
             assert resp["error"]["code"] == -32602
             assert "unknown notification status" in resp["error"]["message"]
         finally:
-            proc.terminate()
-            proc.wait(timeout=5)
+            _stop_mcp(proc)
 
     def test_boolean_notification_limit_returns_invalid_params(self, data_dir: Path) -> None:
         proc = _spawn_mcp(data_dir)
@@ -316,5 +319,4 @@ class TestMCPErrors:
             assert resp["error"]["code"] == -32602
             assert "limit must be an integer" in resp["error"]["message"]
         finally:
-            proc.terminate()
-            proc.wait(timeout=5)
+            _stop_mcp(proc)
