@@ -116,6 +116,7 @@ path and the pinned commit for every claim.
 | MCP server + model-facing skill (7 tools, not a 1:1 RPC tunnel) | Verified | `mcp-server-and-skill` |
 | Ephemeral context + cross-checking verifier | Verified | `ephemeral-context-and-verifier` |
 | Executor-side RPC (status / renew / write-back) | Verified | `executor-session-rpc` |
+| Authenticated local Unix-socket RPC (daemon + `rpc-call` client) | Verified | `local-rpc-transport` |
 | Daemon lifecycle + attempt runner (real subprocess) | Verified | `daemon-lifecycle-and-attempt-runner` |
 
 What this list **does not** claim:
@@ -127,8 +128,8 @@ What this list **does not** claim:
   explicit evidence-producing verifier.
 - Multi-host or cloud relay execution. The current trust boundary is one local
   machine and one user; L2/L3 wakeup remains accepted design debt.
-- A network JSON-RPC daemon transport. MCP stdio is supported; named-pipe and
-  Unix-socket control-plane transport is still planned.
+- A network or multi-host JSON-RPC transport. The current socket is local-only
+  and authenticated with the token in `daemon.token`.
 
 These gaps are tracked explicitly in [`docs/LHGP-ROADMAP.md`](docs/LHGP-ROADMAP.md).
 
@@ -158,6 +159,18 @@ You should see something like:
 Done. You now have a working local LHGP install. The primary commands are
 `lhgp`, `lhgpd` and `lhgp-mcp`; the legacy `longtask`, `longtaskd` and
 `longtask-mcp` aliases remain available during the migration window.
+
+Once the daemon is running, another agent or process can use the same control
+plane without opening the SQLite database directly:
+
+```bash
+lhgp start
+lhgp rpc-call attempt/status \
+  --params '{"contract_id":"<id>","attempt_id":"<attempt>"}'
+```
+
+The client reads the local endpoint token automatically. Socket access is
+single-machine by design; cross-host relay is a separate trust-boundary feature.
 
 ### Your first contract, end to end
 
