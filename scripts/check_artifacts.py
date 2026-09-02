@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import re
 import sys
 import tarfile
 import zipfile
@@ -14,6 +16,7 @@ REQUIRED = {
     "skills/longtask-contract/MANIFEST.json",
     "skills/longtask-contract/SKILL.md",
 }
+_STRICT_SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
 
 
 def _names(path: Path) -> set[str]:
@@ -30,6 +33,37 @@ def _names(path: Path) -> set[str]:
     raise ValueError(f"unsupported artifact: {path}")
 
 
+def _read_member(path: Path, target: str) -> bytes:
+    if path.suffix == ".whl":
+        with zipfile.ZipFile(path) as archive:
+            return archive.read(target)
+    if path.name.endswith(".tar.gz"):
+        with tarfile.open(path, "r:gz") as archive:
+            for member in archive.getmembers():
+                if "/" in member.name and member.name.split("/", 1)[1] == target:
+                    extracted = archive.extractfile(member)
+                    if extracted is not None:
+                        return extracted.read()
+    raise KeyError(f"{target} not found in {path}")
+
+
+def _validate_companion_metadata(path: Path) -> str | None:
+    try:
+        plugin = json.loads(_read_member(path, ".codex-plugin/plugin.json"))
+        mcp = json.loads(_read_member(path, ".mcp.json"))
+    except (KeyError, json.JSONDecodeError, tarfile.TarError, zipfile.BadZipFile) as exc:
+        return f"invalid companion metadata: {exc}"
+    version = plugin.get("version")
+    if not isinstance(version, str) or _STRICT_SEMVER.fullmatch(version) is None:
+        return f"plugin manifest version is not strict SemVer: {version!r}"
+    if plugin.get("id") != "lhgp" or plugin.get("name") != "lhgp":
+        return "plugin manifest id/name must both be 'lhgp'"
+    server = mcp.get("mcpServers", {}).get("lhgp", {})
+    if server.get("command") != "lhgp-mcp":
+        return "MCP companion must expose the canonical 'lhgp-mcp' command"
+    return None
+
+
 def main() -> int:
     dist = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("dist")
     artifacts = sorted((*dist.glob("*.whl"), *dist.glob("*.tar.gz")))
@@ -40,6 +74,10 @@ def main() -> int:
         missing = REQUIRED - _names(artifact)
         if missing:
             print(f"{artifact}: missing {sorted(missing)}", file=sys.stderr)
+            return 1
+        metadata_error = _validate_companion_metadata(artifact)
+        if metadata_error:
+            print(f"{artifact}: {metadata_error}", file=sys.stderr)
             return 1
         print(f"{artifact}: companion resources OK")
     return 0
