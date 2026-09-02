@@ -25,8 +25,10 @@ from lhgp.admission.refuse import (
     AdmissionRefusedError as CanonicalModuleRefusedError,
 )
 from lhgp.cli.formatting import format_eta as canonical_format_eta
+from lhgp.contracts import Acceptance as CanonicalPackageAcceptance
 from lhgp.contracts import Budget as CanonicalPackageBudget
 from lhgp.contracts import Continuity as CanonicalPackageContinuity
+from lhgp.contracts.acceptance import Acceptance as CanonicalAcceptance
 from lhgp.contracts.budget import Budget as CanonicalBudget
 from lhgp.contracts.continuity import Continuity as CanonicalContinuity
 from lhgp.contracts.contract_draft import ContractDraft as CanonicalContractDraft
@@ -47,6 +49,7 @@ from longtask.admission.refuse import (
     AdmissionRefusedError as LegacyRefusedError,
 )
 from longtask.cli.formatting import format_eta as legacy_format_eta
+from longtask.contracts.acceptance import Acceptance as LegacyAcceptance
 from longtask.contracts.budget import Budget as LegacyBudget
 from longtask.contracts.continuity import Continuity as LegacyContinuity
 from longtask.contracts.contract_draft import ContractDraft as LegacyContractDraft
@@ -71,6 +74,8 @@ def test_contract_namespace_reexports_single_implementation() -> None:
     assert CanonicalContractDraft is LegacyContractDraft
     assert CanonicalBudget is LegacyBudget
     assert CanonicalPackageBudget is CanonicalBudget
+    assert CanonicalAcceptance is LegacyAcceptance
+    assert CanonicalPackageAcceptance is CanonicalAcceptance
     assert CanonicalContinuity is LegacyContinuity
     assert CanonicalPackageContinuity is CanonicalContinuity
 
