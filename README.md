@@ -142,7 +142,8 @@ These gaps are tracked explicitly in [`docs/LHGP-ROADMAP.md`](docs/LHGP-ROADMAP.
 You need Python 3.11+ and [`uv`](https://docs.astral.sh/uv/) (`pip install uv`).
 
 ```bash
-git clone https://github.com/your-org/longtask-protocol
+# replace <OWNER> with the GitHub account that hosts this repository
+git clone https://github.com/<OWNER>/longtask-protocol
 cd longtask-protocol
 uv sync --extra dev
 uv run python scripts/quality_gate.py   # ~10s; the same gate CI runs
