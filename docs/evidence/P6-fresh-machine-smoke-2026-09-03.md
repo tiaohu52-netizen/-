@@ -24,6 +24,9 @@ Environment: new CPython 3.13 virtual environment created with `uv venv`
    redispatch, and post-reap settlement.
 9. Ran `tests/integration/test_p5_repair_loop.py`: 8 tests passed, covering
    verifier failure, structured repair, re-verification, and budget exhaustion.
+10. In a clean temporary data directory, started the daemon with a one-second
+    interval, confirmed `status` reported the live PID and token, stopped it, and
+    confirmed a second `status` reported `running: false`.
 
 ## Scope and remaining work
 
