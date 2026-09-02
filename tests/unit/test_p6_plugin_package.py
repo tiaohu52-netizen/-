@@ -12,6 +12,8 @@ from pathlib import Path
 
 import pytest
 
+from longtask import __version__
+
 pytestmark = pytest.mark.unit
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -23,6 +25,7 @@ class TestPluginManifest:
         assert path.is_file(), f"missing {path}"
         data = json.loads(path.read_text(encoding="utf-8"))
         assert data["name"] == "lhgp"
+        assert data["version"] == __version__
         assert data["skills"] == "skills"
         assert data["mcpServers"] == ".mcp.json"
         assert data["author"]["name"] == "LHGP maintainers"
