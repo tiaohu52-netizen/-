@@ -5,7 +5,10 @@ description: 教模型通过 LHGP CLI 或 MCP 起草、批准、跟踪和交接�
 
 # longtask-contract（DESIGN §17）
 
-`longtask` 远期任务协议的契约 skill——**教会 AI 怎么用这个工具**。
+`longtask`（协议正式名 LHGP）远期任务协议的契约 skill——**教会 AI 怎么用这个工具**。
+
+P6 采用双轨入口：优先使用 `lhgp` / `lhgp-mcp`，现有 `longtask` /
+`longtask-mcp` 仍是兼容别名；两者写入同一份合同与审计账本。
 
 这不是协议本身（见 `DESIGN.md`），是模型侧的接入文档：教你怎么
 通过 CLI / RPC 跟协议对话，谈判什么样的合同、写什么样的交接、什么时候
@@ -27,6 +30,10 @@ prepare` 调用，并把任务交出去。
   完不擅长验证 → 协议派给 DSH 当 verifier
 - **跨今天**：现在是凌晨三点，deadline 在十二小时后——协议
   `wakeup/rtc-armed` 唤醒自己，到点派工
+
+运行中如需查看提醒历史，使用只读 `lhgp notifications --goal-id <id>`，
+默认不会把通知 payload 带回对话；只有用户明确要求审计详情时才追加
+`--include-payload`。
 
 **对比**：
 
