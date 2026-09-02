@@ -10,6 +10,7 @@ from longtask.acceptance.checks import (
     RepairBrief,
 )
 from longtask.acceptance.evaluator import evaluate_check
+from longtask.contracts.acceptance import Acceptance
 
 pytestmark = pytest.mark.unit
 
@@ -43,6 +44,17 @@ class TestCheckSpec:
         d = s.to_dict()
         assert d["mandatory"] is False
         assert d["args"] == {"args": ["-q"]}
+
+    def test_from_dict_round_trips_typed_check(self) -> None:
+        original = CheckSpec(kind=CheckKind.FILE_EXISTS, target="dist/app.js")
+        assert CheckSpec.from_dict(original.to_dict()) == original
+
+    def test_acceptance_validates_typed_check(self) -> None:
+        acceptance = Acceptance(
+            standard="all artifacts",
+            checks=(CheckSpec(kind=CheckKind.FILE_EXISTS, target="result.txt"),),
+        )
+        assert acceptance.validate() == []
 
 
 class TestRepairBrief:

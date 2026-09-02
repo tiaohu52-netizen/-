@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+from longtask.acceptance.checks import parse_check
 from longtask.contracts.acceptance import Acceptance
 from longtask.contracts.attention import Attention
 from longtask.contracts.attention import from_dict as attention_from_dict
@@ -77,7 +78,10 @@ class ContractDraft:
             "hard_constraints": self.hard_constraints,
             "acceptance": {
                 "standard": self.acceptance.standard,
-                "checks": list(self.acceptance.checks),
+                "checks": [
+                    check.to_dict() if hasattr(check, "to_dict") else check
+                    for check in self.acceptance.checks
+                ],
                 "verifier": self.acceptance.verifier,
             },
             "workload_estimate": {
@@ -116,7 +120,7 @@ def from_dict(data: dict[str, Any]) -> ContractDraft:
     acceptance_raw = data["acceptance"]
     acceptance = Acceptance(
         standard=str(acceptance_raw["standard"]),
-        checks=tuple(str(c) for c in acceptance_raw.get("checks") or ()),
+        checks=tuple(parse_check(c) for c in acceptance_raw.get("checks") or ()),
         verifier=str(acceptance_raw.get("verifier") or "cross_check"),
     )
 

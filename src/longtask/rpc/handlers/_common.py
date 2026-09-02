@@ -15,6 +15,7 @@ import sqlite3
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+from longtask.acceptance.checks import parse_check
 from longtask.contracts.attention import from_dict as attention_from_dict
 from longtask.contracts.authority import from_dict as authority_from_dict
 from longtask.contracts.continuity import from_dict as continuity_from_dict
@@ -78,7 +79,7 @@ def parse_contract_draft(params: dict[str, Any]) -> ContractDraft:
         acc_raw = draft_data["acceptance"]
         acceptance = Acceptance(
             standard=str(acc_raw["standard"]),
-            checks=tuple(str(c) for c in acc_raw["checks"]),
+            checks=tuple(parse_check(c) for c in acc_raw["checks"]),
             verifier=str(acc_raw.get("verifier", "cross_check")),
         )
 

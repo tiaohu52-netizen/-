@@ -43,6 +43,26 @@ class CheckSpec:
             "note": self.note,
         }
 
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> CheckSpec:
+        """从合同 JSON 读取 typed check，并在边界处拒绝畸形值。"""
+        if not isinstance(data, dict):
+            raise TypeError("check must be an object")
+        return cls(
+            kind=CheckKind(str(data["kind"])),
+            target=str(data["target"]),
+            args=dict(data.get("args") or {}),
+            mandatory=bool(data.get("mandatory", True)),
+            note=str(data.get("note", "")),
+        )
+
+
+def parse_check(value: str | dict[str, Any]) -> str | CheckSpec:
+    """兼容旧自然语言 check，同时保留新的 typed check 对象。"""
+    if isinstance(value, dict):
+        return CheckSpec.from_dict(value)
+    return str(value)
+
 
 @dataclass(frozen=True, slots=True)
 class RepairBrief:
@@ -66,4 +86,4 @@ class RepairBrief:
         }
 
 
-__all__ = ["CheckKind", "CheckSpec", "RepairBrief"]
+__all__ = ["CheckKind", "CheckSpec", "RepairBrief", "parse_check"]
