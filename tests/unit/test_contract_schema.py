@@ -5,9 +5,12 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
+from jsonschema import Draft202012Validator
 
 from longtask.contracts.schema import (
     FROZEN_FIELDS,
@@ -39,6 +42,24 @@ def make_draft(**overrides: object) -> ContractDraft:
     }
     kwargs.update(overrides)
     return ContractDraft(**kwargs)  # type: ignore[arg-type]
+
+
+def test_json_schema_accepts_typed_check_object() -> None:
+    schema_path = Path(__file__).parents[2] / "schemas" / "contract.schema.json"
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    payload = make_draft(
+        acceptance=Acceptance(
+            standard="artifact exists",
+            checks=(
+                {
+                    "kind": "file-exists",
+                    "target": "dist/app.js",
+                    "mandatory": True,
+                },
+            ),
+        )
+    ).to_dict()
+    assert list(Draft202012Validator(schema).iter_errors(payload)) == []
 
 
 class TestDraftValidation:
