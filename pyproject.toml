@@ -120,7 +120,7 @@ markers = [
 
 # ── coverage（棘轮：fail_under 是地板，只许上调；见 CONTRIBUTING.md）──
 [tool.coverage.run]
-source = ["src/longtask"]
+source = ["src/longtask", "src/lhgp"]
 branch = true
 
 [tool.coverage.report]
