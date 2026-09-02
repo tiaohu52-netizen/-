@@ -90,3 +90,23 @@ def test_unix_socket_round_trip(tmp_path) -> None:
     stopped.set()
     thread.join(timeout=2)
     assert json.loads(payloads[0])["ok"] is True
+
+
+def test_unix_socket_does_not_delete_regular_file(tmp_path) -> None:
+    if not hasattr(socket, "AF_UNIX"):
+        return
+    endpoint = tmp_path / "rpc.sock"
+    endpoint.write_text("sentinel", encoding="utf-8")
+    stopped = threading.Event()
+    try:
+        serve_unix_socket(
+            endpoint,
+            token="secret",
+            dispatch=lambda _: {"ok": True},
+            stop_event=stopped,
+        )
+    except OSError as exc:
+        assert "not a socket" in str(exc)
+    else:
+        raise AssertionError("regular endpoint file must not be deleted")
+    assert endpoint.read_text(encoding="utf-8") == "sentinel"
