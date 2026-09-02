@@ -205,7 +205,7 @@ Write a contract:
 
 ```bash
 uv run python -m longtask.cli.main prepare \
-  --contract-id lt-hello \
+  --contract-id lt-20260903-hello \
   --title "First contract" \
   --objective "Write hello.txt with 'hi from LHGP' in my workspace." \
   --deadline 2026-12-31T00:00:00+00:00
@@ -214,7 +214,7 @@ uv run python -m longtask.cli.main prepare \
 Approve it:
 
 ```bash
-uv run python -m longtask.cli.main approve lt-hello
+uv run python -m longtask.cli.main approve lt-20260903-hello
 ```
 
 Start the daemon in another terminal:
@@ -227,19 +227,19 @@ uv run python -m longtask.cli.main start --interval 30
 Check:
 
 ```bash
-uv run python -m longtask.cli.main get lt-hello
+uv run python -m longtask.cli.main get lt-20260903-hello
 uv run python -m longtask.cli.main status    # daemon / kill-switch
 # inspect durable notification delivery (payload is hidden by default)
 uv run python -m longtask.cli.main notifications --status pending
 # narrow the audit to one long-horizon goal when several run in parallel
-uv run python -m longtask.cli.main notifications --goal-id lt-hello
+uv run python -m longtask.cli.main notifications --goal-id lt-20260903-hello
 # add --include-payload only when the audit needs notification details
-cat ~/.longtask/contracts/lt-hello/contract.yaml
+cat ~/.longtask/contracts/lt-20260903-hello/contract.yaml
 ```
 
 The whole story of the run — `contract/prepared` → `contract/approved` →
 `attempt/started` → `attempt/succeeded` → `contract/completed` — is in
-`state.db` and mirrored into `~/.longtask/contracts/lt-hello/`.
+`state.db` and mirrored into `~/.longtask/contracts/lt-20260903-hello/`.
 
 ### If your agent is an MCP-compatible LLM
 
