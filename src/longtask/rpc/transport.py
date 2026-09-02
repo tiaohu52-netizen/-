@@ -11,6 +11,7 @@ from __future__ import annotations
 import hmac
 import json
 import socket
+import stat
 import threading
 from collections.abc import Callable, Iterable
 from contextlib import suppress
@@ -106,6 +107,8 @@ def serve_unix_socket(
     endpoint = Path(endpoint)
     endpoint.parent.mkdir(parents=True, exist_ok=True)
     if endpoint.exists():
+        if not stat.S_ISSOCK(endpoint.stat().st_mode):
+            raise OSError(f"RPC endpoint exists and is not a socket: {endpoint}")
         endpoint.unlink()
     server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     try:
