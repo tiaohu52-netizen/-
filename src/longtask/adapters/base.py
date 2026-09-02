@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
+    from longtask.adapters.handles import ExternalRunHandle
     from longtask.adapters.manifest import ExecutorManifest
     from longtask.contracts.schema import AttemptRole, Enforcement
 
@@ -86,6 +87,26 @@ class ExecutorAdapter(Protocol):
 
     def spawn(self, input_: AttemptInput, launch: PreparedLaunch) -> str:
         """拉起执行，返回 session_ref。只接收结构化启动声明。"""
+        ...
+
+    def run_handle(self, attempt_id: str) -> ExternalRunHandle | None:
+        """spawn 成功后持久返回外部运行句柄（SPEC §11.3）。
+
+        四元组 external_run_id / session_locator / recovery_strategy /
+        capability_snapshot，外加仅作提示的 process_identity（PID 与启动
+        时间不得单独作为身份真相）。拿不到句柄（例如纯内存适配器）返回
+        None，由 reconcile 按「状态未知」处理，不伪造可恢复性。
+        """
+        ...
+
+    def reattach(self, handle: ExternalRunHandle) -> bool:
+        """重启后按持久句柄重新绑定观察关系（SPEC §11.3 分支 1）。
+
+        返回 True 表示「能确认同一外部 run 仍活着且已重新绑定」，此后
+        observe/collect/cancel 对该 attempt 重新可用。返回 False 表示无法
+        确认——调用方必须按「状态未知」处理（orphan grace），不得据此判定
+        外部 run 已终止。绝不猜测。
+        """
         ...
 
     def observe(self, attempt_id: str) -> dict[str, Any]:

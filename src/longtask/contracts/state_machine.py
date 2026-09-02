@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from longtask.contracts.schema import (
     AcceptanceStatus,
+    AttemptState,
     ContractState,
     DeadlineStatus,
 )
@@ -100,6 +101,78 @@ def is_terminal_state(state: ContractState) -> bool:
 def is_valid_transition(from_state: ContractState, to_state: ContractState) -> bool:
     """判定从 from_state 迁移至 to_state 是否合法（DESIGN §5）。纯函数。"""
     return to_state in LEGAL_TRANSITIONS.get(from_state, frozenset())
+
+
+# ── attempt 轴（SPEC §7.4）──
+# admitted → starting → running ↔ waiting → succeeded | failed | cancelled | stale | orphaned
+# 「所有终态不可变；重试创建新 attempt id」：五个终态无出边，
+# orphaned 之后的 fence + 重新派发表现为「新 attempt_id」，不是状态回退。
+ATTEMPT_TERMINAL_STATES: frozenset[AttemptState] = frozenset(
+    {
+        AttemptState.SUCCEEDED,
+        AttemptState.FAILED,
+        AttemptState.CANCELLED,
+        AttemptState.STALE,
+        AttemptState.ORPHANED,
+    }
+)
+
+ATTEMPT_LEGAL_TRANSITIONS: dict[AttemptState, frozenset[AttemptState]] = {
+    AttemptState.ADMITTED: frozenset(
+        {
+            AttemptState.STARTING,
+            AttemptState.RUNNING,  # 无 starting 阶段的适配器直接 running
+            AttemptState.FAILED,
+            AttemptState.CANCELLED,
+            AttemptState.STALE,
+            AttemptState.ORPHANED,
+        }
+    ),
+    AttemptState.STARTING: frozenset(
+        {
+            AttemptState.RUNNING,
+            AttemptState.FAILED,
+            AttemptState.CANCELLED,
+            AttemptState.STALE,
+            AttemptState.ORPHANED,
+        }
+    ),
+    AttemptState.RUNNING: frozenset(
+        {
+            AttemptState.WAITING,
+            AttemptState.SUCCEEDED,
+            AttemptState.FAILED,
+            AttemptState.CANCELLED,
+            AttemptState.STALE,
+            AttemptState.ORPHANED,
+        }
+    ),
+    AttemptState.WAITING: frozenset(
+        {
+            AttemptState.RUNNING,
+            AttemptState.SUCCEEDED,
+            AttemptState.FAILED,
+            AttemptState.CANCELLED,
+            AttemptState.STALE,
+            AttemptState.ORPHANED,
+        }
+    ),
+    AttemptState.SUCCEEDED: frozenset(),
+    AttemptState.FAILED: frozenset(),
+    AttemptState.CANCELLED: frozenset(),
+    AttemptState.STALE: frozenset(),
+    AttemptState.ORPHANED: frozenset(),
+}
+
+
+def is_terminal_attempt_state(state: AttemptState) -> bool:
+    """attempt 轴终态判定（SPEC §7.4）。纯函数。"""
+    return state in ATTEMPT_TERMINAL_STATES
+
+
+def is_valid_attempt_transition(from_state: AttemptState, to_state: AttemptState) -> bool:
+    """attempt 轴迁移合法性（SPEC §7.4）。终态无出边，纯函数。"""
+    return to_state in ATTEMPT_LEGAL_TRANSITIONS.get(from_state, frozenset())
 
 
 def is_valid_deadline_transition(
