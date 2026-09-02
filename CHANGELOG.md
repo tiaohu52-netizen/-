@@ -17,6 +17,8 @@ follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
   plugin/roadmap documentation.
 - Release artifacts now validate embedded plugin metadata (strict SemVer,
   `lhgp` identity, and canonical `lhgp-mcp` command) during CI.
+- Canonical `lhgp` Python namespace facades now cover the runtime layers,
+  while legacy `longtask` imports remain compatible during migration.
 
 ### Fixed
 
@@ -24,6 +26,9 @@ follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
   pipe closure after child exit.
 - MCP canonical aliases now retain their safety annotations and report the
   correct server identity when launched through `lhgp-mcp`.
+- Schema startup reconciliation now repairs partially upgraded v2 databases,
+  including missing external-handle capability columns, before daemon scans.
+- Doctor output and README quickstart commands now use the canonical LHGP name.
 
 ## [0.1.0a0] - 2026-09-01
 
