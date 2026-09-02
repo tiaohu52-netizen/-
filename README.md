@@ -154,7 +154,7 @@ You should see something like:
 
 ```
 [gate] ALL PASS (7 gates)
-=== longtask doctor (v0.1.0a0, protocol v1) ===
+=== LHGP doctor (v0.1.0a0, protocol v1) ===
 [PASS] python_runtime: Python 3.13.x
 [PASS] storage_directory: ~/.lhgp accessible
 [PASS] database_integrity: state.db healthy
