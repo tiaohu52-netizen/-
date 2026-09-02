@@ -135,6 +135,27 @@ class TestMCPDiscovery:
         finally:
             _stop_mcp(proc)
 
+    def test_canonical_entrypoint_reports_canonical_server_name(self, data_dir: Path) -> None:
+        """The installed LHGP entrypoint should not identify itself as the legacy shim."""
+        proc = subprocess.Popen(  # noqa: S603
+            [
+                sys.executable,
+                "-c",
+                "import sys; sys.argv[0] = 'lhgp-mcp'; "
+                "from longtask.mcp_server import main; main()",
+            ],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=Path(__file__).resolve().parents[2],
+            env={**os.environ, "PYTHONPATH": str(Path(__file__).resolve().parents[2] / "src")},
+        )
+        try:
+            init = _roundtrip(proc, "initialize", {"protocolVersion": "2024-11-05"})
+            assert init["result"]["serverInfo"]["name"] == "lhgp-mcp"
+        finally:
+            _stop_mcp(proc)
+
 
 class TestMCPHealth:
     def test_health_returns_protocol_info(self, data_dir: Path) -> None:
