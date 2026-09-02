@@ -41,6 +41,7 @@ def build_gates() -> list[Gate]:
                 "-m",
                 "pytest",
                 "--cov=src/longtask",
+                "--cov=src/lhgp",
                 "--cov-report=term-missing",
                 "--cov-fail-under=70",
             ),
