@@ -2,7 +2,7 @@
   "mcpServers": {
     "lhgp": {
       "type": "stdio",
-      "command": "longtask-mcp",
+      "command": "lhgp-mcp",
       "args": [],
       "env": {}
     }
