@@ -10,6 +10,7 @@ from lhgp.adapters.registry import ExecutorRegistry as CanonicalExecutorRegistry
 from lhgp.admission.offer import Offer as CanonicalOffer
 from lhgp.cli.formatting import format_eta as canonical_format_eta
 from lhgp.contracts.contract_draft import ContractDraft as CanonicalContractDraft
+from lhgp.forecast import Forecast as CanonicalPackageForecast
 from lhgp.forecast.model import Forecast as CanonicalForecast
 from lhgp.persistence.store import connect as canonical_connect
 from lhgp.promoter.urgency import classify as canonical_classify
@@ -80,6 +81,7 @@ def test_supporting_namespaces_reexport_single_implementation() -> None:
     assert CanonicalCheckSpec is LegacyCheckSpec
     assert CanonicalOffer is LegacyOffer
     assert CanonicalForecast is LegacyForecast
+    assert CanonicalPackageForecast is CanonicalForecast
 
 
 def test_canonical_modules_preserve_module_execution_entrypoints() -> None:

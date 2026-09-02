@@ -1,1 +1,5 @@
-"""Canonical LHGP forecast namespace over the single legacy implementation."""
+"""Canonical LHGP forecast namespace."""
+
+from lhgp.forecast.model import RISK_TIER_THRESHOLDS, Forecast, risk_tier
+
+__all__ = ["RISK_TIER_THRESHOLDS", "Forecast", "risk_tier"]
