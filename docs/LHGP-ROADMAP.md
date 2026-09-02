@@ -3,7 +3,7 @@
 > 版本：1.0
 > 日期：2026-09-01
 > 上游：[LHGP-SPEC.md](./LHGP-SPEC.md)（语义权威）、[ADR-003](./decisions/0003-long-horizon-goal-protocol.md)（命名权威）
-> 状态：**执行计划基线**，尚未开始实施
+> 状态：**执行计划基线（持续更新）**；P1–P5 已有大量实现，P6 分发仍在收尾
 
 本文档只回答两个问题：**做到什么算完成**，以及**按什么顺序做**。
 语义冲突以 LHGP-SPEC.md 为准；执行顺序与范围以本文档为准。
@@ -44,7 +44,7 @@
 
 ## 二、起点：当前实现的位置
 
-2026-09-01 只读盘点结论（详见 `.workbuddy/memory/2026-09-01.md`）：
+2026-09-01 的只读盘点结论（历史基线，详见 `.workbuddy/memory/2026-09-01.md`）：
 
 - 六个里程碑整体完成度约 **15%**，M0 尚未完成，M5 为 0。
 - 存储 3 张表（contracts / leases / events），SPEC §13.1 要求 11 个最小实体。
@@ -52,7 +52,15 @@
 - 合同 8 组字段中 `authority`、`attention`、`continuity` 三组零命中。
 - `external_run_id` / `session_locator` / `recovery_strategy` / `reconcile` / `checkpoint` 全部不存在。
 
-### 2.1 四个必须先纠正的冲突项
+### 2.1 当前实现快照（2026-09-03）
+
+历史盘点不再代表当前代码。现已落地：四轴合同状态与不可变 revision、typed
+checks 的确定性执行、attempt 外部句柄与 reconcile、模型/CLI 授权与证明、
+daemon + 本机认证 Unix-socket RPC、Goal Capsule/handover、L0/L1 唤醒、
+通知 outbox（幂等/重试/安静时间/风险红线）。完整证据以 README、测试和
+`quality/claims.json` 为准；仍未宣称跨主机 relay、严格墙钟交付保证或外部通知渠道。
+
+### 2.2 四个必须先纠正的冲突项（历史基线）
 
 它们不是"还没做"，而是当前行为与规范相反，会持续产出错误的权威数据：
 
@@ -65,7 +73,7 @@
 
 附带：`daemon.py:382-390` 每 60 秒无条件 append 提醒事件，无冷却、无跨档判定，违反 §10.5。
 
-### 2.2 明确保留、不得推倒的部分
+### 2.3 明确保留、不得推倒的部分
 
 租约 generation + holder 双重 fencing（含崩溃恢复集成测试）、fail-closed 拒接、SQLite/WAL 单事务与 request_id 幂等、七道质量门、分层唤醒 L0/L1、结构化 argv 与环境白名单。这些是 SPEC §19.1 点名的保留项，是本项目的地基。
 
