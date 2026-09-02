@@ -24,6 +24,7 @@ TOKEN_FILE = "daemon.token"  # noqa: S105
 DAEMON_STOP_FILE = "daemon.stop"
 DAEMON_LOG_FILE = "daemon.log"
 START_LOCK_FILE = "daemon.start.lock"
+RPC_SOCKET_FILE = "daemon.sock"
 REGISTRY_FILE = "registry.json"
 DEFAULT_TICK_INTERVAL_SECONDS = 60.0
 STOP_GRACE_SECONDS = 10.0
@@ -135,6 +136,8 @@ def spawn_daemon(
             return {"ok": False, "error": f"daemon already running (pid {status['pid']})"}
         (root / PID_FILE).unlink(missing_ok=True)
         (root / TOKEN_FILE).unlink(missing_ok=True)
+        token = secrets.token_hex(16)
+        (root / TOKEN_FILE).write_text(f"{token}\n", encoding="utf-8")
 
         log_path = root / DAEMON_LOG_FILE
         log_fh = log_path.open("ab")
@@ -169,6 +172,7 @@ def spawn_daemon(
 
         for _ in range(40):
             if proc.poll() is not None:
+                (root / TOKEN_FILE).unlink(missing_ok=True)
                 return {
                     "ok": False,
                     "error": f"daemon process exited immediately (code {proc.returncode})",
@@ -176,9 +180,7 @@ def spawn_daemon(
                 }
             time.sleep(0.05)
 
-        token = secrets.token_hex(16)
         (root / PID_FILE).write_text(f"{proc.pid}\n", encoding="utf-8")
-        (root / TOKEN_FILE).write_text(f"{token}\n", encoding="utf-8")
         return {"ok": True, "pid": proc.pid, "interval_seconds": interval_seconds}
     finally:
         os.close(lock_fd)

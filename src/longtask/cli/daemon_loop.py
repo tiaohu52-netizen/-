@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json as _json
 import sqlite3
+import threading
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -20,6 +21,7 @@ from longtask.cli.daemon_proc import (
     DAEMON_STOP_FILE,
     DEFAULT_TICK_INTERVAL_SECONDS,
     REGISTRY_FILE,
+    RPC_SOCKET_FILE,
 )
 from longtask.cli.runner import AttemptRunner
 from longtask.cli.tick import run_daemon_tick
@@ -34,6 +36,8 @@ from longtask.persistence.store import (
     list_contracts,
 )
 from longtask.promoter.reconcile import reconcile_attempts
+from longtask.rpc.server import RequestEnvelope, parse_envelope, route
+from longtask.rpc.transport import serve_unix_socket
 from longtask.scheduler.wakeup import (
     NullSchedulePort,
     PowerPort,
@@ -70,6 +74,44 @@ def run_daemon_loop(
     clock = now_fn if now_fn is not None else (lambda: datetime.now(UTC))
     conn = connect(StoreConfig(db_path=root / "state.db"))
     ensure_schema(conn)
+    rpc_stop = threading.Event()
+    rpc_thread: threading.Thread | None = None
+    token_path = root / "daemon.token"
+    if token_path.is_file():
+        token = token_path.read_text(encoding="utf-8").strip()
+        if token:
+            def dispatch_rpc(raw: dict[str, Any]) -> dict[str, Any]:
+                envelope = RequestEnvelope(
+                    method=parse_envelope(raw).method,
+                    request_id=str(raw["request_id"]),
+                    client_id=str(raw["client_id"]),
+                    protocol_version=int(raw["protocol_version"]),
+                    params=dict(raw.get("params", {})),
+                )
+                rpc_conn = connect(StoreConfig(db_path=root / "state.db"))
+                try:
+                    ensure_schema(rpc_conn)
+                    return route(
+                        envelope,
+                        conn=rpc_conn,
+                        now=clock(),
+                        registry=ExecutorRegistry.load_from_file(root / REGISTRY_FILE),
+                    )
+                finally:
+                    rpc_conn.close()
+
+            rpc_thread = threading.Thread(
+                target=serve_unix_socket,
+                kwargs={
+                    "endpoint": root / RPC_SOCKET_FILE,
+                    "token": token,
+                    "dispatch": dispatch_rpc,
+                    "stop_event": rpc_stop,
+                },
+                name="lhgp-rpc",
+                daemon=True,
+            )
+            rpc_thread.start()
     runner = AttemptRunner(root, conn, ExecutorRegistry(), emit=emit_fn)
     guard = SleepGuard(power_port if power_port is not None else WindowsPowerPort())
     rtc = RtcAlarm(schedule_port if schedule_port is not None else NullSchedulePort())
@@ -147,6 +189,9 @@ def run_daemon_loop(
                         sleep_seconds = min(interval_seconds, max(0.5, until))
                 sleep_fn(sleep_seconds)
     finally:
+        rpc_stop.set()
+        if rpc_thread is not None:
+            rpc_thread.join(timeout=2)
         if stopped:
             (root / DAEMON_STOP_FILE).unlink(missing_ok=True)
         conn.close()
