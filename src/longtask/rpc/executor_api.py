@@ -242,6 +242,7 @@ def handle_attempt_write_back(
             ) from None
 
     events: list[EventInput] = []
+    actual_model = str(params.get("model_id", "")).strip()
     note = params.get("progress_note")
     if note is not None and str(note).strip():
         events.append(
@@ -256,7 +257,6 @@ def handle_attempt_write_back(
         state_text = str(raw_attempt_state)
         attempt = get_attempt(conn, attempt_id)
         attempt_role = attempt.role if attempt is not None else "executor"
-        actual_model = str(params.get("model_id", "")).strip()
         contract = get_contract(conn, contract_id)
         if attempt is not None and attempt.executor_id and contract is not None:
             binding = binding_for_executor(contract.draft.authority, attempt.executor_id)
@@ -337,6 +337,7 @@ def handle_attempt_write_back(
             request_id=envelope.request_id or None,
             actor="model",
             events=events,
+            model_id=actual_model or None,
         )
     except LeaseFencedError as exc:
         raise RpcError(code=ErrorCode.LEASE_FENCED, message=str(exc)) from exc

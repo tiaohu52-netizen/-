@@ -780,6 +780,7 @@ def write_back(
     role: str | None = None,  # P1
     contract_revision: int | None = None,  # P1
     goal_id: str | None = None,  # P1
+    model_id: str | None = None,
 ) -> WriteBackResult:
     """带 generation fencing 的执行结果写回（DESIGN §7、§11.3、§14.1）。
 
@@ -818,6 +819,15 @@ def write_back(
                     f"write attempt {attempt_id} is not lease holder "
                     f"{lease.holder_attempt_id} (contract {contract_id})"
                 )
+
+        # 将执行者自报的实际模型与写回一并持久化，确保重启后审计视图
+        # 与终态事件中的 model_id 保持一致。仅接受非空值，避免普通进度
+        # 写回意外清空调度阶段已选模型。
+        if model_id and str(model_id).strip():
+            conn.execute(
+                "UPDATE attempts SET model_id = ?, updated_at = ? WHERE attempt_id = ?",
+                (str(model_id).strip(), now.isoformat(), attempt_id),
+            )
 
         new_revision: int | None = None
         if contract_state is not None:
