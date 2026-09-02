@@ -2,8 +2,10 @@
 
 import longtask
 from lhgp import PROTOCOL_VERSION, __version__
+from lhgp.adapters.registry import ExecutorRegistry as CanonicalExecutorRegistry
 from lhgp.contracts.contract_draft import ContractDraft as CanonicalContractDraft
 from lhgp.persistence.store import connect as canonical_connect
+from longtask.adapters.registry import ExecutorRegistry as LegacyExecutorRegistry
 from longtask.contracts.contract_draft import ContractDraft as LegacyContractDraft
 from longtask.persistence.store import connect as legacy_connect
 
@@ -25,3 +27,9 @@ def test_persistence_namespace_reexports_single_implementation() -> None:
     """Persistence facades must preserve callable identity during migration."""
 
     assert canonical_connect is legacy_connect
+
+
+def test_adapter_namespace_reexports_single_implementation() -> None:
+    """Adapter facades must preserve registry class identity during migration."""
+
+    assert CanonicalExecutorRegistry is LegacyExecutorRegistry
