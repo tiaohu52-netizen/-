@@ -305,13 +305,18 @@ If you're an early user, expect: rough edges, missing docs in places,
 occasional gate noise. The 7 quality gates and the claims registry exist
 exactly to keep those honest.
 
-## Naming migration window
+## Naming migration window (P6 dual-track is live)
 
-The protocol is **LHGP** (`Long-Horizon Goal Protocol`). The current
-implementation binary is still **`longtask`** / **`longtaskd`**, with the
-data directory at **`~/.longtask`**, because the rename to `lhgp` /
-`lhgpd` / `~/.lhgp` is staged for **P6** of the roadmap so existing
-installs keep working. A migration tool (dry-run + backup) will ship with
-P6; the old names will continue to work as aliases for at least one
-minor release after that. Don't pin scripts to either name yet — see
-[`docs/LHGP-ROADMAP.md`](docs/LHGP-ROADMAP.md) §P6 for the cut-over plan.
+The protocol is **LHGP** (`Long-Horizon Goal Protocol`). As of P6 the new
+entry points are shipped **alongside** the old ones (dual-track, SPEC §19.3):
+
+- `lhgp` / `lhgpd` / `lhgp-mcp` — new names, same behavior as
+  `longtask` / `longtaskd` / `longtask-mcp`;
+- data directory: fresh installs use **`~/.lhgp`**; existing installs keep
+  reading `~/.longtask` until migrated;
+- `lhgp migrate` — moves `~/.longtask` → `~/.lhgp` with the safety defaults
+  on: prints the plan only (dry-run) unless you pass `--execute`, makes a
+  full backup under `~/.lhgp-migration-backups/`, and copies (never moves)
+  so rollback = delete the new directory. Old names remain working aliases
+  for at least one minor release. See
+  [`docs/LHGP-ROADMAP.md`](docs/LHGP-ROADMAP.md) §P6 for the cut-over plan.

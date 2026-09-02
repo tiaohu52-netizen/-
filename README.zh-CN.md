@@ -245,6 +245,10 @@ scripts/                  7 道质量门运行器（本地 == CI）
 
 作为早期用户，请预期：边角粗糙、部分文档缺失、质量门偶有噪音。7 道质量门与声明注册表正是为了让这些不被打肿脸充胖子。
 
-## 改名窗口
+## 改名窗口（P6 双轨已上线）
 
-协议正式名是 **LHGP**（`Long-Horizon Goal Protocol`）。当前实现的二进制仍是 **`longtask`** / **`longtaskd`**，数据目录仍是 **`~/.longtask`** —— 因为向 `lhgp` / `lhgpd` / `~/.lhgp` 的改名被安排在 **P6**，以保证现有安装继续工作。P6 会同步发布迁移工具（带 dry-run + 备份），旧名至少在改名后一个次版本里继续作为别名可用。先别把脚本硬绑到任一名字 —— 见 [`docs/LHGP-ROADMAP.md`](docs/LHGP-ROADMAP.md) §P6 的切换计划。
+协议正式名是 **LHGP**（`Long-Horizon Goal Protocol`）。P6 起按双轨策略（SPEC §19.3）新旧名并存：
+
+- `lhgp` / `lhgpd` / `lhgp-mcp` —— 新入口，与 `longtask` / `longtaskd` / `longtask-mcp` 行为完全一致；
+- 数据目录：全新安装直接用 **`~/.lhgp`**；旧安装未迁移前继续读 `~/.longtask`；
+- `lhgp migrate` —— 把 `~/.longtask` 迁到 `~/.lhgp`，安全默认全开：只打印计划（dry-run），传 `--execute` 才真跑；真跑前完整备份到 `~/.lhgp-migration-backups/`；用拷贝而不是移动——回滚 = 删掉新目录。旧名至少在一个次版本内继续可用。见 [`docs/LHGP-ROADMAP.md`](docs/LHGP-ROADMAP.md) §P6 的切换计划。

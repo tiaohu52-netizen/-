@@ -31,6 +31,7 @@ from typing import Any
 
 from longtask import PROTOCOL_VERSION, __version__
 from longtask.adapters.registry import ExecutorRegistry
+from longtask.cli.paths import default_data_root
 from longtask.persistence.store import (
     StoreConfig,
     connect,
@@ -566,9 +567,7 @@ def main(argv: list[str] | None = None) -> int:
         help="LongTask 数据目录（默认 ~/.longtask）",
     )
     args = parser.parse_args(argv)
-    root = (
-        Path(args.data_dir).expanduser().resolve() if args.data_dir else (Path.home() / ".longtask")
-    )
+    root = Path(args.data_dir).expanduser().resolve() if args.data_dir else default_data_root()
     root.mkdir(parents=True, exist_ok=True)
     serve_stdio(root)
     return 0

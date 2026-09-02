@@ -31,6 +31,7 @@ from longtask.cli.daemon import (
     spawn_daemon,
 )
 from longtask.cli.doctor import run_doctor
+from longtask.cli.paths import default_data_root, migrate_data_dir
 from longtask.persistence.projections import rebuild_projection, revert_projection
 from longtask.persistence.store import StoreConfig, connect, ensure_schema
 from longtask.rpc.errors import RpcError
@@ -71,6 +72,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="调度扫描间隔秒数（默认 60）",
     )
     sub.add_parser("stop", help="停止 longtaskd 调度守护进程")
+    # P6：数据目录迁移——安全默认：不带 --execute 只打印计划不动数据
+    migrate_p = sub.add_parser(
+        "migrate",
+        help="迁移数据目录 ~/.longtask → ~/.lhgp（默认 dry-run；--execute 才真跑）",
+    )
+    migrate_p.add_argument(
+        "--execute",
+        action="store_true",
+        help="真跑迁移（备份 + 拷贝式可回滚）；不带此标志只打印计划",
+    )
     # 内部命令：常驻主循环入口，仅由 start 以分离进程方式调用
     daemonrun_p = sub.add_parser("_daemon-run", help=argparse.SUPPRESS)
     daemonrun_p.add_argument("--interval", type=float, default=DEFAULT_TICK_INTERVAL_SECONDS)
@@ -242,11 +253,16 @@ def main(argv: list[str] | None = None) -> int:
         parser.print_help()
         return 0
 
-    root = (
-        Path(args.data_dir).expanduser().resolve() if args.data_dir else (Path.home() / ".longtask")
-    )
+    root = Path(args.data_dir).expanduser().resolve() if args.data_dir else default_data_root()
     root.mkdir(parents=True, exist_ok=True)
     dry_run = bool(args.dry_run)
+
+    # P6：数据目录迁移（安全默认：不带 --execute 只 dry-run）
+    if args.command == "migrate":
+        execute = bool(getattr(args, "execute", False))
+        plan = migrate_data_dir(dry_run=not execute)
+        print(plan.format_text())
+        return 1 if any("FAILED" in s for s in plan.skipped) else 0
 
     # 1. doctor
     if args.command == "doctor":
