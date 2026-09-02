@@ -29,6 +29,9 @@ Environment: new CPython 3.13 virtual environment created with `uv venv`
     confirmed a second `status` reported `running: false`.
 11. Ran the Codex plugin creator validator against the repository; validation
     passed after the plugin manifest was changed to strict SemVer `0.1.0`.
+12. Rebuilt the wheel and sdist, verified both with `scripts/check_artifacts.py`,
+    reran the plugin validator, and inspected the wheel to confirm its embedded
+    `.codex-plugin/plugin.json` also reports version `0.1.0`.
 
 ## Scope and remaining work
 
