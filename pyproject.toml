@@ -99,7 +99,7 @@ known-first-party = ["longtask"]
 [tool.mypy]
 python_version = "3.11"
 mypy_path = "src"
-packages = ["longtask"]
+packages = ["longtask", "lhgp"]
 strict = true
 warn_unreachable = true
 # 骨架期就 strict：新代码没有「先随便写再补类型」的债可欠。
