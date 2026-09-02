@@ -7,12 +7,14 @@ run_daemon_tick 只做调度簿记：ticker 扫描、过期仲裁、紧迫度分
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from longtask.acceptance.checks import RepairBrief
 from longtask.adapters.base import ExecutorAdapter
 from longtask.adapters.factory import build_adapter
 from longtask.adapters.registry import ExecutorRegistry, RegistryEntry
@@ -471,6 +473,12 @@ def _judge_verifier_outcomes(root: Path, conn: sqlite3.Connection, now: datetime
             )
             rebuild_projection(root, contract.contract_id, conn)
         else:  # failed
+            # P5 修复闭环（SPEC §12.4）：verifier 失败不退回裸 active，
+            # 而是把失败原因结构化成 RepairBrief 写进 handover.md——
+            # 下一轮 attempt 的 task_prompt/active.md 自动携带
+            # 「哪些 check 没过 + 建议怎么修」，repair 才有上下文。
+            brief = _repair_brief_from(verifier_attempt_id, last_verifier_payload)
+            _write_repair_brief(root, contract, verifier_attempt_id, brief)
             append_event(
                 conn,
                 contract_id=contract.contract_id,
@@ -478,7 +486,8 @@ def _judge_verifier_outcomes(root: Path, conn: sqlite3.Connection, now: datetime
                 payload={
                     "verifier": verifier_attempt_id,
                     "evidence": last_verifier_payload,
-                    "reason": "verifier rejected (§5.2): back to active",
+                    "reason": "verifier rejected (§5.2): repair brief written to handover",
+                    "repair_brief": brief.to_dict(),
                 },
                 now=now,
                 actor="verifier",
@@ -571,3 +580,82 @@ def _next_decision_reason(
     if decision_tier is None:
         return "past deadline: arbitration owns this contract"
     return f"u-tier {int(decision_tier)}: re-check at tier cadence"
+
+
+# ── P5：verifier 失败 → RepairBrief → handover（SPEC §12.4 修复闭环）──
+
+
+def _repair_brief_from(
+    verifier_attempt_id: str,
+    evidence: dict[str, Any],
+) -> RepairBrief:
+    """从 verifier 失败证据提炼 RepairBrief（§12.4）。
+
+    evidence 的形态由 verifier 写回决定（失败 check 列表 / 失败原因 /
+    stdout 尾部）；此处做忠实提炼，不发明没写过的失败项。
+    """
+    failed: list[str] = []
+    raw_failed = evidence.get("failed_checks")
+    if isinstance(raw_failed, list):
+        failed = [str(c) for c in raw_failed]
+    reasons = evidence.get("fail_reasons")
+    if not failed and isinstance(reasons, list):
+        failed = [str(r) for r in reasons]
+    notes: list[str] = []
+    if evidence.get("reason"):
+        notes.append(str(evidence["reason"]))
+    stderr = evidence.get("stderr")
+    if stderr:
+        notes.append(str(stderr))
+    return RepairBrief(
+        failed_checks=tuple(failed),
+        context_pointer=str(evidence.get("context_pointer") or ""),
+        retry_strategy="respawn",
+        notes=tuple(notes[:3]),  # 提示性尾部，不淹没交接
+    )
+
+
+def _write_repair_brief(
+    root: Path,
+    contract: Any,
+    verifier_attempt_id: str,
+    brief: RepairBrief,
+) -> None:
+    """把 RepairBrief 融进 handover.md（§12.4 修复上下文传递）。
+
+    handover 的 remaining/next_action 换成「修什么/怎么修」——下轮
+    attempt 的 task_prompt 附言与 active.md 快照自动携带（§4.1 通道，
+    无需新机制）。写失败如实抛 OSError：修复上下文丢失不该被静默。
+    """
+    from longtask.persistence.projections import HandoverData, parse_handover_markdown
+
+    cdir = root / "contracts" / contract.contract_id
+    handover_path = cdir / "handover.md"
+    prev_stage = "repair"
+    estimate = contract.draft.workload_initial_hours / 2.0
+    completed: tuple[str, ...] = ()
+    if handover_path.is_file():
+        try:
+            data, _violations = parse_handover_markdown(handover_path.read_text(encoding="utf-8"))
+        except OSError:
+            data = None
+        if data is not None:
+            completed = data.completed_evidence
+            estimate = max(0.25, data.estimate_remaining_hours / 2.0)
+    failed_lines = tuple(f"修复验收失败项：{c}" for c in brief.failed_checks) or (
+        "按 verifier 证据修复未通过的验收项",
+    )
+    note_lines = tuple(f"备注：{n}" for n in brief.notes)
+    next_action = brief.context_pointer or "按 verifier 失败证据修复，再交验收"
+    data = HandoverData(
+        current_stage=prev_stage,
+        completed_evidence=completed,
+        remaining=failed_lines,
+        estimate_remaining_hours=estimate,
+        next_action=next_action,
+        constraints_digest=json.dumps(contract.draft.hard_constraints, ensure_ascii=False),
+        source_attempt_id=verifier_attempt_id,
+        open_risks=note_lines,
+    )
+    handover_path.parent.mkdir(parents=True, exist_ok=True)
+    handover_path.write_text(data.format_markdown(), encoding="utf-8")

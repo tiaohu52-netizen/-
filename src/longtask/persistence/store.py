@@ -159,6 +159,8 @@ def _row_to_contract_view(row: sqlite3.Row | tuple[Any, ...]) -> ContractView:
         max_concurrent_attempts=budget_dict["max_concurrent_attempts"],
         max_attempt_minutes=budget_dict["max_attempt_minutes"],
         max_output_bytes=budget_dict["max_output_bytes"],
+        # P5 验证预算：老库存 JSON 无此字段 → 兜底 1（至少一次 reverify）
+        verification_attempts_reserved=int(budget_dict.get("verification_attempts_reserved", 1)),
     )
     draft = ContractDraft(
         title=title,
@@ -321,6 +323,9 @@ def save_contract(
                         "max_concurrent_attempts": draft.budget.max_concurrent_attempts,
                         "max_attempt_minutes": draft.budget.max_attempt_minutes,
                         "max_output_bytes": draft.budget.max_output_bytes,
+                        "verification_attempts_reserved": (
+                            draft.budget.verification_attempts_reserved
+                        ),
                     },
                     ensure_ascii=False,
                 ),
@@ -441,6 +446,7 @@ def _write_revision_snapshot(
                     "max_concurrent_attempts": draft.budget.max_concurrent_attempts,
                     "max_attempt_minutes": draft.budget.max_attempt_minutes,
                     "max_output_bytes": draft.budget.max_output_bytes,
+                    "verification_attempts_reserved": (draft.budget.verification_attempts_reserved),
                 },
                 ensure_ascii=False,
             ),

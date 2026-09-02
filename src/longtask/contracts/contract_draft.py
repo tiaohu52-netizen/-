@@ -90,6 +90,7 @@ class ContractDraft:
                 "max_concurrent_attempts": self.budget.max_concurrent_attempts,
                 "max_attempt_minutes": self.budget.max_attempt_minutes,
                 "max_output_bytes": self.budget.max_output_bytes,
+                "verification_attempts_reserved": self.budget.verification_attempts_reserved,
             },
             "authority": authority_to_dict(self.authority),
             "attention": attention_to_dict(self.attention),
@@ -134,6 +135,7 @@ def from_dict(data: dict[str, Any]) -> ContractDraft:
         max_concurrent_attempts=int(budget_raw["max_concurrent_attempts"]),
         max_attempt_minutes=int(budget_raw["max_attempt_minutes"]),
         max_output_bytes=int(budget_raw["max_output_bytes"]),
+        verification_attempts_reserved=int(budget_raw.get("verification_attempts_reserved", 1)),
     )
 
     return ContractDraft(
