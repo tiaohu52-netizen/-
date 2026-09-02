@@ -92,6 +92,7 @@ class TestMCPDiscovery:
                 "lhgp_attempt_status",
                 "lhgp_interrupt_attempt",
                 "lhgp_write_back",
+                "lhgp_notifications",
             }.issubset(names)
         finally:
             proc.terminate()
