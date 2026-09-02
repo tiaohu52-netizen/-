@@ -210,6 +210,29 @@ def run_daemon_tick(
 
         match decision.tier:
             case UrgencyTier.RESPAWN | UrgencyTier.PARALLEL:
+                # workspace 排他（共同维护风险）：同 workspace 有其他合同的
+                # 活租约 → 本轮延后。两个执行者并发写同一目录 = 未定义行为
+                # （互相覆盖/读到半成品文件），绝不做静默并发写。
+                holder = _workspace_holder_other_than(conn, c, now)
+                if holder is not None:
+                    append_event(
+                        conn,
+                        contract_id=cid,
+                        event_type=EventType.DISPATCH_DEFERRED,
+                        payload={
+                            "reason": "workspace occupied by another live contract",
+                            "workspace_root": holder["workspace_root"],
+                            "holder_contract_id": holder["contract_id"],
+                            "note": "serialised per workspace; retry next tick",
+                        },
+                        now=now,
+                        actor="daemon",
+                        goal_id=c.goal_id,
+                        contract_revision=c.revision,
+                        role="promoter",
+                    )
+                    _emit(f"promoter/deferred-workspace-busy:{cid}:held-by:{holder['contract_id']}")
+                    continue
                 # 挑选执行器（DESIGN §8.3），逐候选尝试（§9：拒接换下一个）
                 started = _dispatch_attempt(
                     root=root,
@@ -325,6 +348,61 @@ def run_daemon_tick(
         "expired": expired_count,
         "attempts_started": attempts_started,
     }
+
+
+def _workspace_holder_other_than(
+    conn: sqlite3.Connection,
+    contract: Any,
+    now: datetime,
+) -> dict[str, str] | None:
+    """workspace 排他判定（共同维护风险防护）。
+
+    合同 workspace_root 被另一个**持有活租约**的合同占用时返回占用者信息：
+    {contract_id, workspace_root}。自己的租约不冲突（同合同的重派有租约
+    fencing 兜底）；未声明 workspace 或无人占用返回 None。
+
+    活租约 = heartbeat_at + timeout 内（与 decide() 的 lease_alive 同口径）。
+    死租约不算占用——心跳断了说明持有者已停止推进，回收路径会接管。
+    """
+    workspace = _contract_workspace(contract)
+    if not workspace:
+        return None
+    normalized = _norm_workspace(workspace)
+    for other in list_contracts(conn, limit=1000):
+        if other.contract_id == contract.contract_id:
+            continue
+        if other.state not in (ContractState.ACTIVE, ContractState.BLOCKED):
+            continue
+        other_ws = _norm_workspace(_contract_workspace(other))
+        if other_ws != normalized:
+            continue
+        lease = get_lease(conn, other.contract_id)
+        if lease is not None and lease.is_alive(now):
+            return {
+                "contract_id": other.contract_id,
+                "workspace_root": workspace,
+            }
+    return None
+
+
+def _contract_workspace(contract: Any) -> str:
+    """从 ContractView/ContractDraft 提取 workspace_root（未声明返回空串）。"""
+    draft = getattr(contract, "draft", contract)
+    hard = draft.hard_constraints or {}
+    file_effects = hard.get("file_effects")
+    if isinstance(file_effects, dict):
+        root = file_effects.get("workspace_root")
+        if isinstance(root, str) and root.strip():
+            return root
+    return ""
+
+
+def _norm_workspace(workspace: str) -> str:
+    """workspace 归一化比较键：小写盘符 + 正斜杠，忽略尾部分隔符差异。"""
+    text = workspace.strip().replace("\\", "/").rstrip("/")
+    if len(text) >= 2 and text[1] == ":":
+        text = text[0].lower() + text[1:]
+    return text
 
 
 def _judge_verifier_outcomes(root: Path, conn: sqlite3.Connection, now: datetime) -> None:

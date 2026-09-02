@@ -74,6 +74,7 @@ class EventType(StrEnum):
     ESCALATION_PARALLELIZED = "escalation/parallelized"
     ESCALATION_HANDED_TO_USER = "escalation/handed-to-user"
     DISPATCH_REFUSED = "dispatch/refused"
+    DISPATCH_DEFERRED = "dispatch/deferred"  # workspace 排他等场景：本轮不派，下轮重试
 
     # P3：连续性闭环（外部句柄 / reconcile / checkpoint / capsule）
     HANDLE_REGISTERED = "handle/registered"  # spawn 持久化外部句柄
