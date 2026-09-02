@@ -6,5 +6,6 @@ while callers migrate imports incrementally.
 """
 
 from lhgp.contracts.budget import DEFAULT_VERIFICATION_RESERVED, Budget
+from lhgp.contracts.continuity import Continuity
 
-__all__ = ["DEFAULT_VERIFICATION_RESERVED", "Budget"]
+__all__ = ["DEFAULT_VERIFICATION_RESERVED", "Budget", "Continuity"]
