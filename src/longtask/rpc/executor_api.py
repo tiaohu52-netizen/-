@@ -21,6 +21,7 @@ import sqlite3
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
+from longtask.contracts.authority import binding_for_executor, models_allow
 from longtask.contracts.schema import ContractState
 from longtask.persistence.attempts import get_attempt
 from longtask.persistence.events import EventType
@@ -255,6 +256,17 @@ def handle_attempt_write_back(
         state_text = str(raw_attempt_state)
         attempt = get_attempt(conn, attempt_id)
         attempt_role = attempt.role if attempt is not None else "executor"
+        actual_model = str(params.get("model_id", "")).strip()
+        contract = get_contract(conn, contract_id)
+        if actual_model and attempt is not None and attempt.executor_id and contract is not None:
+            binding = binding_for_executor(contract.draft.authority, attempt.executor_id)
+            if binding is not None and not models_allow(
+                contract.draft.authority, binding=binding, model=actual_model
+            ):
+                raise RpcError(
+                    code=ErrorCode.CAPABILITY_MISSING,
+                    message=f"model_id is not allowed by contract authority: {actual_model}",
+                )
         evidence = params.get("evidence")
         if attempt_role == "verifier" and state_text in {"succeeded", "failed"}:
             if not isinstance(evidence, list) or not evidence:
@@ -284,6 +296,7 @@ def handle_attempt_write_back(
                             "reported_by": "model",
                             "role": attempt_role,
                             "evidence": evidence,
+                            **({"model_id": actual_model} if actual_model else {}),
                         },
                         attempt_id=attempt_id,
                     )
@@ -297,6 +310,7 @@ def handle_attempt_write_back(
                             "role": attempt_role,
                             "reason": str(note or ""),
                             "evidence": evidence,
+                            **({"model_id": actual_model} if actual_model else {}),
                         },
                         attempt_id=attempt_id,
                     )
