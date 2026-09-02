@@ -21,7 +21,7 @@ from longtask.cli.daemon_proc import (
     DAEMON_STOP_FILE,
     DEFAULT_TICK_INTERVAL_SECONDS,
     REGISTRY_FILE,
-    RPC_SOCKET_FILE,
+    rpc_socket_path,
 )
 from longtask.cli.runner import AttemptRunner
 from longtask.cli.tick import run_daemon_tick
@@ -104,7 +104,7 @@ def run_daemon_loop(
             def serve_rpc() -> None:
                 try:
                     serve_unix_socket(
-                        endpoint=root / RPC_SOCKET_FILE,
+                        endpoint=rpc_socket_path(root),
                         token=token,
                         dispatch=dispatch_rpc,
                         stop_event=rpc_stop,

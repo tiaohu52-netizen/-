@@ -7,11 +7,13 @@ spawn / halt / status 三件套与进程存活判定。pid/token/stop 标记文�
 
 from __future__ import annotations
 
+import hashlib
 import os
 import secrets
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -28,6 +30,15 @@ RPC_SOCKET_FILE = "daemon.sock"
 REGISTRY_FILE = "registry.json"
 DEFAULT_TICK_INTERVAL_SECONDS = 60.0
 STOP_GRACE_SECONDS = 10.0
+
+
+def rpc_socket_path(root: Path) -> Path:
+    """返回本机 RPC endpoint；长路径平台使用稳定的短临时路径。"""
+    direct = root / RPC_SOCKET_FILE
+    if len(str(direct)) <= 90:
+        return direct
+    digest = hashlib.sha256(str(root.resolve()).encode("utf-8")).hexdigest()[:16]
+    return Path(tempfile.gettempdir()) / f"lhgp-{digest}.sock"
 
 
 def get_daemon_status(root: Path) -> dict[str, Any]:
@@ -53,8 +64,8 @@ def get_daemon_status(root: Path) -> dict[str, Any]:
         "running": running,
         "pid": pid,
         "token_available": token is not None,
-        "rpc_socket": str(root / RPC_SOCKET_FILE) if (root / RPC_SOCKET_FILE).exists() else None,
-        "rpc_socket_available": (root / RPC_SOCKET_FILE).exists() and token is not None,
+        "rpc_socket": str(rpc_socket_path(root)) if rpc_socket_path(root).exists() else None,
+        "rpc_socket_available": rpc_socket_path(root).exists() and token is not None,
         "kill_switch": ks_active,
     }
 

@@ -25,6 +25,7 @@ from longtask.cli.daemon_proc import (
     TOKEN_FILE,
     get_daemon_status,
     halt_daemon,
+    rpc_socket_path,
     spawn_daemon,
 )
 from longtask.cli.tick import run_daemon_tick
@@ -44,6 +45,7 @@ __all__ = [
     "get_daemon_status",
     "halt_daemon",
     "is_kill_switch_active",
+    "rpc_socket_path",
     "run_daemon_loop",
     "run_daemon_tick",
     "set_kill_switch",
