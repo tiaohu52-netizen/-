@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import json
+import socket
+import threading
+import time
 
 from longtask import PROTOCOL_VERSION
 from longtask.rpc.errors import ErrorCode
-from longtask.rpc.transport import process_lines
+from longtask.rpc.transport import process_lines, serve_unix_socket
 
 
 def request() -> str:
@@ -56,3 +59,34 @@ def test_malformed_request_is_recoverable() -> None:
     )
     assert json.loads(out[0])["error"]["code"] == ErrorCode.VALIDATION_FAILED.value
     assert json.loads(out[1])["ok"] is True
+
+
+def test_unix_socket_round_trip(tmp_path) -> None:
+    if not hasattr(socket, "AF_UNIX"):
+        return
+    endpoint = tmp_path / "rpc.sock"
+    stopped = threading.Event()
+    thread = threading.Thread(
+        target=serve_unix_socket,
+        kwargs={
+            "endpoint": endpoint,
+            "token": "secret",
+            "dispatch": lambda _: {"ok": True, "result": {"ready": True}},
+            "stop_event": stopped,
+        },
+        daemon=True,
+    )
+    thread.start()
+    for _ in range(30):
+        if endpoint.exists():
+            break
+        time.sleep(0.01)
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
+        client.connect(str(endpoint))
+        client.sendall((json.dumps({"token": "secret"}) + "\n").encode())
+        client.sendall((request() + "\n").encode())
+        client.shutdown(socket.SHUT_WR)
+        payloads = client.recv(4096).decode().splitlines()
+    stopped.set()
+    thread.join(timeout=2)
+    assert json.loads(payloads[0])["ok"] is True
