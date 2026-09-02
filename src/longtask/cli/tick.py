@@ -27,8 +27,10 @@ from longtask.contracts.schema import (
 )
 from longtask.persistence.decisions import set_next_decision_at
 from longtask.persistence.events import EventType
+from longtask.persistence.notifications import enqueue_notification
 from longtask.persistence.projections import rebuild_projection
 from longtask.persistence.store import (
+    _notification_available_at,
     append_event,
     get_events,
     get_lease,
@@ -189,6 +191,30 @@ def run_daemon_tick(
         remaining_hours = _remaining_workload_hours(root, c)
         u_val = urgency(remaining_hours, time_left_hours)
         u_tier = classify(u_val)
+
+        # 风险红线通知：同一合同 revision 只入队一次，避免 daemon 每轮
+        # 重复骚扰；合同修订后允许重新评估并再次通知。
+        if (
+            u_tier is not None
+            and u_tier >= UrgencyTier.RESPAWN
+            and "risk_red" in c.draft.attention.notify_on
+        ):
+            enqueue_notification(
+                conn,
+                idempotency_key=f"{cid}:risk-red:revision-{c.revision}",
+                goal_id=c.goal_id,
+                event_type="risk_red",
+                channel="local",
+                payload={
+                    "contract_id": cid,
+                    "revision": c.revision,
+                    "urgency": u_val,
+                    "remaining_hours": remaining_hours,
+                    "time_left_hours": time_left_hours,
+                },
+                now=now,
+                available_at=_notification_available_at(c.draft.attention, "risk_red", now),
+            )
 
         active_lease = get_lease(conn, cid)
         lease_alive = active_lease.is_alive(now) if active_lease else False
