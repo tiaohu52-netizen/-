@@ -3,7 +3,8 @@
 > 版本：1.0
 > 日期：2026-09-01
 > 上游：[LHGP-SPEC.md](./LHGP-SPEC.md)（语义权威）、[ADR-003](./decisions/0003-long-horizon-goal-protocol.md)（命名权威）
-> 状态：**执行计划基线（持续更新）**；P1–P5 已有大量实现，P6 分发仍在收尾
+> 状态：**执行计划基线（持续更新）**；P1–P5 已有大量实现，P6 双轨插件包已落地，
+> fresh-machine dogfood 与模块路径迁移仍在收尾
 
 本文档只回答两个问题：**做到什么算完成**，以及**按什么顺序做**。
 语义冲突以 LHGP-SPEC.md 为准；执行顺序与范围以本文档为准。
@@ -211,7 +212,8 @@ daemon + 本机认证 Unix-socket RPC、Goal Capsule/handover、L0/L1 唤醒、
 
 **范围**
 - 建立 `.codex-plugin/plugin.json`、`.mcp.json`、`skills/long-horizon-goals/SKILL.md`、`assets/`。
-- MCP 工具迁移为 10 个 `lhgp_*`，补齐 read-only / destructive / open-world annotations。
+- MCP 工具已提供 `lhgp_*` 双轨命名、审计/控制扩展，并补齐
+  read-only / destructive / open-world annotations；剩余工作是 fresh-machine 验证。
 - `lhgp` / `lhgpd` 命令与 `~/.lhgp` 数据目录迁移工具（dry-run + 备份）；`longtask` 别名保留一个次版本。
 - Python 内部模块路径最后迁移（`src/longtask` → `src/lhgp`），并同步 `scripts/arch_check.py` 的架构约束。
 - fresh-machine 安装测试与三个非玩具 dogfood 目标。
@@ -268,7 +270,7 @@ P0 期间明确：协议语义正式名为 **LHGP**（`Long-Horizon Goal Protoco
 | Python 命令 / CLI | `longtask` / `longtaskd` | `lhgp` / `lhgpd` | P6 同期发布 `lhgp` / `lhgpd`，旧名作为 shim 至少保留一个次版本 |
 | 数据目录 | `~/.longtask/` | `~/.lhgp/` | P6 发布迁移工具（dry-run + 备份 + 可回滚）；旧路径在迁移完成前继续生效 |
 | Python 模块路径 | `src/longtask/` | `src/lhgp/` | P6 末段迁移；先双写后切读 |
-| MCP server 入口 | `longtask-mcp`（暴露 7 个 `longtask_*` 工具） | `lhgp-mcp`（10 个 `lhgp_*` 工具，含 read-only / destructive / open-world 标注） | P6 同步发布；旧入口继续可发现，至少一个次版本 |
+| MCP server 入口 | `longtask-mcp`（核心工具与兼容入口） | `lhgp-mcp`（核心工具、LHGP 别名、审计/控制扩展，含安全语义标注） | 双轨已发布；旧入口继续可发现，至少一个次版本 |
 | skill 名 | `skills/longtask-contract/` | `skills/long-horizon-goals/` | P6 同步迁移；旧名继续作为 alias |
 | README / 文档 | `README.md` + `README.zh-CN.md`（P0 已双语）；文档主体口径用「LHGP / 远期目标协议」 | 同上 | 不变 |
 
@@ -285,7 +287,7 @@ P0 期间明确：协议语义正式名为 **LHGP**（`Long-Horizon Goal Protoco
 3. **可回滚**：迁移完成后保留旧路径 N 个版本窗口；旧名 CLI 持续可调用，自动识别新旧路径。
 4. **claim 同步**：迁移 PR 必须更新 `implementation_claims` 中相关声明的 evidence 路径与 pinned_sha，并新增/更新 `lhgp-*-distribution` 系列 design_claim 描述目标态。
 
-P0 之后 `quality/claims.json` 已有 8 条 `design_claims` 锚定 SPEC 章节（`spec-is-authoritative-source`、`lhgp-spec-four-axis-model`、`lhgp-spec-authorization-tri-axis`、`lhgp-spec-external-handles`、`lhgp-spec-goal-capsule-v1`、`lhgp-spec-forecast-six-component`、`lhgp-spec-typed-acceptance`、`lhgp-spec-distribution-and-rename`），每条 claim 显式标注所处阶段（当前实现状态 + 属 P1–P6 哪一阶段）。`implementation_claims` 16 条保留 `pinned_sha: 280d78858aceee57471a3ceff1722b406194375d` 锚定的实现证据链。
+P0 之后 `quality/claims.json` 已有 8 条 `design_claims` 锚定 SPEC 章节（`spec-is-authoritative-source`、`lhgp-spec-four-axis-model`、`lhgp-spec-authorization-tri-axis`、`lhgp-spec-external-handles`、`lhgp-spec-goal-capsule-v1`、`lhgp-spec-forecast-six-component`、`lhgp-spec-typed-acceptance`、`lhgp-spec-distribution-and-rename`），每条 claim 显式标注所处阶段（当前实现状态 + 属 P1–P6 哪一阶段）。实现声明的当前精确锚点以 `quality/claims.json` 的 `pinned_sha` 为准，并由 claims 门禁校验。
 
 ---
 
