@@ -79,7 +79,7 @@ LHGP **不是**工作流引擎。Agent 可以在租约仍然有效时被换掉�
 | 文件投影 + handover.md 模式 | 已验证 | `file-projections-and-handover` |
 | CLI + 守护进程控制面 + --dry-run | 已验证 | `cli-and-daemon-control-plane` |
 | 严格 Deadline 分层唤醒（L0/L1 已落地；L2/L3 仅设计） | 已接受的债（2026-12-01 复审） | `strict-deadline-wakeup-design` |
-| MCP server + 模型侧 skill（7 个面向任务的工具，不是 1:1 RPC 隧道） | 已验证 | `mcp-server-and-skill` |
+| MCP server + 模型侧 skill（核心工具、LHGP 别名及审计/控制扩展，不是 1:1 RPC 隧道） | 已验证 | `mcp-server-and-skill` |
 | 临时上下文 + 交叉核对 verifier | 已验证 | `ephemeral-context-and-verifier` |
 | 执行者侧 RPC（status / renew / write-back） | 已验证 | `executor-session-rpc` |
 | 守护进程生命周期 + AttemptRunner（真实子进程） | 已验证 | `daemon-lifecycle-and-attempt-runner` |
@@ -181,7 +181,7 @@ cat ~/.longtask/contracts/lt-hello/contract.yaml
 ### 如果你的 Agent 是兼容 MCP 的 LLM
 
 包还装了 `longtask-mcp`，一个薄的 [MCP](https://modelcontextprotocol.io)
-server。它给你的模型暴露 7 个面向任务流的工具（不是 24 个 RPC 方法的 1:1 隧道 —— 见规范 §11.1）。在你的 MCP 配置里加一行把它指给 harness，模型就能直接发现并使用本协议 —— 模型侧的接入文档在 [`skills/longtask-contract/SKILL.md`](skills/longtask-contract/SKILL.md)。
+server。它给你的模型暴露核心任务流工具，以及 LHGP 命名别名、审计和控制扩展（不是 24 个 RPC 方法的 1:1 隧道 —— 见规范 §11.1）。在你的 MCP 配置里加一行把它指给 harness，模型就能直接发现并使用本协议 —— 模型侧的接入文档在 [`skills/longtask-contract/SKILL.md`](skills/longtask-contract/SKILL.md)。
 
 ## 明确不做（暂时）
 
