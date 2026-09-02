@@ -64,3 +64,13 @@ class TestEntryPointAlignment:
         assert "longtask = " in pyproject
         assert "longtaskd = " in pyproject
         assert "longtask-mcp = " in pyproject
+
+    def test_wheel_includes_plugin_companion_resources(self) -> None:
+        """wheel 不能退化成只含 runtime 的包，必须携带模型接入资源。"""
+        pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+        for resource in (
+            '".codex-plugin/plugin.json" = ".codex-plugin/plugin.json"',
+            '".mcp.json" = ".mcp.json"',
+            '"skills/long-horizon-goals/SKILL.md" = "skills/long-horizon-goals/SKILL.md"',
+        ):
+            assert resource in pyproject
