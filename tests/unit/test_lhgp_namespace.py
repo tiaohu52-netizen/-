@@ -5,9 +5,13 @@ from lhgp import PROTOCOL_VERSION, __version__
 from lhgp.adapters.registry import ExecutorRegistry as CanonicalExecutorRegistry
 from lhgp.contracts.contract_draft import ContractDraft as CanonicalContractDraft
 from lhgp.persistence.store import connect as canonical_connect
+from lhgp.rpc.errors import ErrorCode as CanonicalErrorCode
+from lhgp.rpc.methods import Method as CanonicalMethod
 from longtask.adapters.registry import ExecutorRegistry as LegacyExecutorRegistry
 from longtask.contracts.contract_draft import ContractDraft as LegacyContractDraft
 from longtask.persistence.store import connect as legacy_connect
+from longtask.rpc.errors import ErrorCode as LegacyErrorCode
+from longtask.rpc.methods import Method as LegacyMethod
 
 
 def test_canonical_namespace_matches_legacy_runtime_identity() -> None:
@@ -33,3 +37,10 @@ def test_adapter_namespace_reexports_single_implementation() -> None:
     """Adapter facades must preserve registry class identity during migration."""
 
     assert CanonicalExecutorRegistry is LegacyExecutorRegistry
+
+
+def test_rpc_namespace_reexports_protocol_types() -> None:
+    """RPC facades must preserve enum identity during migration."""
+
+    assert CanonicalMethod is LegacyMethod
+    assert CanonicalErrorCode is LegacyErrorCode
