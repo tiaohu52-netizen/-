@@ -52,6 +52,8 @@ Environment: new CPython 3.13 virtual environment created with `uv venv`
     contains the complete `lhgp/` package tree.
 19. Rebuilt the source distribution and inspected its tar members; it also
     contains the complete `src/lhgp/` tree and `src/lhgp/py.typed` marker.
+20. Walked and imported all 65 modules under `lhgp` in a clean `uv run`
+    process; every canonical facade imported successfully with zero failures.
 
 ## Scope and remaining work
 
