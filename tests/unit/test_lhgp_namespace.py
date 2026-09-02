@@ -8,8 +8,22 @@ from lhgp import PROTOCOL_VERSION, __version__
 from lhgp.acceptance import CheckSpec as CanonicalPackageCheckSpec
 from lhgp.acceptance.checks import CheckSpec as CanonicalCheckSpec
 from lhgp.adapters.registry import ExecutorRegistry as CanonicalExecutorRegistry
-from lhgp.admission import Offer as CanonicalPackageOffer
+from lhgp.admission import (
+    AdmissionRefuseCode as CanonicalRefuseCode,
+)
+from lhgp.admission import (
+    AdmissionRefusedError as CanonicalRefusedError,
+)
+from lhgp.admission import (
+    Offer as CanonicalPackageOffer,
+)
 from lhgp.admission.offer import Offer as CanonicalOffer
+from lhgp.admission.refuse import (
+    AdmissionRefuseCode as CanonicalModuleRefuseCode,
+)
+from lhgp.admission.refuse import (
+    AdmissionRefusedError as CanonicalModuleRefusedError,
+)
 from lhgp.cli.formatting import format_eta as canonical_format_eta
 from lhgp.contracts.contract_draft import ContractDraft as CanonicalContractDraft
 from lhgp.forecast import Forecast as CanonicalPackageForecast
@@ -22,6 +36,12 @@ from lhgp.scheduler.wakeup import guard_needed as canonical_guard_needed
 from longtask.acceptance.checks import CheckSpec as LegacyCheckSpec
 from longtask.adapters.registry import ExecutorRegistry as LegacyExecutorRegistry
 from longtask.admission.offer import Offer as LegacyOffer
+from longtask.admission.refuse import (
+    AdmissionRefuseCode as LegacyRefuseCode,
+)
+from longtask.admission.refuse import (
+    AdmissionRefusedError as LegacyRefusedError,
+)
 from longtask.cli.formatting import format_eta as legacy_format_eta
 from longtask.contracts.contract_draft import ContractDraft as LegacyContractDraft
 from longtask.forecast.model import Forecast as LegacyForecast
@@ -84,6 +104,9 @@ def test_supporting_namespaces_reexport_single_implementation() -> None:
     assert CanonicalPackageCheckSpec is CanonicalCheckSpec
     assert CanonicalOffer is LegacyOffer
     assert CanonicalPackageOffer is CanonicalOffer
+    assert CanonicalRefuseCode is CanonicalModuleRefuseCode is LegacyRefuseCode
+    assert CanonicalRefusedError is CanonicalModuleRefusedError is LegacyRefusedError
+    assert CanonicalRefuseCode.POLICY_DENY.value == "policy-deny"
     assert CanonicalForecast is LegacyForecast
     assert CanonicalPackageForecast is CanonicalForecast
 
