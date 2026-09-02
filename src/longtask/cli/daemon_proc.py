@@ -197,6 +197,11 @@ def spawn_daemon(
             time.sleep(0.05)
 
         (root / PID_FILE).write_text(f"{proc.pid}\n", encoding="utf-8")
+        # The daemon is intentionally detached and outlives this short-lived
+        # CLI process.  Popen's destructor warns when its owner disappears
+        # while the child is still running; PID_FILE is the durable ownership
+        # record, so mark this local handle as detached after startup succeeds.
+        proc.returncode = 0
         return {"ok": True, "pid": proc.pid, "interval_seconds": interval_seconds}
     finally:
         os.close(lock_fd)
