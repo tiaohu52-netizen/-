@@ -94,6 +94,17 @@ class TestMCPDiscovery:
                 "lhgp_write_back",
                 "lhgp_notifications",
             }.issubset(names)
+            by_name = {item["name"]: item for item in tools["result"]["tools"]}
+            assert by_name["lhgp_notifications"]["annotations"] == {
+                "readOnlyHint": True,
+                "destructiveHint": False,
+                "openWorldHint": False,
+            }
+            assert by_name["lhgp_interrupt_attempt"]["annotations"] == {
+                "readOnlyHint": False,
+                "destructiveHint": True,
+                "openWorldHint": False,
+            }
         finally:
             proc.terminate()
             proc.wait(timeout=5)
