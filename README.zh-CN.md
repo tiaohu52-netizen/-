@@ -84,15 +84,13 @@ LHGP **不是**工作流引擎。Agent 可以在租约仍然有效时被换掉�
 | 执行者侧 RPC（status / renew / write-back） | 已验证 | `executor-session-rpc` |
 | 守护进程生命周期 + AttemptRunner（真实子进程） | 已验证 | `daemon-lifecycle-and-attempt-runner` |
 
-这份清单**没有**声称：
+这份清单仍然明确不承诺：
 
-- 四轴承诺状态（承诺生命周期 / Deadline / 验收 / 尝试）—— 规范要求四轴，目前实现只有两轴。
-- 跨执行者 × 模型 × 角色的 default-deny 授权（合同下一份统一 allowlist）。verifier 会被派，但三维 allowlist 还未强制。
-- 外部运行句柄（`external_run_id`、`session_locator`、`recovery_strategy`、`capability_snapshot`），守护进程无法接手它不拥有的 harness 派出的工作。
-- 六分量 forecast（queue / startup / remaining work / verification / retry reserve / safety margin）驱动事件式唤醒。
-- 类型化的验收 checks 与 `evidence` 实体，以及结构化的 repair brief。
-- 完整的跨主机插件分发与全新机器 dogfood（P6 双轨入口、MCP 工具迁移和
-  `~/.lhgp` 默认目录已上线；剩余工作见 ROADMAP）。
+- 跨主机 relay、L2/L3 外部唤醒和严格墙钟交付保证；这些依赖外部基础设施。
+- 外部通知渠道的实际投递保证；本地 notification outbox 已实现幂等、重试和安静时间规则。
+- 生产级多租户/网络部署；当前定位仍是单机、单用户 Developer Preview。
+- Python 内部实现已经提供 `lhgp.*` 兼容 facade，但底层源代码仍在
+  `src/longtask/`，完整物理迁移会在兼容窗口后进行。
 
 这些差距在 [`docs/LHGP-ROADMAP.md`](docs/LHGP-ROADMAP.md) 中被显式跟踪。
 
@@ -106,14 +104,14 @@ git clone https://github.com/<OWNER>/longtask-protocol
 cd longtask-protocol
 uv sync --extra dev
 uv run python scripts/quality_gate.py   # 约 10 秒，与 CI 跑的是同一道门
-uv run python -m longtask.cli.main doctor
+uv run lhgp doctor
 ```
 
 你应该看到：
 
 ```
 [gate] ALL PASS (7 gates)
-=== longtask doctor (v0.1.0a0, protocol v1) ===
+=== LHGP doctor (v0.1.0a0, protocol v1) ===
 [PASS] python_runtime: Python 3.13.x
 [PASS] storage_directory: ~/.lhgp accessible
 [PASS] database_integrity: state.db healthy
@@ -241,10 +239,10 @@ scripts/                  7 道质量门运行器（本地 == CI）
 
 ## 出问题了
 
-- **先看这个**：`uv run python -m longtask.cli.main doctor`。它跑 4 项自检并告诉你哪一项挂了。
-- **合同卡住了**：`uv run python -m longtask.cli.main get <id>`。看 `state`、`blocked_reason` 与事件。
-- **紧急熔断**：`uv run python -m longtask.cli.main kill-switch --activate` 立即停止所有派工；`--deactivate` 恢复。
-- **守护进程僵死**：`uv run python -m longtask.cli.main stop`，再 `start`。状态会被保留。
+- **先看这个**：`uv run lhgp doctor`。它跑 4 项自检并告诉你哪一项挂了。
+- **合同卡住了**：`uv run lhgp get <id>`。看 `state`、`blocked_reason` 与事件。
+- **紧急熔断**：`uv run lhgp kill-switch --activate` 立即停止所有派工；`--deactivate` 恢复。
+- **守护进程僵死**：`uv run lhgp stop`，再 `start`。状态会被保留。
 - **找到 bug？** 用 [bug 报告模板](../../issues/new?template=bug_report.md) 提交。如果跑了门，附上 `uv run python scripts/quality_gate.py` 的输出。
 - **问设计问题？** 先翻 [`docs/LHGP-SPEC.md`](docs/LHGP-SPEC.md)（1100+ 行，可搜）。还有疑问，用 [文档模板](../../issues/new?template=documentation.md)。
 
