@@ -63,7 +63,19 @@ daemon + 本机认证 Unix-socket RPC、Goal Capsule/handover、L0/L1 唤醒、
 留证。完整证据以 README、测试和
 `quality/claims.json` 为准；仍未宣称跨主机 relay、严格墙钟交付保证或外部通知渠道。
 
-### 2.2 四个必须先纠正的冲突项（历史基线）
+### 2.2 发布审计快照（2026-09-03）
+
+当前 Developer Preview 发布基线已完成一次全量复验：质量门 7/7 全部通过，479
+个测试通过，覆盖率 80.75%，资源警告为 0；wheel 与 sdist 的 companion metadata
+一致；官方插件 manifest validator 与两个 Skill validator 均通过。最新可复验
+证据见 [`docs/evidence/P6-fresh-machine-smoke-2026-09-03.md`](evidence/P6-fresh-machine-smoke-2026-09-03.md)
+以及 `quality/claims.json` 的 `pinned_sha`。
+
+这只证明 Developer Preview 的单机发布基线，不改变 Alpha 完成判据：跨主机
+relay、L2/L3 外部唤醒、严格墙钟交付保证，以及完整 Python 模块路径迁移仍是
+后续明确工作项。
+
+### 2.3 四个必须先纠正的冲突项（历史基线）
 
 它们不是"还没做"，而是当前行为与规范相反，会持续产出错误的权威数据：
 
@@ -76,7 +88,7 @@ daemon + 本机认证 Unix-socket RPC、Goal Capsule/handover、L0/L1 唤醒、
 
 附带：`daemon.py:382-390` 每 60 秒无条件 append 提醒事件，无冷却、无跨档判定，违反 §10.5。
 
-### 2.3 明确保留、不得推倒的部分
+### 2.4 明确保留、不得推倒的部分
 
 租约 generation + holder 双重 fencing（含崩溃恢复集成测试）、fail-closed 拒接、SQLite/WAL 单事务与 request_id 幂等、七道质量门、分层唤醒 L0/L1、结构化 argv 与环境白名单。这些是 SPEC §19.1 点名的保留项，是本项目的地基。
 
