@@ -10,7 +10,11 @@ from __future__ import annotations
 
 import hmac
 import json
+import socket
+import threading
 from collections.abc import Callable, Iterable
+from contextlib import suppress
+from pathlib import Path
 from typing import Any, TextIO
 
 from longtask.rpc.errors import ErrorCode, RpcError
@@ -83,4 +87,50 @@ def serve_stream(
         writer.flush()
 
 
-__all__ = ["process_lines", "serve_stream"]
+def serve_unix_socket(
+    endpoint: Path,
+    *,
+    token: str,
+    dispatch: Callable[[dict[str, Any]], dict[str, Any]],
+    stop_event: threading.Event | None = None,
+) -> None:
+    """监听 Unix domain socket，逐连接服务 JSON-RPC。
+
+    ``AF_UNIX`` 在现代 Windows 版本也可用；不支持的平台会明确报错，
+    不会悄悄降级到暴露网络端口。endpoint 权限收紧为用户可读写（POSIX）。
+    ``stop_event`` 供守护进程优雅退出，未提供时持续运行。
+    """
+
+    if not hasattr(socket, "AF_UNIX"):
+        raise RuntimeError("this platform does not provide Unix domain sockets")
+    endpoint = Path(endpoint)
+    endpoint.parent.mkdir(parents=True, exist_ok=True)
+    if endpoint.exists():
+        endpoint.unlink()
+    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        server.bind(str(endpoint))
+        with suppress(OSError):
+            endpoint.chmod(0o600)
+        server.listen(8)
+        server.settimeout(0.5)
+        while stop_event is None or not stop_event.is_set():
+            try:
+                connection, _ = server.accept()
+            except TimeoutError:
+                continue
+            with connection:
+                reader = connection.makefile("r", encoding="utf-8", newline="\n")
+                writer = connection.makefile("w", encoding="utf-8", newline="\n")
+                try:
+                    serve_stream(reader, writer, token=token, dispatch=dispatch)
+                finally:
+                    reader.close()
+                    writer.close()
+    finally:
+        server.close()
+        with suppress(FileNotFoundError):
+            endpoint.unlink()
+
+
+__all__ = ["process_lines", "serve_stream", "serve_unix_socket"]
