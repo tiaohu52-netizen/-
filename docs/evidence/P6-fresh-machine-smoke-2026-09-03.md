@@ -16,6 +16,9 @@ Environment: new CPython 3.13 virtual environment created with `uv venv`
    `drafted` to `active` and the read-only commands returned successfully.
 6. Verified both wheel and sdist with `scripts/check_artifacts.py`; all companion
    plugin and Skill resources were present.
+7. Ran `examples/dsh-dogfood-v4/dogfood_v4.py probe` twice on Windows. Both runs
+   selected only `dsh-headless` for the executor role and only `kimi-code` for the
+   verifier role, rejecting the enabled `codex-cli` interference entry.
 
 ## Scope and remaining work
 
