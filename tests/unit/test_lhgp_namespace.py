@@ -70,6 +70,7 @@ from lhgp.contracts.validation import validate_draft as canonical_validate_draft
 from lhgp.forecast import Forecast as CanonicalPackageForecast
 from lhgp.forecast.model import Forecast as CanonicalForecast
 from lhgp.persistence.store import connect as canonical_connect
+from lhgp.persistence.types import StoredLease as CanonicalStoredLease
 from lhgp.promoter.urgency import classify as canonical_classify
 from lhgp.rpc.errors import ErrorCode as CanonicalErrorCode
 from lhgp.rpc.methods import Method as CanonicalMethod
@@ -121,6 +122,7 @@ from longtask.contracts.state_machine import is_valid_transition as legacy_is_va
 from longtask.contracts.validation import validate_draft as legacy_validate_draft
 from longtask.forecast.model import Forecast as LegacyForecast
 from longtask.persistence.store import connect as legacy_connect
+from longtask.persistence.types import StoredLease as LegacyStoredLease
 from longtask.promoter.urgency import classify as legacy_classify
 from longtask.rpc.errors import ErrorCode as LegacyErrorCode
 from longtask.rpc.methods import Method as LegacyMethod
@@ -167,6 +169,7 @@ def test_persistence_namespace_reexports_single_implementation() -> None:
     """Persistence facades must preserve callable identity during migration."""
 
     assert canonical_connect is legacy_connect
+    assert CanonicalStoredLease is LegacyStoredLease
 
 
 def test_adapter_namespace_reexports_single_implementation() -> None:
