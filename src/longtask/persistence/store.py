@@ -17,8 +17,10 @@ from __future__ import annotations
 import json
 import sqlite3
 from collections.abc import Callable, Sequence
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
+from datetime import time as datetime_time
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from longtask.contracts.attention import from_dict as attention_from_dict
 from longtask.contracts.attention import to_dict as attention_to_dict
@@ -622,6 +624,7 @@ def update_contract_state(
                 channel="local",
                 payload={"contract_id": contract_id, "event_id": event.event_id, **payload},
                 now=now,
+                available_at=_notification_available_at(current.draft.attention, notify_kind, now),
             )
 
     updated = get_contract(conn, contract_id)
@@ -643,6 +646,36 @@ def _notification_kind(event_type: EventType | str, state: ContractState) -> str
     if state == ContractState.BLOCKED or raw == EventType.ESCALATION_HANDED_TO_USER.value:
         return "need_user"
     return None
+
+
+def _notification_available_at(attention: Any, kind: str, now: datetime) -> datetime:
+    """安静时间内延迟普通通知；bypass 类别保持立即可投递。"""
+    quiet = attention.quiet_hours
+    if quiet is None or kind in attention.bypass_quiet_hours_on:
+        return now
+    try:
+        timezone = UTC if quiet.timezone in {"UTC", "Etc/UTC"} else ZoneInfo(quiet.timezone)
+        local_now = now.astimezone(timezone)
+        start_h, start_m = (int(part) for part in quiet.start.split(":"))
+        end_h, end_m = (int(part) for part in quiet.end.split(":"))
+        local_time = local_now.timetz().replace(tzinfo=None)
+        start = datetime_time(start_h, start_m)
+        end = datetime_time(end_h, end_m)
+        in_quiet = (
+            (start <= local_time < end)
+            if start <= end
+            else (local_time >= start or local_time < end)
+        )
+        if not in_quiet:
+            return now
+        end_date = local_now.date()
+        if start > end and local_time >= start:
+            end_date += timedelta(days=1)
+        return datetime.combine(end_date, end, tzinfo=timezone).astimezone(now.tzinfo)
+    except (ValueError, KeyError):
+        # attention.validate 应在合同边界拒绝畸形值；若旧库含坏时区，
+        # 不阻塞安全关键通知，退回立即投递。
+        return now
 
 
 def patch_contract(

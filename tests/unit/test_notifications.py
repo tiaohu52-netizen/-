@@ -1,5 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
+from longtask.contracts.attention import Attention, QuietHours
 from longtask.persistence.notifications import (
     claim_notifications,
     drain_notifications,
@@ -7,7 +8,12 @@ from longtask.persistence.notifications import (
     mark_failed,
     mark_sent,
 )
-from longtask.persistence.store import StoreConfig, connect, ensure_schema
+from longtask.persistence.store import (
+    StoreConfig,
+    _notification_available_at,
+    connect,
+    ensure_schema,
+)
 
 
 def test_outbox_is_idempotent_and_retryable(tmp_path) -> None:
@@ -79,3 +85,15 @@ def test_drain_retries_channel_failure(tmp_path) -> None:
     assert drain_notifications(conn, now=now, deliver=fail_delivery) == 0
     assert claim_notifications(conn, now=now) == []
     assert claim_notifications(conn, now=now + timedelta(seconds=60))
+
+
+def test_quiet_hours_delay_non_bypass_and_allow_bypass() -> None:
+    attention = Attention(
+        notify_on=("need_user",),
+        quiet_hours=QuietHours("22:00", "08:00", "UTC"),
+        bypass_quiet_hours_on=("satisfied",),
+    )
+    now = datetime(2026, 9, 3, 23, 0, tzinfo=UTC)
+    delayed = _notification_available_at(attention, "need_user", now)
+    assert delayed.hour == 8 and delayed.day == 4
+    assert _notification_available_at(attention, "satisfied", now) == now
