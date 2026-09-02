@@ -59,4 +59,5 @@ class TestEntryPointAlignment:
         """
         pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
         assert "longtask = " in pyproject
+        assert "longtaskd = " in pyproject
         assert "longtask-mcp = " in pyproject
