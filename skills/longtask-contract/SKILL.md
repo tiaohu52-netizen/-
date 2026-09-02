@@ -68,28 +68,28 @@ prepare` 调用，并把任务交出去。
 ```bash
 # 1. 立远期合同（草稿状态）
 longtask prepare \
-  --contract-id lt-2026-001 \
+  --contract-id lt-20260903-001 \
   --title "整理力量体系对照表" \
   --objective "产出第三卷全部登场角色的力量体系对照表..." \
   --deadline 2026-09-12T18:00:00+08:00
 
 # 2. 批准（从 drafted 转到 active，协议开始调度）
-longtask approve lt-2026-001
+longtask approve lt-20260903-001
 
 # 3. 查看状态
-longtask get lt-2026-001
+longtask get lt-20260903-001
 longtask list
 
 # 4. 修改可修订区（soft_guidance、acceptance、workload；冻结区不可改）
-longtask patch lt-2026-001 --patch-json '{...}'
+longtask patch lt-20260903-001 --patch-json '{...}'
 
 # 5. 暂停/恢复/取消
-longtask pause lt-2026-001
-longtask resume lt-2026-001
-longtask cancel lt-2026-001
+longtask pause lt-20260903-001
+longtask resume lt-20260903-001
+longtask cancel lt-20260903-001
 
 # 6. 修完成不了的事：转给人裁
-longtask arbitrate lt-2026-001 --decision hand_to_user --note "需要确认 X"
+longtask arbitrate lt-20260903-001 --decision hand_to_user --note "需要确认 X"
 ```
 
 完整子命令：`longtask --help`。
