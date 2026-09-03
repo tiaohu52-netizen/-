@@ -19,6 +19,9 @@ follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
   `lhgp` identity, and canonical `lhgp-mcp` command) during CI.
 - Canonical `lhgp` Python namespace facades now cover the runtime layers,
   while legacy `longtask` imports remain compatible during migration.
+- Canonical RPC and persistence package APIs now expose stable protocol,
+  schema, event, notification, and executor-side entry points with lazy
+  loading where legacy import order requires it.
 
 ### Fixed
 
@@ -29,6 +32,8 @@ follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
 - Schema startup reconciliation now repairs partially upgraded v2 databases,
   including missing external-handle capability columns, before daemon scans.
 - Doctor output and README quickstart commands now use the canonical LHGP name.
+- Claims evidence is re-anchored to the latest verified implementation commit;
+  the full 7-gate suite remains green with 492 tests.
 
 ## [0.1.0a0] - 2026-09-01
 
