@@ -231,7 +231,7 @@ def get_contract(conn: sqlite3.Connection, contract_id: str) -> ContractView | N
 
 
 def get_goal(conn: sqlite3.Connection, goal_id: str) -> dict[str, Any] | None:
-    """Return the stable Goal identity and its current contract ids."""
+    """Return stable Goal identity plus an aggregated progress view."""
     row = conn.execute(
         "SELECT goal_id, title, objective, created_at, updated_at, schema_version "
         "FROM goals WHERE goal_id = ?",
@@ -240,9 +240,29 @@ def get_goal(conn: sqlite3.Connection, goal_id: str) -> dict[str, Any] | None:
     if row is None:
         return None
     contracts = conn.execute(
-        "SELECT contract_id FROM contracts WHERE goal_id = ? ORDER BY contract_id",
+        "SELECT contract_id FROM contracts WHERE goal_id = ? ORDER BY updated_at DESC, contract_id",
         (goal_id,),
     ).fetchall()
+    contract_ids = [str(item[0]) for item in contracts]
+    states: dict[str, int] = {}
+    latest_contract: ContractView | None = None
+    latest_risk: dict[str, Any] | None = None
+    for contract_id in contract_ids:
+        view = get_contract(conn, contract_id)
+        if view is None:
+            continue
+        states[view.state.value] = states.get(view.state.value, 0) + 1
+        if latest_contract is None:
+            latest_contract = view
+            for event in reversed(get_events(conn, contract_id=contract_id)):
+                if event.event_type == EventType.FORECAST_UPDATED:
+                    try:
+                        payload = json.loads(event.payload_json or "{}")
+                    except ValueError:
+                        payload = None
+                    if isinstance(payload, dict):
+                        latest_risk = payload
+                    break
     return {
         "goal_id": row[0],
         "title": row[1],
@@ -250,7 +270,11 @@ def get_goal(conn: sqlite3.Connection, goal_id: str) -> dict[str, Any] | None:
         "created_at": row[3],
         "updated_at": row[4],
         "schema_version": int(row[5]),
-        "contract_ids": [str(item[0]) for item in contracts],
+        "contract_ids": contract_ids,
+        "contract_count": len(contract_ids),
+        "state_counts": states,
+        "current_contract": latest_contract.to_dict() if latest_contract else None,
+        "deadline_snapshot": latest_risk,
     }
 
 
