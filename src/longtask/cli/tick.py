@@ -32,8 +32,10 @@ from longtask.persistence.notifications import enqueue_notification
 from longtask.persistence.projections import rebuild_projection
 from longtask.persistence.store import (
     _notification_available_at,
+    advance_goal,
     append_event,
     get_events,
+    get_goal,
     get_lease,
     list_contracts,
     update_contract_state,
@@ -581,6 +583,7 @@ def _judge_verifier_outcomes(root: Path, conn: sqlite3.Connection, now: datetime
                 ),
             )
             rebuild_projection(root, contract.contract_id, conn)
+            _advance_goal_after_verified_contract(conn, contract, now)
         else:  # failed
             # P5 修复闭环（SPEC §12.4）：verifier 失败不退回裸 active，
             # 而是把失败原因结构化成 RepairBrief 写进 handover.md——
@@ -621,6 +624,45 @@ def _safe_json(text: str) -> dict[str, Any]:
     if isinstance(result, dict):
         return result
     return {}
+
+
+def _advance_goal_after_verified_contract(
+    conn: sqlite3.Connection, contract: Any, now: datetime
+) -> None:
+    """Advance a stage only when its bound contract has verifier evidence."""
+    goal = get_goal(conn, contract.goal_id)
+    if goal is None or not isinstance(goal.get("plan"), dict):
+        return
+    stages = goal["plan"].get("stages")
+    if not isinstance(stages, list):
+        return
+    bound = next(
+        (
+            stage
+            for stage in stages
+            if isinstance(stage, dict) and stage.get("contract_id") == contract.contract_id
+        ),
+        None,
+    )
+    if bound is None:
+        return
+    current = goal.get("progress", {}).get("current")
+    stage_id = str(bound.get("id", ""))
+    if current is not None and str(current) != stage_id:
+        return
+    try:
+        advance_goal(
+            conn,
+            goal_id=contract.goal_id,
+            complete_stage=stage_id,
+            now=now,
+            expected_revision=int(goal["revision"]),
+            actor="verifier",
+        )
+    except Exception:
+        # Contract completion is authoritative; Goal progress can be retried
+        # safely on the next read/advance without hiding verifier evidence.
+        return
 
 
 def _remaining_workload_hours(root: Path, contract: Any) -> float:
