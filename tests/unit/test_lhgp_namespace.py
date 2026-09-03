@@ -101,6 +101,7 @@ from lhgp.promoter.urgency import classify as canonical_classify
 from lhgp.rpc import Method as CanonicalPackageMethod
 from lhgp.rpc.client import call_unix_socket as canonical_call_unix_socket
 from lhgp.rpc.errors import ErrorCode as CanonicalErrorCode
+from lhgp.rpc.executor_api import handle_control_interrupt as canonical_handle_control_interrupt
 from lhgp.rpc.handlers import HANDLERS as CANONICAL_HANDLERS
 from lhgp.rpc.handlers.executor import handle_executor_list as canonical_handle_executor_list
 from lhgp.rpc.handlers.protocol import handle_protocol_events as canonical_handle_protocol_events
@@ -175,6 +176,7 @@ from longtask.promoter.urgency import classify as legacy_classify
 from longtask.rpc import Method as LegacyPackageMethod
 from longtask.rpc.client import call_unix_socket as legacy_call_unix_socket
 from longtask.rpc.errors import ErrorCode as LegacyErrorCode
+from longtask.rpc.executor_api import handle_control_interrupt as legacy_handle_control_interrupt
 from longtask.rpc.handlers.executor import handle_executor_list as legacy_handle_executor_list
 from longtask.rpc.handlers.protocol import handle_protocol_events as legacy_handle_protocol_events
 from longtask.rpc.methods import Method as LegacyMethod
@@ -251,6 +253,7 @@ def test_rpc_namespace_reexports_protocol_types() -> None:
     assert canonical_process_lines is legacy_process_lines
     assert canonical_handle_protocol_events is legacy_handle_protocol_events
     assert canonical_handle_executor_list is legacy_handle_executor_list
+    assert canonical_handle_control_interrupt is legacy_handle_control_interrupt
     assert CANONICAL_HANDLERS[CanonicalMethod.PROTOCOL_HELLO] is canonical_handle_protocol_hello
     assert CanonicalMethod is LegacyMethod
     assert canonical_parse_envelope is legacy_parse_envelope

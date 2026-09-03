@@ -359,5 +359,6 @@ def handle_attempt_write_back(
 __all__ = [
     "handle_attempt_status",
     "handle_attempt_write_back",
+    "handle_control_interrupt",
     "handle_lease_renew",
 ]
