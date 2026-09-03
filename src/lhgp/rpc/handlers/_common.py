@@ -8,13 +8,18 @@ temporarily delegated until their persistence dependencies are migrated.
 from __future__ import annotations
 
 import sqlite3
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+from lhgp.acceptance.checks import parse_check
+from lhgp.contracts.attention import from_dict as attention_from_dict
+from lhgp.contracts.authority import from_dict as authority_from_dict
+from lhgp.contracts.continuity import from_dict as continuity_from_dict
+from lhgp.contracts.schema import Acceptance, Budget, ContractDraft
 from lhgp.persistence.store import get_contract, get_events_by_request_id
 from lhgp.rpc.errors import ErrorCode, RpcError
 from longtask.rpc.handlers._common import (
     _parse_iso,
-    parse_contract_draft,
 )
 
 if TYPE_CHECKING:
@@ -49,6 +54,69 @@ def require_contract_id(params: dict[str, Any]) -> str:
     if not contract_id:
         raise RpcError(code=ErrorCode.VALIDATION_FAILED, message="contract_id is required")
     return contract_id
+
+
+def parse_contract_draft(params: dict[str, Any]) -> ContractDraft:
+    """解析并验证合同草稿，统一 canonical contracts 组件。"""
+    draft_data: dict[str, Any] = params.get("draft", params)
+    try:
+        title = str(draft_data["title"])
+        objective = str(draft_data["objective"])
+        raw_deadline = draft_data["deadline_at"]
+        deadline_at = (
+            raw_deadline
+            if hasattr(raw_deadline, "tzinfo")
+            else datetime.fromisoformat(str(raw_deadline))
+        )
+        acc_raw = draft_data["acceptance"]
+        acceptance = Acceptance(
+            standard=str(acc_raw["standard"]),
+            checks=tuple(parse_check(item) for item in acc_raw["checks"]),
+            verifier=str(acc_raw.get("verifier", "cross_check")),
+        )
+        workload_estimate = draft_data.get("workload_estimate")
+        if isinstance(workload_estimate, dict):
+            workload_initial_hours = float(workload_estimate["initial_hours"])
+        else:
+            workload_initial_hours = float(draft_data["workload_initial_hours"])
+        budget_raw = draft_data["budget"]
+        budget = Budget(
+            max_dispatches=int(budget_raw["max_dispatches"]),
+            max_escalations=int(budget_raw["max_escalations"]),
+            max_concurrent_attempts=int(budget_raw["max_concurrent_attempts"]),
+            max_attempt_minutes=int(budget_raw["max_attempt_minutes"]),
+            max_output_bytes=int(budget_raw["max_output_bytes"]),
+            verification_attempts_reserved=int(budget_raw.get("verification_attempts_reserved", 1)),
+        )
+        draft = ContractDraft(
+            title=title,
+            objective=objective,
+            deadline_at=deadline_at,
+            hard_constraints=dict(draft_data["hard_constraints"]),
+            acceptance=acceptance,
+            workload_initial_hours=workload_initial_hours,
+            budget=budget,
+            soft_guidance=dict(draft_data.get("soft_guidance", {})),
+            context=dict(draft_data.get("context", {})),
+            execution=dict(draft_data.get("execution", {})),
+            client_meta=dict(draft_data.get("client_meta", {})),
+            authority=authority_from_dict(draft_data.get("authority")),
+            attention=attention_from_dict(draft_data.get("attention")),
+            continuity=continuity_from_dict(draft_data.get("continuity")),
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise RpcError(
+            code=ErrorCode.VALIDATION_FAILED,
+            message=f"malformed contract draft parameter: {exc}",
+        ) from exc
+    errors = draft.validate()
+    if errors:
+        raise RpcError(
+            code=ErrorCode.VALIDATION_FAILED,
+            message="; ".join(errors),
+            details={"errors": errors},
+        )
+    return draft
 
 
 def idempotent_replay(
