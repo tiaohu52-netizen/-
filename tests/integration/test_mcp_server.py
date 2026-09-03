@@ -107,7 +107,8 @@ class TestMCPDiscovery:
             assert {"longtask_get_goal", "longtask_list_goals"}.issubset(names)
             assert {"longtask_update_goal", "lhgp_update_goal"}.issubset(names)
             assert {"longtask_advance_goal", "lhgp_advance_goal"}.issubset(names)
-            assert len(names) == 24
+            assert {"longtask_next_goal_action", "lhgp_next_goal_action"}.issubset(names)
+            assert len(names) == 26
             by_name = {item["name"]: item for item in tools["result"]["tools"]}
             assert by_name["lhgp_notifications"]["annotations"] == {
                 "readOnlyHint": True,
