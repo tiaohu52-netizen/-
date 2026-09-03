@@ -78,10 +78,16 @@ from lhgp.persistence import (
     EventType as CanonicalPackageEventType,
 )
 from lhgp.persistence import (
+    Notification as CanonicalPackageNotification,
+)
+from lhgp.persistence import (
     StoreConfig as CanonicalPackageStoreConfig,
 )
 from lhgp.persistence import (
     connect as canonical_package_connect,
+)
+from lhgp.persistence import (
+    enqueue_notification as canonical_package_enqueue_notification,
 )
 from lhgp.persistence import (
     ensure_schema as canonical_package_ensure_schema,
@@ -162,6 +168,8 @@ from longtask.persistence.decisions import set_next_decision_at as legacy_set_ne
 from longtask.persistence.errors import StoreError as LegacyStoreError
 from longtask.persistence.events import EventType as LegacyEventType
 from longtask.persistence.events_query import append_event as legacy_append_event
+from longtask.persistence.notifications import Notification as LegacyNotification
+from longtask.persistence.notifications import enqueue_notification as legacy_enqueue_notification
 from longtask.persistence.paths import default_data_root as legacy_default_data_root
 from longtask.persistence.store import StoreConfig as LegacyStoreConfig
 from longtask.persistence.store import connect as legacy_connect
@@ -237,6 +245,8 @@ def test_persistence_namespace_reexports_single_implementation() -> None:
     assert CanonicalPackageStoreConfig is LegacyStoreConfig
     assert canonical_package_connect is legacy_connect
     assert canonical_package_ensure_schema is legacy_ensure_schema
+    assert CanonicalPackageNotification is LegacyNotification
+    assert canonical_package_enqueue_notification is legacy_enqueue_notification
 
 
 def test_adapter_namespace_reexports_single_implementation() -> None:
