@@ -40,6 +40,7 @@ from longtask.contracts.contract_draft import from_dict
 from longtask.contracts.validation import validate_draft
 from longtask.persistence.events import EventType
 from longtask.persistence.store import (
+    advance_goal,
     get_contract,
     get_events_by_request_id,
     get_goal,
@@ -350,9 +351,49 @@ def handle_goal_update(
     return {"ok": True, "result": {"goal": goal}}
 
 
+def handle_goal_advance(
+    envelope: RequestEnvelope,
+    *,
+    conn: sqlite3.Connection,
+    now: datetime,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Complete the current staged step using revision CAS."""
+    params = envelope.params
+    goal_id = str(params.get("goal_id", "")).strip()
+    stage_id = str(params.get("stage_id", "")).strip()
+    revision = params.get("revision")
+    if not goal_id or not stage_id or isinstance(revision, bool) or not isinstance(revision, int):
+        raise RpcError(
+            code=ErrorCode.VALIDATION_FAILED,
+            message="goal_id, stage_id and integer revision are required",
+        )
+    try:
+        result = advance_goal(
+            conn,
+            goal_id=goal_id,
+            complete_stage=stage_id,
+            now=now,
+            expected_revision=revision,
+            actor=resolve_actor(envelope, params),
+        )
+    except ValueError as exc:
+        raise RpcError(code=ErrorCode.VALIDATION_FAILED, message=str(exc)) from exc
+    except Exception as exc:
+        from longtask.persistence.errors import RevisionConflictError, StoreError
+
+        if isinstance(exc, RevisionConflictError):
+            raise RpcError(code=ErrorCode.REVISION_CONFLICT, message=str(exc)) from exc
+        if isinstance(exc, StoreError):
+            raise RpcError(code=ErrorCode.UNKNOWN_CONTRACT, message=str(exc)) from exc
+        raise
+    return {"ok": True, "result": {"goal": result}}
+
+
 __all__ = [
     "_parse_iso",
     "handle_goal_admission_check",
+    "handle_goal_advance",
     "handle_goal_get",
     "handle_goal_list",
     "handle_goal_prepare",

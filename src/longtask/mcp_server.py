@@ -189,6 +189,11 @@ def tool_update_goal(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any
     return _mcp_route(Method.GOAL_UPDATE, args, ctx)
 
 
+def tool_advance_goal(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
+    """Complete the current Goal stage with revision CAS."""
+    return _mcp_route(Method.GOAL_ADVANCE, args, ctx)
+
+
 def _mcp_route(method: Method, args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
     """为控制类工具构造统一的模型侧 RPC envelope。"""
     return route(
@@ -547,6 +552,21 @@ TOOLS: dict[
             },
         },
     ),
+    "longtask_advance_goal": (
+        tool_advance_goal,
+        {
+            "description": "完成当前 Goal 阶段并推进到下一阶段。",
+            "inputSchema": {
+                "type": "object",
+                "required": ["goal_id", "stage_id", "revision"],
+                "properties": {
+                    "goal_id": {"type": "string"},
+                    "stage_id": {"type": "string"},
+                    "revision": {"type": "integer"},
+                },
+            },
+        },
+    ),
     "longtask_attach_to_executor": (
         tool_attach_to_executor,
         {
@@ -586,6 +606,7 @@ _RENAMED_TOOLS = {
     "lhgp_get_goal": "longtask_get_goal",
     "lhgp_list_goals": "longtask_list_goals",
     "lhgp_update_goal": "longtask_update_goal",
+    "lhgp_advance_goal": "longtask_advance_goal",
     "lhgp_attach_executor": "longtask_attach_to_executor",
 }
 for _new_name, _legacy_name in _RENAMED_TOOLS.items():

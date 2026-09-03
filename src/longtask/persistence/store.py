@@ -95,6 +95,7 @@ __all__ = [
     "WriteBackResult",
     # functions（按字母序，函数体下方定义）
     "acquire_lease",
+    "advance_goal",
     "append_event",
     "connect",
     "ensure_schema",
@@ -344,6 +345,9 @@ def patch_goal(
             )
         next_plan = plan if plan is not None else json.loads(row[1] or "{}")
         next_progress = progress if progress is not None else json.loads(row[2] or "{}")
+        from lhgp.goals.progress import normalize_plan
+
+        next_plan = normalize_plan(next_plan)
         next_revision = current_revision + 1
         conn.execute(
             "UPDATE goals SET revision = ?, plan_json = ?, progress_json = ?, updated_at = ? "
@@ -370,6 +374,32 @@ def patch_goal(
     if result is None:
         raise StoreError(f"goal {goal_id} disappeared after update")
     return result
+
+
+def advance_goal(
+    conn: sqlite3.Connection,
+    *,
+    goal_id: str,
+    complete_stage: str,
+    now: datetime,
+    expected_revision: int,
+    actor: str = "user",
+) -> dict[str, Any]:
+    """Advance one Goal stage through the same revision-CAS write path."""
+    goal = get_goal(conn, goal_id)
+    if goal is None:
+        raise StoreError(f"goal {goal_id} not found")
+    from lhgp.goals.progress import advance_progress
+
+    progress = advance_progress(goal["plan"], goal["progress"], complete_stage=complete_stage)
+    return patch_goal(
+        conn,
+        goal_id=goal_id,
+        now=now,
+        progress=progress,
+        expected_revision=expected_revision,
+        actor=actor,
+    )
 
 
 def list_contracts(

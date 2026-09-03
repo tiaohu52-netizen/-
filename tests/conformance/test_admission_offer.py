@@ -23,6 +23,7 @@ from longtask.persistence.store import (
 )
 from longtask.rpc.errors import ErrorCode, RpcError
 from longtask.rpc.handlers.goal import (
+    handle_goal_advance,
     handle_goal_get,
     handle_goal_list,
     handle_goal_prepare,
@@ -114,7 +115,19 @@ def test_goal_prepare_preserves_stable_goal_identity(tmp_path) -> None:
         now=NOW,
     )
     assert updated["result"]["goal"]["revision"] == 2
-    assert updated["result"]["goal"]["plan"]["stages"] == ["implement", "verify"]
+    assert [stage["id"] for stage in updated["result"]["goal"]["plan"]["stages"]] == [
+        "implement",
+        "verify",
+    ]
+    advanced = handle_goal_advance(
+        _envelope(
+            "req-advance",
+            {"goal_id": "goal-stable-1", "stage_id": "implement", "revision": 2},
+        ),
+        conn=conn,
+        now=NOW,
+    )
+    assert advanced["result"]["goal"]["progress"]["current"] == "verify"
 
 
 def test_goal_prepare_returns_offer_with_seven_fields(tmp_path) -> None:
