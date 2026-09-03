@@ -85,6 +85,7 @@ from lhgp.promoter.records import _record_attempt as canonical_record_attempt
 from lhgp.promoter.urgency import classify as canonical_classify
 from lhgp.rpc.client import call_unix_socket as canonical_call_unix_socket
 from lhgp.rpc.errors import ErrorCode as CanonicalErrorCode
+from lhgp.rpc.handlers.executor import handle_executor_list as canonical_handle_executor_list
 from lhgp.rpc.handlers.protocol import handle_protocol_events as canonical_handle_protocol_events
 from lhgp.rpc.methods import Method as CanonicalMethod
 from lhgp.rpc.server import parse_envelope as canonical_parse_envelope
@@ -152,6 +153,7 @@ from longtask.promoter.records import _record_attempt as legacy_record_attempt
 from longtask.promoter.urgency import classify as legacy_classify
 from longtask.rpc.client import call_unix_socket as legacy_call_unix_socket
 from longtask.rpc.errors import ErrorCode as LegacyErrorCode
+from longtask.rpc.handlers.executor import handle_executor_list as legacy_handle_executor_list
 from longtask.rpc.handlers.protocol import handle_protocol_events as legacy_handle_protocol_events
 from longtask.rpc.methods import Method as LegacyMethod
 from longtask.rpc.server import parse_envelope as legacy_parse_envelope
@@ -220,6 +222,7 @@ def test_rpc_namespace_reexports_protocol_types() -> None:
     assert canonical_call_unix_socket is legacy_call_unix_socket
     assert canonical_process_lines is legacy_process_lines
     assert canonical_handle_protocol_events is legacy_handle_protocol_events
+    assert canonical_handle_executor_list is legacy_handle_executor_list
     assert CanonicalMethod is LegacyMethod
     assert canonical_parse_envelope is legacy_parse_envelope
     assert CanonicalErrorCode is LegacyErrorCode
