@@ -22,7 +22,12 @@ from longtask.persistence.store import (
     get_goal,
 )
 from longtask.rpc.errors import ErrorCode, RpcError
-from longtask.rpc.handlers.goal import handle_goal_get, handle_goal_list, handle_goal_prepare
+from longtask.rpc.handlers.goal import (
+    handle_goal_get,
+    handle_goal_list,
+    handle_goal_prepare,
+    handle_goal_update,
+)
 from longtask.rpc.methods import Method
 from longtask.rpc.server import RequestEnvelope
 
@@ -95,6 +100,21 @@ def test_goal_prepare_preserves_stable_goal_identity(tmp_path) -> None:
     assert fetched["result"]["goal"]["goal_id"] == "goal-stable-1"
     listed = handle_goal_list(_envelope("req-list", {"limit": 10}), conn=conn)
     assert listed["result"]["goals"][0]["goal_id"] == "goal-stable-1"
+    updated = handle_goal_update(
+        _envelope(
+            "req-update",
+            {
+                "goal_id": "goal-stable-1",
+                "revision": 1,
+                "plan": {"stages": ["implement", "verify"]},
+                "progress": {"completed": ["contract"]},
+            },
+        ),
+        conn=conn,
+        now=NOW,
+    )
+    assert updated["result"]["goal"]["revision"] == 2
+    assert updated["result"]["goal"]["plan"]["stages"] == ["implement", "verify"]
 
 
 def test_goal_prepare_returns_offer_with_seven_fields(tmp_path) -> None:

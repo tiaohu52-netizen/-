@@ -35,6 +35,7 @@ class Method(StrEnum):
     GOAL_ADMISSION_CHECK = "goal/admission-check"
     GOAL_GET = "goal/get"
     GOAL_LIST = "goal/list"
+    GOAL_UPDATE = "goal/update"
 
 
 IDEMPOTENT_METHODS = frozenset(
