@@ -194,6 +194,11 @@ def tool_advance_goal(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, An
     return _mcp_route(Method.GOAL_ADVANCE, args, ctx)
 
 
+def tool_next_goal_action(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
+    """Get the next safe model action for a Goal."""
+    return _mcp_route(Method.GOAL_NEXT, args, ctx)
+
+
 def _mcp_route(method: Method, args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
     """为控制类工具构造统一的模型侧 RPC envelope。"""
     return route(
@@ -567,6 +572,17 @@ TOOLS: dict[
             },
         },
     ),
+    "longtask_next_goal_action": (
+        tool_next_goal_action,
+        {
+            "description": "读取 Goal 当前阶段的下一步可执行动作（只读）。",
+            "inputSchema": {
+                "type": "object",
+                "required": ["goal_id"],
+                "properties": {"goal_id": {"type": "string"}},
+            },
+        },
+    ),
     "longtask_attach_to_executor": (
         tool_attach_to_executor,
         {
@@ -607,6 +623,7 @@ _RENAMED_TOOLS = {
     "lhgp_list_goals": "longtask_list_goals",
     "lhgp_update_goal": "longtask_update_goal",
     "lhgp_advance_goal": "longtask_advance_goal",
+    "lhgp_next_goal_action": "longtask_next_goal_action",
     "lhgp_attach_executor": "longtask_attach_to_executor",
 }
 for _new_name, _legacy_name in _RENAMED_TOOLS.items():

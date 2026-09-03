@@ -104,6 +104,7 @@ __all__ = [
     "get_events_by_request_id",
     "get_goal",
     "get_lease",
+    "goal_next_action",
     "list_contracts",
     "list_goals",
     "patch_contract",
@@ -400,6 +401,54 @@ def advance_goal(
         expected_revision=expected_revision,
         actor=actor,
     )
+
+
+def goal_next_action(conn: sqlite3.Connection, *, goal_id: str) -> dict[str, Any]:
+    """Return a deterministic, read-only next action for model callers."""
+    goal = get_goal(conn, goal_id)
+    if goal is None:
+        raise StoreError(f"goal {goal_id} not found")
+    plan = goal["plan"] if isinstance(goal["plan"], dict) else {}
+    progress = goal["progress"] if isinstance(goal["progress"], dict) else {}
+    stages = plan.get("stages") if isinstance(plan.get("stages"), list) else []
+    completed = {str(item) for item in progress.get("completed", [])}
+    current = progress.get("current")
+    if current is None and stages:
+        current = next(
+            (
+                str(stage.get("id"))
+                for stage in stages
+                if isinstance(stage, dict) and str(stage.get("id")) not in completed
+            ),
+            None,
+        )
+    if current is None and stages:
+        return {"goal_id": goal_id, "action": "satisfied", "reason": "all planned stages completed"}
+    contracts = [get_contract(conn, cid) for cid in goal["contract_ids"]]
+    contracts = [item for item in contracts if item is not None]
+    active = [
+        item
+        for item in contracts
+        if item.state.value not in {"complete", "satisfied", "cancelled", "archived"}
+    ]
+    if active:
+        contract = active[0]
+        return {
+            "goal_id": goal_id,
+            "stage_id": current,
+            "action": "resume_contract",
+            "contract_id": contract.contract_id,
+            "deadline_status": contract.deadline_status.value,
+            "next_decision_at": contract.next_decision_at.isoformat()
+            if contract.next_decision_at
+            else None,
+        }
+    return {
+        "goal_id": goal_id,
+        "stage_id": current,
+        "action": "create_contract",
+        "reason": "current stage has no non-terminal contract",
+    }
 
 
 def list_contracts(

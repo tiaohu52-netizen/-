@@ -44,6 +44,7 @@ from longtask.persistence.store import (
     get_contract,
     get_events_by_request_id,
     get_goal,
+    goal_next_action,
     list_goals,
     patch_goal,
     save_contract,
@@ -390,12 +391,33 @@ def handle_goal_advance(
     return {"ok": True, "result": {"goal": result}}
 
 
+def handle_goal_next(
+    envelope: RequestEnvelope,
+    *,
+    conn: sqlite3.Connection,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Return the next safe model action without mutating Goal state."""
+    goal_id = str(envelope.params.get("goal_id", "")).strip()
+    if not goal_id:
+        raise RpcError(code=ErrorCode.VALIDATION_FAILED, message="goal_id is required")
+    try:
+        return {"ok": True, "result": {"next": goal_next_action(conn, goal_id=goal_id)}}
+    except Exception as exc:
+        from longtask.persistence.errors import StoreError
+
+        if isinstance(exc, StoreError):
+            raise RpcError(code=ErrorCode.UNKNOWN_CONTRACT, message=str(exc)) from exc
+        raise
+
+
 __all__ = [
     "_parse_iso",
     "handle_goal_admission_check",
     "handle_goal_advance",
     "handle_goal_get",
     "handle_goal_list",
+    "handle_goal_next",
     "handle_goal_prepare",
     "handle_goal_update",
 ]

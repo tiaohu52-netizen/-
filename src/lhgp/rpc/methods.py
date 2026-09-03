@@ -37,6 +37,7 @@ class Method(StrEnum):
     GOAL_LIST = "goal/list"
     GOAL_UPDATE = "goal/update"
     GOAL_ADVANCE = "goal/advance"
+    GOAL_NEXT = "goal/next"
 
 
 IDEMPOTENT_METHODS = frozenset(
