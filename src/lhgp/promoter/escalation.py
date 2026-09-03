@@ -1,3 +1,70 @@
-"""Compatibility facade for :mod:`longtask.promoter.escalation`."""
+"""Pure escalation ladder decision logic."""
 
-from longtask.promoter.escalation import *  # noqa: F403
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from lhgp.promoter.urgency import UrgencyTier
+
+
+@dataclass(frozen=True, slots=True)
+class EscalationDecision:
+    tier: UrgencyTier | None
+    reason: str
+    consumes_dispatch: bool
+    consumes_escalation: bool
+
+
+def _free(tier: UrgencyTier, reason: str) -> EscalationDecision:
+    return EscalationDecision(tier, reason, False, False)
+
+
+def decide(
+    tier: UrgencyTier | None,
+    *,
+    lease_alive: bool,
+    budget_dispatches_left: int,
+    budget_escalations_left: int,
+    estimate_stalled: bool,
+    partitions_allowed: bool = True,
+) -> EscalationDecision:
+    if tier is None:
+        return EscalationDecision(
+            None, "past deadline: contract goes to arbitration, not the ladder (§6.2)", False, False
+        )
+    if lease_alive:
+        capped = min(tier, UrgencyTier.REMIND)
+        return _free(
+            capped, f"lease alive: cap at remind (§7), u-tier {int(tier)} -> {int(capped)}"
+        )
+    if tier in (UrgencyTier.QUEUED, UrgencyTier.REMIND, UrgencyTier.STEER):
+        return _free(tier, f"u-tier {int(tier)}: free action, no budget consumed")
+    if budget_dispatches_left < 1:
+        return EscalationDecision(
+            UrgencyTier.HAND_TO_USER, "dispatch budget exhausted: hand to user (§6.3)", False, False
+        )
+    if estimate_stalled and partitions_allowed and budget_escalations_left >= 1:
+        return EscalationDecision(
+            UrgencyTier.PARALLEL,
+            "estimate stalled after tier 3 and partitionable: parallel dispatch (§6.2/§7.1)",
+            True,
+            True,
+        )
+    if estimate_stalled:
+        return EscalationDecision(
+            UrgencyTier.RESPAWN,
+            "estimate stalled but tier 4 unavailable "
+            f"(partitions_allowed={partitions_allowed}, "
+            f"escalations_left={budget_escalations_left}): serial respawn (§7.1)",
+            True,
+            False,
+        )
+    return EscalationDecision(
+        UrgencyTier.RESPAWN,
+        "u >= respawn threshold and no live lease: dispatch new attempt (§6.2)",
+        True,
+        False,
+    )
+
+
+__all__ = ["EscalationDecision", "decide"]
