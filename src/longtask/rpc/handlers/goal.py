@@ -42,6 +42,8 @@ from longtask.persistence.events import EventType
 from longtask.persistence.store import (
     get_contract,
     get_events_by_request_id,
+    get_goal,
+    list_goals,
     save_contract,
 )
 from longtask.rpc.errors import ErrorCode, RpcError
@@ -272,8 +274,43 @@ def handle_goal_admission_check(
     return {"ok": True, "result": {"contract_id": contract_id, "admission": offer.to_dict()}}
 
 
+def handle_goal_get(
+    envelope: RequestEnvelope,
+    *,
+    conn: sqlite3.Connection,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Read a stable Goal identity and its contract history."""
+    goal_id = str(envelope.params.get("goal_id", "")).strip()
+    if not goal_id:
+        raise RpcError(code=ErrorCode.VALIDATION_FAILED, message="goal_id is required")
+    goal = get_goal(conn, goal_id)
+    if goal is None:
+        raise RpcError(code=ErrorCode.UNKNOWN_CONTRACT, message=f"goal {goal_id} not found")
+    return {"ok": True, "result": {"goal": goal}}
+
+
+def handle_goal_list(
+    envelope: RequestEnvelope,
+    *,
+    conn: sqlite3.Connection,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """List stable Goals independently from individual contract revisions."""
+    raw_limit = envelope.params.get("limit", 20)
+    try:
+        limit = max(1, min(1000, int(raw_limit)))
+    except (TypeError, ValueError):
+        raise RpcError(
+            code=ErrorCode.VALIDATION_FAILED, message="limit must be an integer"
+        ) from None
+    return {"ok": True, "result": {"goals": list_goals(conn, limit=limit)}}
+
+
 __all__ = [
     "_parse_iso",
     "handle_goal_admission_check",
+    "handle_goal_get",
+    "handle_goal_list",
     "handle_goal_prepare",
 ]

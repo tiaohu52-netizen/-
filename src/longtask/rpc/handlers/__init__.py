@@ -67,6 +67,8 @@ def _build_handlers() -> dict[Method, Callable[..., dict[str, Any]]]:
         Method.CONTRACT_ARBITRATE: contract.handle_contract_arbitrate,
         Method.GOAL_PREPARE: goal.handle_goal_prepare,
         Method.GOAL_ADMISSION_CHECK: goal.handle_goal_admission_check,
+        Method.GOAL_GET: goal.handle_goal_get,
+        Method.GOAL_LIST: goal.handle_goal_list,
         Method.EXECUTOR_LIST: executor.handle_executor_list,
         Method.EXECUTOR_ENABLE: executor.handle_executor_enable,
         Method.EXECUTOR_DISABLE: executor.handle_executor_disable,

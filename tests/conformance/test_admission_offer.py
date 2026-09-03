@@ -22,7 +22,7 @@ from longtask.persistence.store import (
     get_goal,
 )
 from longtask.rpc.errors import ErrorCode, RpcError
-from longtask.rpc.handlers.goal import handle_goal_prepare
+from longtask.rpc.handlers.goal import handle_goal_get, handle_goal_list, handle_goal_prepare
 from longtask.rpc.methods import Method
 from longtask.rpc.server import RequestEnvelope
 
@@ -88,6 +88,10 @@ def test_goal_prepare_preserves_stable_goal_identity(tmp_path) -> None:
     goal = get_goal(conn, "goal-stable-1")
     assert goal is not None
     assert goal["contract_ids"] == ["contract-revision-1"]
+    fetched = handle_goal_get(_envelope("req-get", {"goal_id": "goal-stable-1"}), conn=conn)
+    assert fetched["result"]["goal"]["goal_id"] == "goal-stable-1"
+    listed = handle_goal_list(_envelope("req-list", {"limit": 10}), conn=conn)
+    assert listed["result"]["goals"][0]["goal_id"] == "goal-stable-1"
 
 
 def test_goal_prepare_returns_offer_with_seven_fields(tmp_path) -> None:
