@@ -265,8 +265,16 @@ def run_daemon_tick(
         # snapshot。当前历史样本尚未接入校准器，因此明确标记 low/coarse，
         # 但仍给出保守 p50/p90、slack 和下一决策点，供 UI/恢复流程使用。
         remaining_minutes = remaining_hours * 60.0
-        forecast_p50 = remaining_minutes + 10.0
-        forecast_p90 = forecast_p50 * 1.5
+        historical_minutes = _completed_attempt_durations(conn, c.goal_id)
+        if historical_minutes:
+            ordered = sorted(historical_minutes)
+            p50_index = (len(ordered) - 1) // 2
+            p90_index = min(len(ordered) - 1, max(0, int(len(ordered) * 0.9) - 1))
+            forecast_p50 = ordered[p50_index] + 10.0
+            forecast_p90 = ordered[p90_index] + 15.0
+        else:
+            forecast_p50 = remaining_minutes + 10.0
+            forecast_p90 = forecast_p50 * 1.5
         forecast = Forecast(
             queue_minutes=0.0,
             startup_minutes=5.0,
@@ -283,7 +291,7 @@ def run_daemon_tick(
             computed_at=now,
             due_at=c.draft.deadline_at,
             next_decision_at=next_at,
-            sample_count=0,
+            sample_count=len(historical_minutes),
         )
         snapshot_payload = snapshot.to_dict()
         previous_snapshot: dict[str, Any] | None = None
@@ -624,6 +632,28 @@ def _safe_json(text: str) -> dict[str, Any]:
     if isinstance(result, dict):
         return result
     return {}
+
+
+def _completed_attempt_durations(conn: sqlite3.Connection, goal_id: str) -> list[float]:
+    """Return trusted completed executor durations in minutes for this Goal."""
+    rows = conn.execute(
+        "SELECT started_at, terminal_at FROM attempts "
+        "WHERE goal_id = ? AND role = 'executor' AND state IN "
+        "('succeeded', 'failed', 'cancelled', 'stale', 'orphaned') "
+        "AND started_at IS NOT NULL AND terminal_at IS NOT NULL",
+        (goal_id,),
+    ).fetchall()
+    durations: list[float] = []
+    for started_at, terminal_at in rows:
+        try:
+            seconds = (
+                datetime.fromisoformat(str(terminal_at)) - datetime.fromisoformat(str(started_at))
+            ).total_seconds()
+        except (TypeError, ValueError):
+            continue
+        if seconds >= 0:
+            durations.append(seconds / 60.0)
+    return durations
 
 
 def _advance_goal_after_verified_contract(
