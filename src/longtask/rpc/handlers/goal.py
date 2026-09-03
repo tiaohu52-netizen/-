@@ -198,6 +198,36 @@ def handle_goal_prepare(
 
     draft = from_dict(draft_data)
     actor = resolve_actor(envelope, params)
+    goal_id_param = str(params.get("goal_id", "")).strip() or None
+    stage_id_param = str(params.get("stage_id", "")).strip() or None
+    goal_before = get_goal(conn, goal_id_param) if goal_id_param else None
+    if stage_id_param:
+        if goal_before is None:
+            raise RpcError(code=ErrorCode.UNKNOWN_CONTRACT, message="goal_id not found")
+        stages = goal_before.get("plan", {}).get("stages", [])
+        stage = next(
+            (
+                item
+                for item in stages
+                if isinstance(item, dict) and str(item.get("id")) == stage_id_param
+            ),
+            None,
+        )
+        if stage is None:
+            raise RpcError(code=ErrorCode.VALIDATION_FAILED, message="stage_id is not in Goal plan")
+        bound = stage.get("contract_id")
+        if bound and bound != contract_id:
+            raise RpcError(code=ErrorCode.VALIDATION_FAILED, message="stage already has a contract")
+        required_checks = stage.get("acceptance_checks", [])
+        actual_checks = set(draft.acceptance.checks)
+        if (
+            isinstance(required_checks, list)
+            and not set(map(str, required_checks)) <= actual_checks
+        ):
+            raise RpcError(
+                code=ErrorCode.VALIDATION_FAILED,
+                message="contract acceptance checks do not cover stage requirements",
+            )
 
     view = save_contract(
         conn,
@@ -217,6 +247,23 @@ def handle_goal_prepare(
         draft_dict=view.draft.to_dict(),
         registry_view=registry_view,
     )
+    if stage_id_param and goal_before is not None:
+        if goal_id_param is None:
+            raise RpcError(code=ErrorCode.VALIDATION_FAILED, message="goal_id is required")
+        updated_plan = dict(goal_before.get("plan", {}))
+        updated_stages = [dict(item) for item in updated_plan.get("stages", [])]
+        for stage in updated_stages:
+            if str(stage.get("id")) == stage_id_param:
+                stage["contract_id"] = contract_id
+        updated_plan["stages"] = updated_stages
+        patch_goal(
+            conn,
+            goal_id=goal_id_param,
+            now=now,
+            plan=updated_plan,
+            expected_revision=int(goal_before["revision"]),
+            actor=actor,
+        )
 
     # 把 admission 概要也写进 contract/prepared 事件 payload（便于审计/回放）
     from longtask.persistence.store import append_event
