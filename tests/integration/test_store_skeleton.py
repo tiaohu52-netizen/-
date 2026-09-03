@@ -29,6 +29,8 @@ def test_connect_and_ensure_schema(tmp_path: Path) -> None:
         ensure_schema(conn)
         row = conn.execute("PRAGMA user_version").fetchone()
         assert row[0] == STORE_SCHEMA_VERSION
+        goal_cols = {r[1] for r in conn.execute("PRAGMA table_info(goals)").fetchall()}
+        assert {"goal_id", "title", "objective", "created_at", "updated_at"} <= goal_cols
         # 事件表骨架存在且字段齐全（DESIGN §13.3 最小集）
         cols = {r[1] for r in conn.execute("PRAGMA table_info(events)").fetchall()}
         assert {

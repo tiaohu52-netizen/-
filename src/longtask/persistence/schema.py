@@ -65,6 +65,18 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
     # ── v2 终态：建表 + 索引（IF NOT EXISTS 保证幂等）──
     conn.execute(
         """
+        CREATE TABLE IF NOT EXISTS goals (
+            goal_id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            objective TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            schema_version INTEGER NOT NULL DEFAULT 2
+        )
+        """
+    )
+    conn.execute(
+        """
         CREATE TABLE IF NOT EXISTS contracts (
             contract_id TEXT PRIMARY KEY,
             goal_id TEXT NOT NULL,  -- P1：与 contract_id 同义（§7 命名迁移）
@@ -305,6 +317,20 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
 
     # ── 迁移：v1 → v2 ──
     _migrate_v1_to_v2(conn)
+
+    # Stable Goal identity migration: old contracts used contract_id as a
+    # compatibility goal id; materialize those identities before new writes.
+    conn.execute(
+        """
+        INSERT INTO goals (goal_id, title, objective, created_at, updated_at, schema_version)
+        SELECT goal_id, MIN(title), MIN(objective), MIN(created_at), MAX(updated_at), ?
+        FROM contracts
+        WHERE goal_id IS NOT NULL AND goal_id <> ''
+        GROUP BY goal_id
+        ON CONFLICT(goal_id) DO NOTHING
+        """,
+        (STORE_SCHEMA_VERSION,),
+    )
 
     conn.execute(f"PRAGMA user_version={STORE_SCHEMA_VERSION}")
 

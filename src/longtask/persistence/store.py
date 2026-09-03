@@ -101,8 +101,10 @@ __all__ = [
     "get_contract",
     "get_events",
     "get_events_by_request_id",
+    "get_goal",
     "get_lease",
     "list_contracts",
+    "list_goals",
     "patch_contract",
     "reclaim_lease",
     "release_lease",
@@ -228,6 +230,38 @@ def get_contract(conn: sqlite3.Connection, contract_id: str) -> ContractView | N
     return _row_to_contract_view(row)
 
 
+def get_goal(conn: sqlite3.Connection, goal_id: str) -> dict[str, Any] | None:
+    """Return the stable Goal identity and its current contract ids."""
+    row = conn.execute(
+        "SELECT goal_id, title, objective, created_at, updated_at, schema_version "
+        "FROM goals WHERE goal_id = ?",
+        (goal_id,),
+    ).fetchone()
+    if row is None:
+        return None
+    contracts = conn.execute(
+        "SELECT contract_id FROM contracts WHERE goal_id = ? ORDER BY contract_id",
+        (goal_id,),
+    ).fetchall()
+    return {
+        "goal_id": row[0],
+        "title": row[1],
+        "objective": row[2],
+        "created_at": row[3],
+        "updated_at": row[4],
+        "schema_version": int(row[5]),
+        "contract_ids": [str(item[0]) for item in contracts],
+    }
+
+
+def list_goals(conn: sqlite3.Connection, *, limit: int = 20) -> list[dict[str, Any]]:
+    """List stable Goals, including their contract history."""
+    rows = conn.execute(
+        "SELECT goal_id FROM goals ORDER BY updated_at DESC, goal_id ASC LIMIT ?", (limit,)
+    ).fetchall()
+    return [goal for row in rows if (goal := get_goal(conn, str(row[0]))) is not None]
+
+
 def list_contracts(
     conn: sqlite3.Connection,
     *,
@@ -267,6 +301,7 @@ def save_contract(
     contract_id: str,
     now: datetime,
     *,
+    goal_id: str | None = None,
     state: ContractState = ContractState.DRAFTED,
     revision: int = 1,
     next_wakeup_at: datetime | None = None,
@@ -291,6 +326,23 @@ def save_contract(
                 if existing_contract is not None:
                     return existing_contract
 
+        resolved_goal_id = goal_id or contract_id
+        conn.execute(
+            """
+            INSERT INTO goals (goal_id, title, objective, created_at, updated_at, schema_version)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(goal_id) DO UPDATE SET title=excluded.title,
+                objective=excluded.objective, updated_at=excluded.updated_at
+            """,
+            (
+                resolved_goal_id,
+                draft.title,
+                draft.objective,
+                now.isoformat(),
+                now.isoformat(),
+                schema_version,
+            ),
+        )
         conn.execute(
             """
             INSERT INTO contracts (
@@ -306,7 +358,7 @@ def save_contract(
             """,
             (
                 contract_id,
-                contract_id,  # P1：goal_id 初值 = contract_id，§7 命名迁移
+                resolved_goal_id,
                 revision,
                 state.value,
                 deadline_status.value,
@@ -377,7 +429,7 @@ def save_contract(
                 "title": draft.title,
                 "objective": draft.objective,
                 "state": state.value,
-                "goal_id": contract_id,
+                "goal_id": resolved_goal_id,
                 "deadline_status": deadline_status.value,
                 "acceptance_status": acceptance_status.value,
                 "revision": revision,
