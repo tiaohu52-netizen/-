@@ -18,9 +18,6 @@ from lhgp.contracts.continuity import from_dict as continuity_from_dict
 from lhgp.contracts.schema import Acceptance, Budget, ContractDraft
 from lhgp.persistence.store import get_contract, get_events_by_request_id
 from lhgp.rpc.errors import ErrorCode, RpcError
-from longtask.rpc.handlers._common import (
-    _parse_iso,
-)
 
 if TYPE_CHECKING:
     from lhgp.rpc.server import RequestEnvelope
@@ -35,6 +32,11 @@ _TRUSTED_CLIENT_ACTORS: dict[str, str] = {
     "daemon": "daemon",
     "system": "system",
 }
+
+
+def _parse_iso(value: str) -> datetime:
+    """Parse an ISO timestamp for handler-side input normalization."""
+    return datetime.fromisoformat(value)
 
 
 def resolve_actor(envelope: RequestEnvelope, params: dict[str, Any]) -> str:
