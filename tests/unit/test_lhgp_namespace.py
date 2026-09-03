@@ -96,6 +96,7 @@ from lhgp.persistence.decisions import set_next_decision_at as canonical_set_nex
 from lhgp.persistence.errors import StoreError as CanonicalStoreError
 from lhgp.persistence.events import EventType as CanonicalEventType
 from lhgp.persistence.events_query import append_event as canonical_append_event
+from lhgp.persistence.notifications import enqueue_notification as canonical_notification_enqueue
 from lhgp.persistence.paths import default_data_root as canonical_default_data_root
 from lhgp.persistence.store import connect as canonical_connect
 from lhgp.persistence.types import StoredLease as CanonicalStoredLease
@@ -247,6 +248,7 @@ def test_persistence_namespace_reexports_single_implementation() -> None:
     assert canonical_package_ensure_schema is legacy_ensure_schema
     assert CanonicalPackageNotification is LegacyNotification
     assert canonical_package_enqueue_notification is legacy_enqueue_notification
+    assert canonical_notification_enqueue is legacy_enqueue_notification
 
 
 def test_adapter_namespace_reexports_single_implementation() -> None:
