@@ -17,6 +17,7 @@ from lhgp.admission import (
 from lhgp.admission import (
     Offer as CanonicalPackageOffer,
 )
+from lhgp.admission import evaluate as canonical_package_evaluate_eligibility
 from lhgp.admission.eligibility import evaluate as canonical_evaluate_eligibility
 from lhgp.admission.offer import Offer as CanonicalOffer
 from lhgp.admission.refuse import (
@@ -237,6 +238,7 @@ def test_supporting_namespaces_reexport_single_implementation() -> None:
     assert CanonicalPackageCheckSpec is CanonicalCheckSpec
     assert CanonicalOffer is LegacyOffer
     assert canonical_evaluate_eligibility is legacy_evaluate_eligibility
+    assert canonical_package_evaluate_eligibility is canonical_evaluate_eligibility
     assert CanonicalPackageOffer is CanonicalOffer
     assert CanonicalRefuseCode is CanonicalModuleRefuseCode is LegacyRefuseCode
     assert CanonicalRefusedError is CanonicalModuleRefusedError is LegacyRefusedError
