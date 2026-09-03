@@ -249,7 +249,7 @@ scripts/                  7 道质量门运行器（本地 == CI）
 
 ## 成熟度
 
-这是 **0.1.0a0 "Developer Preview"**。规范领先于实现；实现路径见 [`docs/LHGP-ROADMAP.md`](docs/LHGP-ROADMAP.md)。现实世界的验证还停留在"让 AI 写个回文判定器"的几轮端到端跑通（见 `examples/`）。骨架是稳的；粗糙的地方集中在：授权强制、外部运行句柄、Deadline 驱动的唤醒、类型化验收、公开发插件与分发 —— 这些都被 ROADMAP P2–P6 显式跟踪。
+这是 **0.1.0a0 "Developer Preview"**。规范领先于实现；实现路径见 [`docs/LHGP-ROADMAP.md`](docs/LHGP-ROADMAP.md)。现实世界的验证还停留在"让 AI 写个回文判定器"的几轮端到端跑通（见 `examples/`）。本地合同、证据、模型证明、交接和守护进程路径已经落地；剩余粗糙点集中在严格 Deadline 保证、多主机唤醒与网络控制面传输，这些都被 ROADMAP 明确跟踪。
 
 作为早期用户，请预期：边角粗糙、部分文档缺失、质量门偶有噪音。7 道质量门与声明注册表正是为了让这些不被打肿脸充胖子。
 
