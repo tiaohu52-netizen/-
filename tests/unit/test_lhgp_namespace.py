@@ -78,6 +78,7 @@ from lhgp.persistence.paths import default_data_root as canonical_default_data_r
 from lhgp.persistence.store import connect as canonical_connect
 from lhgp.persistence.types import StoredLease as CanonicalStoredLease
 from lhgp.promoter.killswitch import is_kill_switch_active as canonical_kill_switch_active
+from lhgp.promoter.lease import check_write_fence as canonical_check_write_fence
 from lhgp.promoter.urgency import classify as canonical_classify
 from lhgp.rpc.errors import ErrorCode as CanonicalErrorCode
 from lhgp.rpc.methods import Method as CanonicalMethod
@@ -138,6 +139,7 @@ from longtask.persistence.paths import default_data_root as legacy_default_data_
 from longtask.persistence.store import connect as legacy_connect
 from longtask.persistence.types import StoredLease as LegacyStoredLease
 from longtask.promoter.killswitch import is_kill_switch_active as legacy_kill_switch_active
+from longtask.promoter.lease import check_write_fence as legacy_check_write_fence
 from longtask.promoter.urgency import classify as legacy_classify
 from longtask.rpc.errors import ErrorCode as LegacyErrorCode
 from longtask.rpc.methods import Method as LegacyMethod
@@ -212,6 +214,7 @@ def test_scheduler_and_promoter_namespaces_reexport_functions() -> None:
     assert canonical_guard_needed is legacy_guard_needed
     assert canonical_classify is legacy_classify
     assert canonical_kill_switch_active is legacy_kill_switch_active
+    assert canonical_check_write_fence is legacy_check_write_fence
     assert canonical_run_tick is legacy_run_tick
 
 
