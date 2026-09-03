@@ -390,6 +390,22 @@ def advance_goal(
     goal = get_goal(conn, goal_id)
     if goal is None:
         raise StoreError(f"goal {goal_id} not found")
+    plan = goal["plan"] if isinstance(goal.get("plan"), dict) else {}
+    stages = plan.get("stages") if isinstance(plan.get("stages"), list) else []
+    bound = next(
+        (
+            stage
+            for stage in stages
+            if isinstance(stage, dict) and str(stage.get("id", "")) == complete_stage
+        ),
+        None,
+    )
+    if isinstance(bound, dict) and bound.get("contract_id"):
+        contract = get_contract(conn, str(bound["contract_id"]))
+        if contract is None or contract.goal_id != goal_id:
+            raise ValueError("stage contract is missing or belongs to another goal")
+        if contract.acceptance_status.value != "passed":
+            raise ValueError("stage contract must pass acceptance before advancement")
     from lhgp.goals.progress import advance_progress
 
     progress = advance_progress(goal["plan"], goal["progress"], complete_stage=complete_stage)
