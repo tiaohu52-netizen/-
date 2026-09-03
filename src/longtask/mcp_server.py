@@ -174,6 +174,16 @@ def tool_list_contracts(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, 
     return route(envelope, conn=ctx["conn"], now=_now(), registry=ctx["registry"])
 
 
+def tool_get_goal(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
+    """Read a stable Goal aggregate, independent of a contract revision."""
+    return _mcp_route(Method.GOAL_GET, args, ctx)
+
+
+def tool_list_goals(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
+    """List stable Goal aggregates."""
+    return _mcp_route(Method.GOAL_LIST, args, ctx)
+
+
 def _mcp_route(method: Method, args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
     """为控制类工具构造统一的模型侧 RPC envelope。"""
     return route(
@@ -495,6 +505,27 @@ TOOLS: dict[
             },
         },
     ),
+    "longtask_get_goal": (
+        tool_get_goal,
+        {
+            "description": "查询稳定 Goal 聚合视图（合同历史、状态和 Deadline 风险）。",
+            "inputSchema": {
+                "type": "object",
+                "required": ["goal_id"],
+                "properties": {"goal_id": {"type": "string"}},
+            },
+        },
+    ),
+    "longtask_list_goals": (
+        tool_list_goals,
+        {
+            "description": "列出稳定 Goal 聚合视图。",
+            "inputSchema": {
+                "type": "object",
+                "properties": {"limit": {"type": "integer", "default": 20}},
+            },
+        },
+    ),
     "longtask_attach_to_executor": (
         tool_attach_to_executor,
         {
@@ -531,8 +562,8 @@ _RENAMED_TOOLS = {
     "lhgp_list_executors": "longtask_list_executors",
     "lhgp_prepare_goal": "longtask_prepare_contract",
     "lhgp_approve_goal": "longtask_approve_contract",
-    "lhgp_get_goal": "longtask_get_contract",
-    "lhgp_list_goals": "longtask_list_contracts",
+    "lhgp_get_goal": "longtask_get_goal",
+    "lhgp_list_goals": "longtask_list_goals",
     "lhgp_attach_executor": "longtask_attach_to_executor",
 }
 for _new_name, _legacy_name in _RENAMED_TOOLS.items():
