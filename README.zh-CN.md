@@ -82,6 +82,9 @@ LHGP **不是**工作流引擎。Agent 可以在租约仍然有效时被换掉�
 | MCP server + 模型侧 skill（核心工具、LHGP 别名及审计/控制扩展，不是 1:1 RPC 隧道） | 已验证 | `mcp-server-and-skill` |
 | 临时上下文 + 交叉核对 verifier | 已验证 | `ephemeral-context-and-verifier` |
 | 执行者侧 RPC（status / renew / write-back） | 已验证 | `executor-session-rpc` |
+| 本机认证 Unix-socket RPC（daemon + `rpc-call` 客户端） | 已验证 | `local-rpc-transport` |
+| 持久化通知 outbox（幂等、重试、安静时间） | 已验证 | `notification-outbox` |
+| 状态与风险通知（`need_user` / `satisfied` / `missed` / `risk_red`） | 已验证 | `notification-routing` |
 | 守护进程生命周期 + AttemptRunner（真实子进程） | 已验证 | `daemon-lifecycle-and-attempt-runner` |
 
 这份清单仍然明确不承诺：
@@ -89,6 +92,7 @@ LHGP **不是**工作流引擎。Agent 可以在租约仍然有效时被换掉�
 - 跨主机 relay、L2/L3 外部唤醒和严格墙钟交付保证；这些依赖外部基础设施。
 - 外部通知渠道的实际投递保证；本地 notification outbox 已实现幂等、重试和安静时间规则。
 - 生产级多租户/网络部署；当前定位仍是单机、单用户 Developer Preview。
+- 网络或多主机 JSON-RPC 传输；当前 socket 仅限本机，并使用 `daemon.token` 认证。
 - Python 内部实现已经提供 `lhgp.*` 兼容 facade，但底层源代码仍在
   `src/longtask/`，完整物理迁移会在兼容窗口后进行。
 
