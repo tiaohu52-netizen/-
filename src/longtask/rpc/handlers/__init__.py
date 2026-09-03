@@ -70,6 +70,7 @@ def _build_handlers() -> dict[Method, Callable[..., dict[str, Any]]]:
         Method.GOAL_GET: goal.handle_goal_get,
         Method.GOAL_LIST: goal.handle_goal_list,
         Method.GOAL_UPDATE: goal.handle_goal_update,
+        Method.GOAL_ADVANCE: goal.handle_goal_advance,
         Method.EXECUTOR_LIST: executor.handle_executor_list,
         Method.EXECUTOR_ENABLE: executor.handle_executor_enable,
         Method.EXECUTOR_DISABLE: executor.handle_executor_disable,
