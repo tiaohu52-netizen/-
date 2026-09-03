@@ -7,12 +7,13 @@ temporarily delegated until their persistence dependencies are migrated.
 
 from __future__ import annotations
 
+import sqlite3
 from typing import TYPE_CHECKING, Any
 
+from lhgp.persistence.store import get_contract, get_events_by_request_id
 from lhgp.rpc.errors import ErrorCode, RpcError
 from longtask.rpc.handlers._common import (
     _parse_iso,
-    idempotent_replay,
     parse_contract_draft,
 )
 
@@ -48,6 +49,18 @@ def require_contract_id(params: dict[str, Any]) -> str:
     if not contract_id:
         raise RpcError(code=ErrorCode.VALIDATION_FAILED, message="contract_id is required")
     return contract_id
+
+
+def idempotent_replay(
+    conn: sqlite3.Connection,
+    envelope: RequestEnvelope,
+    contract_id: str,
+) -> dict[str, Any] | None:
+    """检测 request_id 重放并返回已有合同快照，不重复执行副作用。"""
+    if not envelope.request_id or not get_events_by_request_id(conn, envelope.request_id):
+        return None
+    existing = get_contract(conn, contract_id)
+    return {"ok": True, "result": existing.to_dict()} if existing is not None else None
 
 
 __all__ = [
