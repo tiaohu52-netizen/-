@@ -133,6 +133,44 @@ def test_goal_prepare_preserves_stable_goal_identity(tmp_path) -> None:
     assert next_action["result"]["next"]["action"] == "resume_contract"
 
 
+def test_bound_stage_cannot_advance_before_contract_acceptance(tmp_path) -> None:
+    conn = _conn(tmp_path)
+    response = handle_goal_prepare(
+        _envelope(
+            "req-bound-stage",
+            {
+                "contract_id": "contract-bound-1",
+                "goal_id": "goal-bound-1",
+                "draft": _draft_payload(),
+            },
+        ),
+        conn=conn,
+        now=NOW,
+    )
+    handle_goal_update(
+        _envelope(
+            "req-bound-plan",
+            {
+                "goal_id": "goal-bound-1",
+                "revision": response["result"]["contract"]["revision"],
+                "plan": {"stages": [{"id": "build", "contract_id": "contract-bound-1"}]},
+                "progress": {},
+            },
+        ),
+        conn=conn,
+        now=NOW,
+    )
+    with pytest.raises(RpcError, match="must pass acceptance"):
+        handle_goal_advance(
+            _envelope(
+                "req-bound-advance",
+                {"goal_id": "goal-bound-1", "stage_id": "build", "revision": 2},
+            ),
+            conn=conn,
+            now=NOW,
+        )
+
+
 def test_goal_prepare_returns_offer_with_seven_fields(tmp_path) -> None:
     """goal/prepare 返回结构含 SPEC §10.4 全部 7 类 admission 字段。"""
     conn = _conn(tmp_path)
