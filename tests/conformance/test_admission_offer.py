@@ -88,6 +88,9 @@ def test_goal_prepare_preserves_stable_goal_identity(tmp_path) -> None:
     goal = get_goal(conn, "goal-stable-1")
     assert goal is not None
     assert goal["contract_ids"] == ["contract-revision-1"]
+    assert goal["contract_count"] == 1
+    assert goal["state_counts"]["drafted"] == 1
+    assert goal["timeline"][0]["contract_id"] == "contract-revision-1"
     fetched = handle_goal_get(_envelope("req-get", {"goal_id": "goal-stable-1"}), conn=conn)
     assert fetched["result"]["goal"]["goal_id"] == "goal-stable-1"
     listed = handle_goal_list(_envelope("req-list", {"limit": 10}), conn=conn)
