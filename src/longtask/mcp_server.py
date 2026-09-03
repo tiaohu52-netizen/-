@@ -199,6 +199,11 @@ def tool_next_goal_action(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str
     return _mcp_route(Method.GOAL_NEXT, args, ctx)
 
 
+def tool_goal_contract_draft(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
+    """Build a reviewable contract draft from a Goal stage."""
+    return _mcp_route(Method.GOAL_CONTRACT_DRAFT, args, ctx)
+
+
 def _mcp_route(method: Method, args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
     """为控制类工具构造统一的模型侧 RPC envelope。"""
     return route(
@@ -583,6 +588,20 @@ TOOLS: dict[
             },
         },
     ),
+    "longtask_goal_contract_draft": (
+        tool_goal_contract_draft,
+        {
+            "description": "根据 Goal 当前阶段生成合同草案（只读，不创建合同）。",
+            "inputSchema": {
+                "type": "object",
+                "required": ["goal_id"],
+                "properties": {
+                    "goal_id": {"type": "string"},
+                    "stage_id": {"type": "string"},
+                },
+            },
+        },
+    ),
     "longtask_attach_to_executor": (
         tool_attach_to_executor,
         {
@@ -624,6 +643,7 @@ _RENAMED_TOOLS = {
     "lhgp_update_goal": "longtask_update_goal",
     "lhgp_advance_goal": "longtask_advance_goal",
     "lhgp_next_goal_action": "longtask_next_goal_action",
+    "lhgp_goal_contract_draft": "longtask_goal_contract_draft",
     "lhgp_attach_executor": "longtask_attach_to_executor",
 }
 for _new_name, _legacy_name in _RENAMED_TOOLS.items():
