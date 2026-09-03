@@ -62,6 +62,25 @@ def parse_check(value: str | dict[str, Any]) -> str | CheckSpec:
     return str(value)
 
 
+def check_identity(check: str | CheckSpec) -> str:
+    """Canonical comparable identity for one acceptance check.
+
+    A Goal stage declares its required acceptance as plain references while a
+    contract carries either typed objects or legacy free text, so the two sides
+    are not directly comparable — a typed ``CheckSpec`` is not even hashable,
+    because ``args`` is a mutable mapping.  Collapsing both sides to one
+    identity string is what makes "the contract covers the stage" decidable.
+
+    Typed checks reduce to ``<kind>:<target>``: ``args`` deliberately does not
+    participate, so a stage requirement stays satisfiable by any contract check
+    aimed at the same kind and target regardless of its argument details.
+    Legacy free-text checks compare as their own trimmed text.
+    """
+    if isinstance(check, CheckSpec):
+        return f"{check.kind.value}:{check.target}"
+    return str(check).strip()
+
+
 @dataclass(frozen=True, slots=True)
 class RepairBrief:
     """Structured verifier failure output for the repair loop."""
@@ -80,4 +99,4 @@ class RepairBrief:
         }
 
 
-__all__ = ["CheckKind", "CheckSpec", "RepairBrief", "parse_check"]
+__all__ = ["CheckKind", "CheckSpec", "RepairBrief", "check_identity", "parse_check"]
