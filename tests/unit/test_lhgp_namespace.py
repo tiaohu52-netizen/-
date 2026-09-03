@@ -83,6 +83,7 @@ from lhgp.promoter.killswitch import is_kill_switch_active as canonical_kill_swi
 from lhgp.promoter.lease import check_write_fence as canonical_check_write_fence
 from lhgp.promoter.records import _record_attempt as canonical_record_attempt
 from lhgp.promoter.urgency import classify as canonical_classify
+from lhgp.rpc import Method as CanonicalPackageMethod
 from lhgp.rpc.client import call_unix_socket as canonical_call_unix_socket
 from lhgp.rpc.errors import ErrorCode as CanonicalErrorCode
 from lhgp.rpc.handlers.executor import handle_executor_list as canonical_handle_executor_list
@@ -151,6 +152,7 @@ from longtask.promoter.killswitch import is_kill_switch_active as legacy_kill_sw
 from longtask.promoter.lease import check_write_fence as legacy_check_write_fence
 from longtask.promoter.records import _record_attempt as legacy_record_attempt
 from longtask.promoter.urgency import classify as legacy_classify
+from longtask.rpc import Method as LegacyPackageMethod
 from longtask.rpc.client import call_unix_socket as legacy_call_unix_socket
 from longtask.rpc.errors import ErrorCode as LegacyErrorCode
 from longtask.rpc.handlers.executor import handle_executor_list as legacy_handle_executor_list
@@ -220,6 +222,7 @@ def test_rpc_namespace_reexports_protocol_types() -> None:
     """RPC facades must preserve enum identity during migration."""
 
     assert canonical_call_unix_socket is legacy_call_unix_socket
+    assert CanonicalPackageMethod is LegacyPackageMethod is CanonicalMethod
     assert canonical_process_lines is legacy_process_lines
     assert canonical_handle_protocol_events is legacy_handle_protocol_events
     assert canonical_handle_executor_list is legacy_handle_executor_list
