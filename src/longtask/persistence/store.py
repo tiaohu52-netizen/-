@@ -440,6 +440,14 @@ def goal_next_action(conn: sqlite3.Connection, *, goal_id: str) -> dict[str, Any
         )
     if current is None and stages:
         return {"goal_id": goal_id, "action": "satisfied", "reason": "all planned stages completed"}
+    current_stage = next(
+        (
+            stage
+            for stage in stages
+            if isinstance(stage, dict) and str(stage.get("id")) == str(current)
+        ),
+        {"id": current} if current else None,
+    )
     contracts = [get_contract(conn, cid) for cid in goal["contract_ids"]]
     contracts = [item for item in contracts if item is not None]
     active = [
@@ -452,6 +460,7 @@ def goal_next_action(conn: sqlite3.Connection, *, goal_id: str) -> dict[str, Any
         return {
             "goal_id": goal_id,
             "stage_id": current,
+            "stage": current_stage,
             "action": "resume_contract",
             "contract_id": contract.contract_id,
             "deadline_status": contract.deadline_status.value,
@@ -462,6 +471,7 @@ def goal_next_action(conn: sqlite3.Connection, *, goal_id: str) -> dict[str, Any
     return {
         "goal_id": goal_id,
         "stage_id": current,
+        "stage": current_stage,
         "action": "create_contract",
         "reason": "current stage has no non-terminal contract",
     }

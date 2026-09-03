@@ -131,6 +131,7 @@ def test_goal_prepare_preserves_stable_goal_identity(tmp_path) -> None:
     assert advanced["result"]["goal"]["progress"]["current"] == "verify"
     next_action = handle_goal_next(_envelope("req-next", {"goal_id": "goal-stable-1"}), conn=conn)
     assert next_action["result"]["next"]["action"] == "resume_contract"
+    assert next_action["result"]["next"]["stage"]["id"] == "verify"
 
 
 def test_bound_stage_cannot_advance_before_contract_acceptance(tmp_path) -> None:
