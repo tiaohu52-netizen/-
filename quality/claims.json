@@ -361,13 +361,14 @@
     },
     {
       "id": "mcp-server-and-skill",
-      "statement": "MCP server 薄层（DESIGN §11.1、§17）+ §17 longtask-contract skill：任何 MCP 兼容的 agent harness 可通过 stdio JSON-RPC 2.0 发现并调用长任务协议。当前暴露 28 个面向 AI 任务流的工具（15 个 lhgp_ 规范别名 + 13 个 longtask_ 遗留别名），不暴露 RPC 方法——工具是 AI 任务流语义不是 RPC 隧道。skill 教模型怎么起草合同（objective 写验收不是方法、acceptance.checks 逐条可独立核对、workload_initial_hours 如实填决定紧迫度）。stdio 输出强制 ASCII（ensure_ascii=True）避免 Windows pipe 编码转换破坏非 ASCII 字节；协议错误码透传（StrEnum 值），JSON-RPC 标准错误码用于客户端层。",
+      "statement": "MCP server 薄层（DESIGN §11.1、§17）+ §17 longtask-contract skill：任何 MCP 兼容的 agent harness 可通过 stdio JSON-RPC 2.0 发现并调用长任务协议。当前暴露 30 个面向 AI 任务流的工具（17 个 lhgp_ 规范别名 + 13 个 longtask_ 遗留别名），不暴露 RPC 方法——工具是 AI 任务流语义不是 RPC 隧道。skill 教模型怎么起草合同（objective 写验收不是方法、acceptance.checks 逐条可独立核对、workload_initial_hours 如实填决定紧迫度）。stdio 输出强制 ASCII（ensure_ascii=True）避免 Windows pipe 编码转换破坏非 ASCII 字节；协议错误码透传（StrEnum 值），JSON-RPC 标准错误码用于客户端层。",
       "lifecycle": "verified",
       "scope_paths": [
         "src/longtask/mcp_server.py",
         "skills/longtask-contract/SKILL.md",
         "skills/longtask-contract/MANIFEST.json",
         "tests/integration/test_mcp_server.py",
+        "tests/conformance/test_lhgp_tool_namespace.py",
         "examples/dsh-minimax-run-v2/"
       ],
       "evidence": [
@@ -375,7 +376,13 @@
           "kind": "integration_real_store",
           "path": "tests/integration/test_mcp_server.py",
           "recorded_at": "2026-09-01",
-          "summary": "5 个 stdio 集成场景：discover（initialize + tools.list 断言 28 个工具，含 15 个 lhgp_ 规范别名与 13 个 longtask_ 遗留别名）、health、立合同→批准→查询→执行者认领四步走通（contract_id 格式合法、approve 后 state 变 active、attach 读 lease + 上下文快照 hint）、未知工具/缺必填回 JSON-RPC error。真实 spawn longtask-mcp 子进程 + 真实 SQLite + 真实 stdio JSON-RPC。"
+          "summary": "5 个 stdio 集成场景：discover（initialize + tools.list 断言 longtask_prepare_contract 在列）、health、立合同→批准→查询→执行者认领四步走通（contract_id 格式合法、approve 后 state 变 active、attach 读 lease + 上下文快照 hint）、未知工具/缺必填回 JSON-RPC error。真实 spawn longtask-mcp 子进程 + 真实 SQLite + 真实 stdio JSON-RPC。"
+        },
+        {
+          "kind": "integration_real_store",
+          "path": "tests/conformance/test_lhgp_tool_namespace.py",
+          "recorded_at": "2026-09-04",
+          "summary": "5 个一致性场景钉住规范命名空间的暴露完整性：lhgp_get_contract / lhgp_list_contracts 可被发现；规范别名与旧工具复用同一处理链（防语义分叉）；只用 lhgp_* 工具完成立合同→读合同→列出合同；按状态过滤列出；结构性守卫确保合同读取/列出能力不再退回「只有旧命名暴露」。守卫已反向验证：移除别名后 4 项断言全部转红，非恒真测试。修复前只见 lhgp_* 工具集的 AI 无法读取或列出合同。"
         },
         {
           "kind": "manual_review",
