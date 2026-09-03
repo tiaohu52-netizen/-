@@ -25,6 +25,7 @@ from longtask.contracts.schema import (
     ContractState,
     DeadlineStatus,
 )
+from longtask.forecast.model import Forecast, build_deadline_snapshot
 from longtask.persistence.decisions import set_next_decision_at
 from longtask.persistence.events import EventType
 from longtask.persistence.notifications import enqueue_notification
@@ -256,6 +257,63 @@ def run_daemon_tick(
                 reason=_next_decision_reason(decision.tier, lease_alive, budget_dispatches_left),
                 goal_id=c.goal_id,
                 contract_revision=c.revision,
+            )
+
+        # Deadline Decision Reliability v1：把本轮风险判断固化成不可变
+        # snapshot。当前历史样本尚未接入校准器，因此明确标记 low/coarse，
+        # 但仍给出保守 p50/p90、slack 和下一决策点，供 UI/恢复流程使用。
+        remaining_minutes = remaining_hours * 60.0
+        forecast_p50 = remaining_minutes + 10.0
+        forecast_p90 = forecast_p50 * 1.5
+        forecast = Forecast(
+            queue_minutes=0.0,
+            startup_minutes=5.0,
+            remaining_minutes=remaining_minutes,
+            verification_minutes=5.0,
+            retry_reserve_minutes=max(5.0, remaining_minutes * 0.15),
+            safety_margin_minutes=1.0,
+            forecast_p50_minutes=forecast_p50,
+            forecast_p90_minutes=forecast_p90,
+            p_finish=0.9 if forecast_p90 <= time_left_hours * 60.0 else 0.3,
+        )
+        snapshot = build_deadline_snapshot(
+            forecast,
+            computed_at=now,
+            due_at=c.draft.deadline_at,
+            next_decision_at=next_at,
+            sample_count=0,
+        )
+        snapshot_payload = snapshot.to_dict()
+        previous_snapshot: dict[str, Any] | None = None
+        for event in reversed(get_events(conn, contract_id=cid)):
+            if event.event_type == EventType.FORECAST_UPDATED:
+                try:
+                    value = json.loads(event.payload_json or "{}")
+                except ValueError:
+                    value = None
+                if isinstance(value, dict):
+                    previous_snapshot = value
+                break
+        # computed_at 只是观测时间，不应让同一份风险事实在每轮 tick
+        # 刷屏；其余字段变化（尤其 risk/slack/next_decision_at）才是
+        # 需要留下新证据的事实变化。
+        previous_semantic = (
+            {k: v for k, v in previous_snapshot.items() if k != "computed_at"}
+            if previous_snapshot is not None
+            else None
+        )
+        current_semantic = {k: v for k, v in snapshot_payload.items() if k != "computed_at"}
+        if previous_semantic != current_semantic:
+            append_event(
+                conn,
+                contract_id=cid,
+                event_type=EventType.FORECAST_UPDATED,
+                payload=snapshot_payload,
+                now=now,
+                actor="promoter",
+                goal_id=c.goal_id,
+                contract_revision=c.revision,
+                role="promoter",
             )
 
         match decision.tier:

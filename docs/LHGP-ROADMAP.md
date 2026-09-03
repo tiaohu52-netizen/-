@@ -190,7 +190,14 @@ relay、L2/L3 外部唤醒、严格墙钟交付保证，以及完整 Python 模�
 
 ---
 
-### P4 · Deadline 风险控制（M，依赖 P3）
+### P4 · Deadline Decision Reliability v1（单机，依赖 P3）
+
+本阶段重新收敛目标：在不引入跨主机/跨网络基础设施的前提下，让 Deadline 成为可解释的决策控制面，而不是 cron 式空转。验收以 snapshot、风险事件、临界唤醒和恢复证据为准；不承诺绝对墙钟完成。
+
+- 每次有效 tick 产生可审计 Deadline snapshot（六项 forecast、p50/p90、slack、置信度、风险档、next decision）。
+- 低样本/过期估计自动降级 `low/coarse`，风险跨档和 miss 事件去重。
+- `due_at` 边界、重启恢复、决策点不晚于安全边界均有测试证据。
+- 跨主机 relay、网络控制面、L2/L3 唤醒、外部通知送达保证和严格墙钟 SLA 保持非目标。
 
 **目标**：让唤醒来自"下一个有意义的决策时刻"，而不是每 60 秒问一次。
 

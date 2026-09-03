@@ -2,9 +2,16 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 
-from longtask.forecast.model import RISK_TIER_THRESHOLDS, Forecast, risk_tier
+from longtask.forecast.model import (
+    RISK_TIER_THRESHOLDS,
+    Forecast,
+    build_deadline_snapshot,
+    risk_tier,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -76,3 +83,22 @@ class TestRiskTier:
 
     def test_risk_tier_none_for_past_deadline(self) -> None:
         assert risk_tier(None) is None
+
+
+def test_deadline_snapshot_is_conservative_for_low_sample_forecast() -> None:
+    now = datetime(2026, 9, 3, 12, tzinfo=UTC)
+    forecast = Forecast(forecast_p50_minutes=20, forecast_p90_minutes=40, p_finish=0.95)
+    snapshot = build_deadline_snapshot(
+        forecast, computed_at=now, due_at=now + timedelta(minutes=30), sample_count=0
+    )
+    assert snapshot.confidence == "low"
+    assert snapshot.forecast_level == "coarse"
+    assert snapshot.slack_p90_minutes == -10
+    assert snapshot.risk == "red"
+
+
+def test_deadline_snapshot_treats_due_at_equality_as_not_missed() -> None:
+    now = datetime(2026, 9, 3, 12, tzinfo=UTC)
+    forecast = Forecast(forecast_p50_minutes=0, forecast_p90_minutes=0, p_finish=0.9)
+    snapshot = build_deadline_snapshot(forecast, computed_at=now, due_at=now, sample_count=3)
+    assert snapshot.risk != "missed"
