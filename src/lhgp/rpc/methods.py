@@ -33,6 +33,8 @@ class Method(StrEnum):
     LEASE_RELEASE = "lease/release"
     GOAL_PREPARE = "goal/prepare"
     GOAL_ADMISSION_CHECK = "goal/admission-check"
+    GOAL_GET = "goal/get"
+    GOAL_LIST = "goal/list"
 
 
 IDEMPOTENT_METHODS = frozenset(
