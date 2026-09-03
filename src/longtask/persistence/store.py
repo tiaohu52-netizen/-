@@ -263,6 +263,31 @@ def get_goal(conn: sqlite3.Connection, goal_id: str) -> dict[str, Any] | None:
                     if isinstance(payload, dict):
                         latest_risk = payload
                     break
+    timeline_rows = conn.execute(
+        "SELECT contract_id, attempt_id, event_type, created_at, actor, payload_json "
+        "FROM events WHERE goal_id = ? ORDER BY event_id DESC LIMIT 20",
+        (goal_id,),
+    ).fetchall()
+    timeline: list[dict[str, Any]] = []
+    for contract_id, attempt_id, event_type, created_at, actor, payload_json in timeline_rows:
+        try:
+            payload = json.loads(payload_json or "{}")
+        except ValueError:
+            payload = {}
+        timeline.append(
+            {
+                "contract_id": contract_id,
+                "attempt_id": attempt_id,
+                "event_type": event_type,
+                "created_at": created_at,
+                "actor": actor,
+                "payload": payload if isinstance(payload, dict) else {},
+            }
+        )
+    active_attempts = conn.execute(
+        "SELECT COUNT(*) FROM attempts WHERE goal_id = ? AND state IN ('admitted', 'running')",
+        (goal_id,),
+    ).fetchone()
     return {
         "goal_id": row[0],
         "title": row[1],
@@ -275,6 +300,8 @@ def get_goal(conn: sqlite3.Connection, goal_id: str) -> dict[str, Any] | None:
         "state_counts": states,
         "current_contract": latest_contract.to_dict() if latest_contract else None,
         "deadline_snapshot": latest_risk,
+        "active_attempt_count": int(active_attempts[0]) if active_attempts else 0,
+        "timeline": timeline,
     }
 
 
@@ -462,7 +489,7 @@ def save_contract(
             request_id=request_id,
             actor=actor,
             schema_version=schema_version,
-            goal_id=contract_id,
+            goal_id=resolved_goal_id,
             contract_revision=revision,
             role="user",
             payload_schema_version=schema_version,

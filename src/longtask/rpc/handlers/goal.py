@@ -220,6 +220,7 @@ def handle_goal_prepare(
     append_event(
         conn,
         contract_id=contract_id,
+        goal_id=view.goal_id,
         event_type=EventType.CONTRACT_PREPARED,
         payload={
             "goal_prepare": True,
