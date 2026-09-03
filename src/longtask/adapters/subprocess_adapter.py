@@ -17,6 +17,7 @@ import os
 import shutil
 import subprocess
 import threading
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
@@ -455,6 +456,15 @@ class SubprocessAdapter(ExecutorAdapter):
                 else:
                     state = AttemptState.FAILED
                 returncode = proc.poll()
+                if returncode is None and state is AttemptState.FAILED:
+                    # A failed terminal event is authoritative, but collect the
+                    # already-imminent process exit when possible so a soft CLI
+                    # failure (event=failed, exit=0) is auditable.  Successful
+                    # events intentionally remain non-blocking because harnesses
+                    # may keep a long-lived process alive during cleanup.
+                    with suppress(subprocess.TimeoutExpired):
+                        proc.wait(timeout=1.0)
+                    returncode = proc.poll()
                 conflict = (
                     returncode is not None and returncode == 0 and state is AttemptState.FAILED
                 )
