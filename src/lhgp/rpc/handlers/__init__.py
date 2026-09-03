@@ -34,7 +34,7 @@ __all__ = [
 def _build_handlers() -> dict[Method, Callable[..., dict[str, Any]]]:
     """构造方法到 handler 的 canonical 分发表。"""
     # executor_api 尚未完成物理迁移，暂时通过兼容入口接入。
-    from longtask.rpc.executor_api import (
+    from lhgp.rpc.executor_api import (
         handle_attempt_status,
         handle_attempt_write_back,
         handle_control_interrupt,
