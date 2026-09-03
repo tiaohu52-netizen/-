@@ -7,6 +7,7 @@ The canonical ``lhgp`` namespace owns this implementation.  The historical
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import Any
 
 
@@ -52,6 +53,115 @@ class Forecast:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class DeadlineSnapshot:
+    """Immutable, explainable Deadline decision snapshot (SPEC §10.6)."""
+
+    computed_at: datetime
+    due_at: datetime
+    forecast: Forecast
+    slack_p50_minutes: float | None
+    slack_p90_minutes: float | None
+    confidence: str
+    forecast_level: str
+    risk: str
+    reason: str
+    next_decision_at: datetime | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "computed_at": self.computed_at.isoformat(),
+            "due_at": self.due_at.isoformat(),
+            **self.forecast.to_dict(),
+            "slack_p50_minutes": self.slack_p50_minutes,
+            "slack_p90_minutes": self.slack_p90_minutes,
+            "confidence": self.confidence,
+            "forecast_level": self.forecast_level,
+            "risk": self.risk,
+            "reason": self.reason,
+            "next_decision_at": (
+                self.next_decision_at.isoformat() if self.next_decision_at else None
+            ),
+        }
+
+
+def build_deadline_snapshot(
+    forecast: Forecast,
+    *,
+    computed_at: datetime,
+    due_at: datetime,
+    next_decision_at: datetime | None = None,
+    sample_count: int = 0,
+    stale_after: timedelta = timedelta(hours=1),
+    forecast_updated_at: datetime | None = None,
+) -> DeadlineSnapshot:
+    """Derive conservative Deadline risk without promising completion.
+
+    Missing/low-sample/stale inputs deliberately produce ``low/coarse``
+    confidence.  The caller may still use the snapshot for scheduling, but
+    must not present it as a precise probability.
+    """
+    p50 = forecast.forecast_p50_minutes
+    p90 = forecast.forecast_p90_minutes
+    remaining = (due_at - computed_at).total_seconds() / 60.0
+    slack_p50 = remaining - p50 if p50 is not None else None
+    slack_p90 = remaining - p90 if p90 is not None else None
+    stale = forecast_updated_at is not None and computed_at - forecast_updated_at > stale_after
+    complete_components = all(
+        value is not None
+        for value in (
+            forecast.queue_minutes,
+            forecast.startup_minutes,
+            forecast.remaining_minutes,
+            forecast.verification_minutes,
+            forecast.retry_reserve_minutes,
+            forecast.safety_margin_minutes,
+            p50,
+            p90,
+            forecast.p_finish,
+        )
+    )
+    low_confidence = sample_count < 3 or not complete_components or stale
+    confidence = "low" if low_confidence else "high"
+    forecast_level = "coarse" if low_confidence else "calibrated"
+    p_finish = forecast.p_finish
+    if p_finish is not None:
+        p_finish = max(0.0, min(1.0, p_finish))
+    if computed_at > due_at:
+        risk = "missed"
+        reason = "deadline passed before acceptance"
+    elif slack_p90 is not None and slack_p90 < 0:
+        risk = "red"
+        reason = "p90 forecast exceeds remaining time"
+    elif p_finish is not None and p_finish < 0.40:
+        risk = "red"
+        reason = "finish probability below 0.40"
+    elif slack_p90 is not None and slack_p90 < 0.25 * max(remaining, 1.0):
+        risk = "orange"
+        reason = "p90 safety slack is narrow"
+    elif p_finish is not None and p_finish < 0.65:
+        risk = "yellow"
+        reason = "finish probability below 0.65"
+    elif p_finish is not None and p_finish >= 0.85 and (slack_p90 or 0) >= 0:
+        risk = "green"
+        reason = "p90 slack and finish probability are healthy"
+    else:
+        risk = "unknown"
+        reason = "insufficient forecast evidence"
+    return DeadlineSnapshot(
+        computed_at=computed_at,
+        due_at=due_at,
+        forecast=Forecast(**{**forecast.to_dict(), "p_finish": p_finish}),
+        slack_p50_minutes=slack_p50,
+        slack_p90_minutes=slack_p90,
+        confidence=confidence,
+        forecast_level=forecast_level,
+        risk=risk,
+        reason=reason,
+        next_decision_at=next_decision_at,
+    )
+
+
 def _opt_float(value: Any) -> float | None:
     if value is None:
         return None
@@ -74,4 +184,10 @@ def risk_tier(u: float | None) -> int | None:
     return len(RISK_TIER_THRESHOLDS)
 
 
-__all__ = ["RISK_TIER_THRESHOLDS", "Forecast", "risk_tier"]
+__all__ = [
+    "RISK_TIER_THRESHOLDS",
+    "DeadlineSnapshot",
+    "Forecast",
+    "build_deadline_snapshot",
+    "risk_tier",
+]

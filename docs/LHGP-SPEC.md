@@ -470,6 +470,20 @@ slack_p = (due_at - now) - T_required,p
 
 用户不是通过手写一串 cron 表达节奏，而是通过以下约束表达意图：`due_at`、`confidence_target`、`start_policy`、`not_before`、预算、允许的 executor/model、并发策略和 `attention`。Risk Controller 再根据实际进度决定何时推进。
 
+### 10.6 Deadline Decision Reliability v1（单机范围）
+
+Developer Preview 的下一阶段目标不是宣称“按时完成”，而是让每一次 Deadline 决策都可解释、可审计、可恢复。对每个非终态合同，守护进程在一次有效 tick 后 SHOULD 保留最新的 immutable Deadline snapshot，至少包含：`computed_at`、`due_at`、六项 forecast、`forecast_p50`、`forecast_p90`、`slack_p50`、`slack_p90`、`p_finish`、`confidence`、`forecast_level`、`risk_tier`、`next_decision_at` 及计算原因。
+
+Snapshot 的硬不变量：
+
+1. `due_at == now` 不算 miss；只有 `now > due_at` 且未验收通过才记录 `missed`。
+2. 任一必需估计缺失、样本不足或估计过期时，置信度 MUST 降为 `low`，精度 MUST 标为 `coarse`；不得输出看似精确的概率。
+3. `slack_p90 < 0` 或 `p_finish < 0.40` MUST 至少进入 `red` 风险解释；风险降级、跨档和 deadline miss 必须有去重事件。
+4. 同一合同 revision 在 snapshot 内容未变化时不得刷写重复 forecast 事件；合同修订或事实变化后必须重新计算。
+5. `next_decision_at` 是下一次必须重新审视的最早时刻；它不得晚于 `due_at - safety_margin`，且在过去的决策点必须立即重算。
+
+本版本仅承诺本机守护进程、SQLite/WAL、L0/L1 唤醒和本地事件审计。跨主机、跨网络 RPC/relay、云端唤醒、外部通知送达保证以及严格墙钟结果保证均为明确非目标，不得作为实现完成度或 SLA 宣称。
+
 - `start_policy: eager` 表示批准后尽快开始；`risk_optimized` 表示在满足置信目标的前提下选择启动与检查时刻；`not_before` 是绝对禁止提前执行的下界。
 - 运行时 MUST 在 `need_user`、无法维持目标置信度、`satisfied`、`missed` 和预算耗尽时，根据合同发送通知。
 - 通知采用 outbox + idempotency，语义为至少一次。`sent` 只代表渠道接受，`delivered`/`acknowledged` 必须由渠道证据支持。
