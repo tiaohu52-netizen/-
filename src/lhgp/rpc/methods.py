@@ -38,6 +38,7 @@ class Method(StrEnum):
     GOAL_UPDATE = "goal/update"
     GOAL_ADVANCE = "goal/advance"
     GOAL_NEXT = "goal/next"
+    GOAL_CONTRACT_DRAFT = "goal/contract-draft"
 
 
 IDEMPOTENT_METHODS = frozenset(

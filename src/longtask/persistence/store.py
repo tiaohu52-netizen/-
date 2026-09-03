@@ -104,6 +104,7 @@ __all__ = [
     "get_events_by_request_id",
     "get_goal",
     "get_lease",
+    "goal_contract_draft",
     "goal_next_action",
     "list_contracts",
     "list_goals",
@@ -475,6 +476,31 @@ def goal_next_action(conn: sqlite3.Connection, *, goal_id: str) -> dict[str, Any
         "action": "create_contract",
         "reason": "current stage has no non-terminal contract",
     }
+
+
+def goal_contract_draft(
+    conn: sqlite3.Connection, *, goal_id: str, stage_id: str | None = None
+) -> dict[str, Any]:
+    """Build a side-effect-free contract draft from the current Goal stage."""
+    goal = get_goal(conn, goal_id)
+    if goal is None:
+        raise StoreError(f"goal {goal_id} not found")
+    plan = goal["plan"] if isinstance(goal["plan"], dict) else {}
+    stages = plan.get("stages") if isinstance(plan.get("stages"), list) else []
+    current = stage_id or goal.get("progress", {}).get("current")
+    stage = next(
+        (item for item in stages if isinstance(item, dict) and str(item.get("id")) == str(current)),
+        None,
+    )
+    if stage is None:
+        raise ValueError("stage_id does not identify a planned stage")
+    raw_draft = stage.get("draft", {})
+    draft = dict(raw_draft) if isinstance(raw_draft, dict) else {}
+    draft.setdefault("title", stage.get("title", stage.get("id", "Goal stage")))
+    draft.setdefault("objective", goal["objective"])
+    draft.setdefault("goal_id", goal_id)
+    draft.setdefault("stage_id", stage.get("id"))
+    return {"goal_id": goal_id, "stage": stage, "draft": draft}
 
 
 def list_contracts(
