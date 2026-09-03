@@ -11,8 +11,8 @@ from lhgp import PROTOCOL_VERSION
 from lhgp.persistence.paths import default_data_root
 from lhgp.persistence.store import StoreConfig, connect, ensure_schema
 from lhgp.rpc.errors import ErrorCode, RpcError
+from lhgp.rpc.handlers import HANDLERS
 from lhgp.rpc.methods import Method
-from longtask.rpc.handlers import HANDLERS
 
 if TYPE_CHECKING:
     from lhgp.adapters.registry import ExecutorRegistry
