@@ -83,9 +83,11 @@ from lhgp.promoter.killswitch import is_kill_switch_active as canonical_kill_swi
 from lhgp.promoter.lease import check_write_fence as canonical_check_write_fence
 from lhgp.promoter.records import _record_attempt as canonical_record_attempt
 from lhgp.promoter.urgency import classify as canonical_classify
+from lhgp.rpc.client import call_unix_socket as canonical_call_unix_socket
 from lhgp.rpc.errors import ErrorCode as CanonicalErrorCode
 from lhgp.rpc.methods import Method as CanonicalMethod
 from lhgp.rpc.server import parse_envelope as canonical_parse_envelope
+from lhgp.rpc.transport import process_lines as canonical_process_lines
 from lhgp.scheduler.ticker import run_tick as canonical_run_tick
 from lhgp.scheduler.wakeup import guard_needed as canonical_guard_needed
 from longtask.acceptance.checks import CheckSpec as LegacyCheckSpec
@@ -147,9 +149,11 @@ from longtask.promoter.killswitch import is_kill_switch_active as legacy_kill_sw
 from longtask.promoter.lease import check_write_fence as legacy_check_write_fence
 from longtask.promoter.records import _record_attempt as legacy_record_attempt
 from longtask.promoter.urgency import classify as legacy_classify
+from longtask.rpc.client import call_unix_socket as legacy_call_unix_socket
 from longtask.rpc.errors import ErrorCode as LegacyErrorCode
 from longtask.rpc.methods import Method as LegacyMethod
 from longtask.rpc.server import parse_envelope as legacy_parse_envelope
+from longtask.rpc.transport import process_lines as legacy_process_lines
 from longtask.scheduler.ticker import run_tick as legacy_run_tick
 from longtask.scheduler.wakeup import guard_needed as legacy_guard_needed
 
@@ -211,6 +215,8 @@ def test_adapter_namespace_reexports_single_implementation() -> None:
 def test_rpc_namespace_reexports_protocol_types() -> None:
     """RPC facades must preserve enum identity during migration."""
 
+    assert canonical_call_unix_socket is legacy_call_unix_socket
+    assert canonical_process_lines is legacy_process_lines
     assert CanonicalMethod is LegacyMethod
     assert canonical_parse_envelope is legacy_parse_envelope
     assert CanonicalErrorCode is LegacyErrorCode
