@@ -19,6 +19,8 @@ follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
   `lhgp` identity, and canonical `lhgp-mcp` command) during CI.
 - Canonical `lhgp` Python namespace facades now cover the runtime layers,
   while legacy `longtask` imports remain compatible during migration.
+- Persistence schema helpers and notification outbox exports are now explicit
+  under `lhgp.persistence`, with lazy loading preserved for legacy import order.
 - Canonical RPC and persistence package APIs now expose stable protocol,
   schema, event, notification, and executor-side entry points with lazy
   loading where legacy import order requires it.
