@@ -71,6 +71,21 @@ from lhgp.contracts.state_machine import (
 from lhgp.contracts.validation import validate_draft as canonical_validate_draft
 from lhgp.forecast import Forecast as CanonicalPackageForecast
 from lhgp.forecast.model import Forecast as CanonicalForecast
+from lhgp.persistence import (
+    EventInput as CanonicalPackageEventInput,
+)
+from lhgp.persistence import (
+    EventType as CanonicalPackageEventType,
+)
+from lhgp.persistence import (
+    StoreConfig as CanonicalPackageStoreConfig,
+)
+from lhgp.persistence import (
+    connect as canonical_package_connect,
+)
+from lhgp.persistence import (
+    ensure_schema as canonical_package_ensure_schema,
+)
 from lhgp.persistence.decisions import set_next_decision_at as canonical_set_next_decision_at
 from lhgp.persistence.errors import StoreError as CanonicalStoreError
 from lhgp.persistence.events import EventType as CanonicalEventType
@@ -147,7 +162,10 @@ from longtask.persistence.errors import StoreError as LegacyStoreError
 from longtask.persistence.events import EventType as LegacyEventType
 from longtask.persistence.events_query import append_event as legacy_append_event
 from longtask.persistence.paths import default_data_root as legacy_default_data_root
+from longtask.persistence.store import StoreConfig as LegacyStoreConfig
 from longtask.persistence.store import connect as legacy_connect
+from longtask.persistence.store import ensure_schema as legacy_ensure_schema
+from longtask.persistence.types import EventInput as LegacyEventInput
 from longtask.persistence.types import StoredLease as LegacyStoredLease
 from longtask.promoter.escalation import decide as legacy_decide_escalation
 from longtask.promoter.killswitch import is_kill_switch_active as legacy_kill_switch_active
@@ -212,6 +230,11 @@ def test_persistence_namespace_reexports_single_implementation() -> None:
     assert CanonicalStoreError is LegacyStoreError
     assert canonical_default_data_root is legacy_default_data_root
     assert canonical_set_next_decision_at is legacy_set_next_decision_at
+    assert CanonicalPackageEventInput is LegacyEventInput
+    assert CanonicalPackageEventType is LegacyEventType
+    assert CanonicalPackageStoreConfig is LegacyStoreConfig
+    assert canonical_package_connect is legacy_connect
+    assert canonical_package_ensure_schema is legacy_ensure_schema
 
 
 def test_adapter_namespace_reexports_single_implementation() -> None:
