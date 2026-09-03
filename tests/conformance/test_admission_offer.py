@@ -26,6 +26,7 @@ from longtask.rpc.handlers.goal import (
     handle_goal_advance,
     handle_goal_get,
     handle_goal_list,
+    handle_goal_next,
     handle_goal_prepare,
     handle_goal_update,
 )
@@ -128,6 +129,8 @@ def test_goal_prepare_preserves_stable_goal_identity(tmp_path) -> None:
         now=NOW,
     )
     assert advanced["result"]["goal"]["progress"]["current"] == "verify"
+    next_action = handle_goal_next(_envelope("req-next", {"goal_id": "goal-stable-1"}), conn=conn)
+    assert next_action["result"]["next"]["action"] == "resume_contract"
 
 
 def test_goal_prepare_returns_offer_with_seven_fields(tmp_path) -> None:
