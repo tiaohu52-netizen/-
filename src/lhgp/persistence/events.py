@@ -4,6 +4,7 @@ from enum import StrEnum
 
 
 class EventType(StrEnum):
+    GOAL_AMENDED = "goal/amended"
     CONTRACT_PREPARED = "contract/prepared"
     CONTRACT_APPROVED = "contract/approved"
     CONTRACT_PATCHED = "contract/patched"

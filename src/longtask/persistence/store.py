@@ -106,6 +106,7 @@ __all__ = [
     "list_contracts",
     "list_goals",
     "patch_contract",
+    "patch_goal",
     "reclaim_lease",
     "release_lease",
     "renew_lease",
@@ -233,7 +234,8 @@ def get_contract(conn: sqlite3.Connection, contract_id: str) -> ContractView | N
 def get_goal(conn: sqlite3.Connection, goal_id: str) -> dict[str, Any] | None:
     """Return stable Goal identity plus an aggregated progress view."""
     row = conn.execute(
-        "SELECT goal_id, title, objective, created_at, updated_at, schema_version "
+        "SELECT goal_id, revision, title, objective, plan_json, progress_json, "
+        "created_at, updated_at, schema_version "
         "FROM goals WHERE goal_id = ?",
         (goal_id,),
     ).fetchone()
@@ -290,11 +292,14 @@ def get_goal(conn: sqlite3.Connection, goal_id: str) -> dict[str, Any] | None:
     ).fetchone()
     return {
         "goal_id": row[0],
-        "title": row[1],
-        "objective": row[2],
-        "created_at": row[3],
-        "updated_at": row[4],
-        "schema_version": int(row[5]),
+        "revision": int(row[1]),
+        "title": row[2],
+        "objective": row[3],
+        "plan": json.loads(row[4] or "{}"),
+        "progress": json.loads(row[5] or "{}"),
+        "created_at": row[6],
+        "updated_at": row[7],
+        "schema_version": int(row[8]),
         "contract_ids": contract_ids,
         "contract_count": len(contract_ids),
         "state_counts": states,
@@ -311,6 +316,60 @@ def list_goals(conn: sqlite3.Connection, *, limit: int = 20) -> list[dict[str, A
         "SELECT goal_id FROM goals ORDER BY updated_at DESC, goal_id ASC LIMIT ?", (limit,)
     ).fetchall()
     return [goal for row in rows if (goal := get_goal(conn, str(row[0]))) is not None]
+
+
+def patch_goal(
+    conn: sqlite3.Connection,
+    *,
+    goal_id: str,
+    now: datetime,
+    plan: dict[str, Any] | None = None,
+    progress: dict[str, Any] | None = None,
+    expected_revision: int | None = None,
+    actor: str = "user",
+) -> dict[str, Any]:
+    """CAS-update Goal plan/progress and append one auditable amendment event."""
+    with transaction(conn):
+        row = conn.execute(
+            "SELECT revision, plan_json, progress_json FROM goals WHERE goal_id = ?",
+            (goal_id,),
+        ).fetchone()
+        if row is None:
+            raise StoreError(f"goal {goal_id} not found")
+        current_revision = int(row[0])
+        if expected_revision is not None and expected_revision != current_revision:
+            raise RevisionConflictError(
+                f"goal {goal_id} revision conflict: expected {expected_revision}, "
+                f"actual {current_revision}"
+            )
+        next_plan = plan if plan is not None else json.loads(row[1] or "{}")
+        next_progress = progress if progress is not None else json.loads(row[2] or "{}")
+        next_revision = current_revision + 1
+        conn.execute(
+            "UPDATE goals SET revision = ?, plan_json = ?, progress_json = ?, updated_at = ? "
+            "WHERE goal_id = ?",
+            (
+                next_revision,
+                json.dumps(next_plan, ensure_ascii=False),
+                json.dumps(next_progress, ensure_ascii=False),
+                now.isoformat(),
+                goal_id,
+            ),
+        )
+        append_event(
+            conn,
+            contract_id=None,
+            goal_id=goal_id,
+            event_type=EventType.GOAL_AMENDED,
+            payload={"revision": next_revision, "plan": next_plan, "progress": next_progress},
+            now=now,
+            actor=actor,
+            role="user",
+        )
+    result = get_goal(conn, goal_id)
+    if result is None:
+        raise StoreError(f"goal {goal_id} disappeared after update")
+    return result
 
 
 def list_contracts(

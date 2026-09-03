@@ -67,8 +67,11 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
         """
         CREATE TABLE IF NOT EXISTS goals (
             goal_id TEXT PRIMARY KEY,
+            revision INTEGER NOT NULL DEFAULT 1,
             title TEXT NOT NULL,
             objective TEXT NOT NULL,
+            plan_json TEXT NOT NULL DEFAULT '{}',
+            progress_json TEXT NOT NULL DEFAULT '{}',
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             schema_version INTEGER NOT NULL DEFAULT 2
@@ -318,6 +321,8 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
     # ── 迁移：v1 → v2 ──
     _migrate_v1_to_v2(conn)
 
+    _add_goal_columns(conn)
+
     # Stable Goal identity migration: old contracts used contract_id as a
     # compatibility goal id; materialize those identities before new writes.
     conn.execute(
@@ -396,6 +401,17 @@ def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
     conn.execute("UPDATE contracts SET state = 'satisfied' WHERE state = 'complete'")
     # expired 状态保留作 commitment lifecycle 中的非终态；deadline_status 由
     # 应用层据 deadline_at 派生为 past_deadline。
+
+
+def _add_goal_columns(conn: sqlite3.Connection) -> None:
+    """Reconcile Goal columns for pre-first-class Goal databases."""
+    for definition in (
+        "revision INTEGER NOT NULL DEFAULT 1",
+        "plan_json TEXT NOT NULL DEFAULT '{}'",
+        "progress_json TEXT NOT NULL DEFAULT '{}'",
+    ):
+        with suppress(sqlite3.OperationalError):
+            conn.execute(f"ALTER TABLE goals ADD COLUMN {definition}")
 
 
 @contextmanager

@@ -44,6 +44,7 @@ from longtask.persistence.store import (
     get_events_by_request_id,
     get_goal,
     list_goals,
+    patch_goal,
     save_contract,
 )
 from longtask.rpc.errors import ErrorCode, RpcError
@@ -308,10 +309,52 @@ def handle_goal_list(
     return {"ok": True, "result": {"goals": list_goals(conn, limit=limit)}}
 
 
+def handle_goal_update(
+    envelope: RequestEnvelope,
+    *,
+    conn: sqlite3.Connection,
+    now: datetime,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """CAS-update the long-lived Goal plan or progress document."""
+    params = envelope.params
+    goal_id = str(params.get("goal_id", "")).strip()
+    if not goal_id:
+        raise RpcError(code=ErrorCode.VALIDATION_FAILED, message="goal_id is required")
+    for key in ("plan", "progress"):
+        if key in params and not isinstance(params[key], dict):
+            raise RpcError(code=ErrorCode.VALIDATION_FAILED, message=f"{key} must be an object")
+    expected = params.get("revision")
+    if expected is not None and (isinstance(expected, bool) or not isinstance(expected, int)):
+        raise RpcError(code=ErrorCode.VALIDATION_FAILED, message="revision must be an integer")
+    try:
+        goal = patch_goal(
+            conn,
+            goal_id=goal_id,
+            now=now,
+            plan=params.get("plan"),
+            progress=params.get("progress"),
+            expected_revision=expected,
+            actor=resolve_actor(envelope, params),
+        )
+    except Exception as exc:
+        if isinstance(exc, RpcError):
+            raise
+        from longtask.persistence.errors import RevisionConflictError, StoreError
+
+        if isinstance(exc, RevisionConflictError):
+            raise RpcError(code=ErrorCode.REVISION_CONFLICT, message=str(exc)) from exc
+        if isinstance(exc, StoreError):
+            raise RpcError(code=ErrorCode.UNKNOWN_CONTRACT, message=str(exc)) from exc
+        raise
+    return {"ok": True, "result": {"goal": goal}}
+
+
 __all__ = [
     "_parse_iso",
     "handle_goal_admission_check",
     "handle_goal_get",
     "handle_goal_list",
     "handle_goal_prepare",
+    "handle_goal_update",
 ]
