@@ -19,6 +19,7 @@ from longtask.persistence.store import (
     StoreConfig,
     connect,
     ensure_schema,
+    get_goal,
 )
 from longtask.rpc.errors import ErrorCode, RpcError
 from longtask.rpc.handlers.goal import handle_goal_prepare
@@ -70,6 +71,23 @@ def _conn(tmp_path) -> sqlite3.Connection:
     c = connect(StoreConfig(db_path=db))
     ensure_schema(c)
     return c
+
+
+def test_goal_prepare_preserves_stable_goal_identity(tmp_path) -> None:
+    conn = _conn(tmp_path)
+    env = _envelope(
+        "req-stable-goal",
+        {
+            "contract_id": "contract-revision-1",
+            "goal_id": "goal-stable-1",
+            "draft": _draft_payload(),
+        },
+    )
+    response = handle_goal_prepare(env, conn=conn, now=NOW)
+    assert response["result"]["contract"]["goal_id"] == "goal-stable-1"
+    goal = get_goal(conn, "goal-stable-1")
+    assert goal is not None
+    assert goal["contract_ids"] == ["contract-revision-1"]
 
 
 def test_goal_prepare_returns_offer_with_seven_fields(tmp_path) -> None:

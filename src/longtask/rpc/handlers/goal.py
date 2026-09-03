@@ -197,6 +197,7 @@ def handle_goal_prepare(
         conn,
         draft=draft,
         contract_id=contract_id,
+        goal_id=(str(params["goal_id"]).strip() if params.get("goal_id") else None),
         now=now,
         request_id=envelope.request_id,
         actor=actor,
