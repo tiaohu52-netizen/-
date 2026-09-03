@@ -3,7 +3,9 @@
 import subprocess
 import sys
 
+import lhgp.persistence.store as canonical_store_module
 import longtask
+import longtask.persistence.store as legacy_store_module
 from lhgp import PROTOCOL_VERSION, __version__
 from lhgp.acceptance import CheckSpec as CanonicalPackageCheckSpec
 from lhgp.acceptance.checks import CheckSpec as CanonicalCheckSpec
@@ -249,6 +251,13 @@ def test_persistence_namespace_reexports_single_implementation() -> None:
     assert CanonicalPackageNotification is LegacyNotification
     assert canonical_package_enqueue_notification is legacy_enqueue_notification
     assert canonical_notification_enqueue is legacy_enqueue_notification
+
+
+def test_canonical_store_exports_match_legacy_contract() -> None:
+    """Explicit canonical exports must stay complete during migration."""
+    assert set(canonical_store_module.__all__) == set(legacy_store_module.__all__)
+    for name in canonical_store_module.__all__:
+        assert getattr(canonical_store_module, name) is getattr(legacy_store_module, name)
 
 
 def test_adapter_namespace_reexports_single_implementation() -> None:
