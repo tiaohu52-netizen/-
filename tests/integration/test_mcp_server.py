@@ -109,7 +109,10 @@ class TestMCPDiscovery:
             assert {"longtask_advance_goal", "lhgp_advance_goal"}.issubset(names)
             assert {"longtask_next_goal_action", "lhgp_next_goal_action"}.issubset(names)
             assert {"longtask_goal_contract_draft", "lhgp_goal_contract_draft"}.issubset(names)
-            assert len(names) == 28
+            # 合同读取/列出此前只挂 longtask_*，补齐规范别名后两个命名空间都要有
+            assert {"longtask_get_contract", "lhgp_get_contract"}.issubset(names)
+            assert {"longtask_list_contracts", "lhgp_list_contracts"}.issubset(names)
+            assert len(names) == 30
             by_name = {item["name"]: item for item in tools["result"]["tools"]}
             assert by_name["lhgp_notifications"]["annotations"] == {
                 "readOnlyHint": True,

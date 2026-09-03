@@ -645,6 +645,10 @@ _RENAMED_TOOLS = {
     "lhgp_next_goal_action": "longtask_next_goal_action",
     "lhgp_goal_contract_draft": "longtask_goal_contract_draft",
     "lhgp_attach_executor": "longtask_attach_to_executor",
+    # 合同读取/列表此前只在遗留 longtask_* 命名空间暴露，只用 lhgp_* 规范
+    # 工具的 AI 无法查看自己立下的合同，补齐以免规范工具集存在死角。
+    "lhgp_get_contract": "longtask_get_contract",
+    "lhgp_list_contracts": "longtask_list_contracts",
 }
 for _new_name, _legacy_name in _RENAMED_TOOLS.items():
     _handler, _metadata = TOOLS[_legacy_name]
