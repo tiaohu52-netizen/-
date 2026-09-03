@@ -25,6 +25,7 @@ import sqlite3
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+from longtask.acceptance.checks import check_identity
 from longtask.admission.eligibility import (
     CandidateFacts,
 )
@@ -219,15 +220,18 @@ def handle_goal_prepare(
         if bound and bound != contract_id:
             raise RpcError(code=ErrorCode.VALIDATION_FAILED, message="stage already has a contract")
         required_checks = stage.get("acceptance_checks", [])
-        actual_checks = set(draft.acceptance.checks)
-        if (
-            isinstance(required_checks, list)
-            and not set(map(str, required_checks)) <= actual_checks
-        ):
-            raise RpcError(
-                code=ErrorCode.VALIDATION_FAILED,
-                message="contract acceptance checks do not cover stage requirements",
-            )
+        if isinstance(required_checks, list) and required_checks:
+            # Compare on a canonical identity, not on object identity: a typed
+            # check is unhashable (args is a dict) and would otherwise crash
+            # here instead of yielding a refusal a model caller can act on.
+            actual_checks = {check_identity(check) for check in draft.acceptance.checks}
+            missing = sorted({check_identity(item) for item in required_checks} - actual_checks)
+            if missing:
+                raise RpcError(
+                    code=ErrorCode.VALIDATION_FAILED,
+                    message="contract acceptance checks do not cover stage requirements",
+                    details={"missing_checks": missing},
+                )
 
     view = save_contract(
         conn,

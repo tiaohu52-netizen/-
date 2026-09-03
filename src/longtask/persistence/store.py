@@ -22,6 +22,7 @@ from datetime import time as datetime_time
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from longtask.acceptance.checks import parse_check
 from longtask.contracts.attention import from_dict as attention_from_dict
 from longtask.contracts.attention import to_dict as attention_to_dict
 from longtask.contracts.authority import from_dict as authority_from_dict
@@ -120,6 +121,25 @@ __all__ = [
 ]
 
 
+def _serialize_acceptance_checks(checks: Sequence[Any]) -> list[Any]:
+    """Project acceptance checks into JSON-writable values.
+
+    A typed check is a ``CheckSpec`` and is not JSON serializable on its own,
+    so it must go through ``to_dict()`` before reaching the authoritative
+    store.  Legacy free-text checks pass through unchanged.
+    """
+    return [item.to_dict() if hasattr(item, "to_dict") else item for item in checks]
+
+
+def _parse_acceptance_checks(values: Sequence[Any]) -> tuple[Any, ...]:
+    """Rebuild check values from the store into their in-memory form.
+
+    Inverse of :func:`_serialize_acceptance_checks`: typed checks come back as
+    ``CheckSpec`` rather than raw mappings, so every caller sees one shape.
+    """
+    return tuple(parse_check(item) if isinstance(item, dict) else item for item in values)
+
+
 def _row_to_contract_view(row: sqlite3.Row | tuple[Any, ...]) -> ContractView:
     """数据库记录转 ContractView（DESIGN §4、§11.6、§7 四轴）。
 
@@ -158,7 +178,7 @@ def _row_to_contract_view(row: sqlite3.Row | tuple[Any, ...]) -> ContractView:
     acceptance_dict = json.loads(acceptance_json)
     acceptance = Acceptance(
         standard=acceptance_dict["standard"],
-        checks=tuple(acceptance_dict["checks"]),
+        checks=_parse_acceptance_checks(acceptance_dict["checks"]),
         verifier=acceptance_dict.get("verifier", "cross_check"),
     )
     budget_dict = json.loads(budget_json)
@@ -378,6 +398,19 @@ def patch_goal(
     return result
 
 
+def _goal_stage_dicts(plan: dict[str, Any]) -> list[dict[str, Any]]:
+    """Normalize a Goal plan's stages to object-shaped entries.
+
+    ``plan.stages`` is free-form JSON supplied by a model caller, so malformed
+    entries are dropped rather than trusted.  Centralized here because three
+    read paths must agree on what counts as a stage.
+    """
+    raw = plan.get("stages")
+    if not isinstance(raw, list):
+        return []
+    return [item for item in raw if isinstance(item, dict)]
+
+
 def advance_goal(
     conn: sqlite3.Connection,
     *,
@@ -392,13 +425,9 @@ def advance_goal(
     if goal is None:
         raise StoreError(f"goal {goal_id} not found")
     plan = goal["plan"] if isinstance(goal.get("plan"), dict) else {}
-    stages = plan.get("stages") if isinstance(plan.get("stages"), list) else []
+    stages = _goal_stage_dicts(plan)
     bound = next(
-        (
-            stage
-            for stage in stages
-            if isinstance(stage, dict) and str(stage.get("id", "")) == complete_stage
-        ),
+        (stage for stage in stages if str(stage.get("id", "")) == complete_stage),
         None,
     )
     if isinstance(bound, dict) and bound.get("contract_id"):
@@ -427,33 +456,24 @@ def goal_next_action(conn: sqlite3.Connection, *, goal_id: str) -> dict[str, Any
         raise StoreError(f"goal {goal_id} not found")
     plan = goal["plan"] if isinstance(goal["plan"], dict) else {}
     progress = goal["progress"] if isinstance(goal["progress"], dict) else {}
-    stages = plan.get("stages") if isinstance(plan.get("stages"), list) else []
+    stages = _goal_stage_dicts(plan)
     completed = {str(item) for item in progress.get("completed", [])}
     current = progress.get("current")
     if current is None and stages:
         current = next(
-            (
-                str(stage.get("id"))
-                for stage in stages
-                if isinstance(stage, dict) and str(stage.get("id")) not in completed
-            ),
+            (str(stage.get("id")) for stage in stages if str(stage.get("id")) not in completed),
             None,
         )
     if current is None and stages:
         return {"goal_id": goal_id, "action": "satisfied", "reason": "all planned stages completed"}
     current_stage = next(
-        (
-            stage
-            for stage in stages
-            if isinstance(stage, dict) and str(stage.get("id")) == str(current)
-        ),
+        (stage for stage in stages if str(stage.get("id")) == str(current)),
         {"id": current} if current else None,
     )
-    contracts = [get_contract(conn, cid) for cid in goal["contract_ids"]]
-    contracts = [item for item in contracts if item is not None]
+    found = [item for item in (get_contract(conn, cid) for cid in goal["contract_ids"]) if item]
     active = [
         item
-        for item in contracts
+        for item in found
         if item.state.value not in {"complete", "satisfied", "cancelled", "archived"}
     ]
     if active:
@@ -486,10 +506,10 @@ def goal_contract_draft(
     if goal is None:
         raise StoreError(f"goal {goal_id} not found")
     plan = goal["plan"] if isinstance(goal["plan"], dict) else {}
-    stages = plan.get("stages") if isinstance(plan.get("stages"), list) else []
+    stages = _goal_stage_dicts(plan)
     current = stage_id or goal.get("progress", {}).get("current")
     stage = next(
-        (item for item in stages if isinstance(item, dict) and str(item.get("id")) == str(current)),
+        (item for item in stages if str(item.get("id")) == str(current)),
         None,
     )
     if stage is None:
@@ -612,7 +632,7 @@ def save_contract(
                 json.dumps(
                     {
                         "standard": draft.acceptance.standard,
-                        "checks": list(draft.acceptance.checks),
+                        "checks": _serialize_acceptance_checks(draft.acceptance.checks),
                         "verifier": draft.acceptance.verifier,
                     },
                     ensure_ascii=False,
@@ -735,7 +755,7 @@ def _write_revision_snapshot(
             json.dumps(
                 {
                     "standard": draft.acceptance.standard,
-                    "checks": list(draft.acceptance.checks),
+                    "checks": _serialize_acceptance_checks(draft.acceptance.checks),
                     "verifier": draft.acceptance.verifier,
                 },
                 ensure_ascii=False,
@@ -1054,7 +1074,7 @@ def patch_contract(
                 json.dumps(
                     {
                         "standard": new_acceptance.standard,
-                        "checks": list(new_acceptance.checks),
+                        "checks": _serialize_acceptance_checks(new_acceptance.checks),
                         "verifier": new_acceptance.verifier,
                     },
                     ensure_ascii=False,
@@ -1086,7 +1106,7 @@ def patch_contract(
         if acceptance is not None:
             patch_details["acceptance"] = {
                 "standard": acceptance.standard,
-                "checks": list(acceptance.checks),
+                "checks": _serialize_acceptance_checks(acceptance.checks),
                 "verifier": acceptance.verifier,
             }
         if workload_initial_hours is not None:

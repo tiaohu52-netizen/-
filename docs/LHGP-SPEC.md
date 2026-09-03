@@ -138,6 +138,24 @@ LHGP 不以“别人完全没有持久化目标”为前提。这个绝对主张
 
 同一个软件进程 MAY 承担多个系统角色，但事件中必须标明逻辑角色。Executor 与 Verifier 的独立性必须按合同执行，不能因为实现方便而合并。
 
+### 4.3 Goal 计划与阶段（Plan stages）
+
+Goal 的 `plan` MAY 包含有序 `stages` 序列（工作分解）。每个 stage 是有限工作单元，可携带：
+
+- `id`：阶段标识，用于绑定与推进。
+- `acceptance_checks`：该阶段被判定完成前，绑定合同 MUST 覆盖的验收要求引用；规范化形式为 `kind:target`（与 §12.1 的 typed check 对齐）或遗留自由文本。
+- `contract_id`：当前绑定到该阶段的合同，由 goal/prepare 写回；它是阶段计划与合同验收保持单一事实来源的手段，不允许计划与合同脱节。
+- `draft`：可选的阶段性合同草案模板，供 goal/contract-draft 复用。
+
+**阶段绑定不变式。** 当 goal/prepare 指定 `stage_id` 时，运行时 MUST：
+
+1. 确认目标 Goal 存在，且 `id` 存在于 `plan.stages` 中；
+2. 拒绝该阶段已被其他合同占用（`contract_id` 非空且不等于本次合同）；
+3. 拒绝合同 `acceptance.checks` 未覆盖阶段 `acceptance_checks` 中全部要求的请求，且错误信息 MUST 列出缺失项，供模型调用方修正草案；
+4. 通过后把 `contract_id` 写回阶段，使计划与合同验收保持单一事实来源。
+
+阶段推进（goal/advance）只有当绑定合同的 `acceptance_status` 为 `passed` 时才允许；阶段完成态由证据推导，而非由执行者声明。检查身份的比较 MUST 在规范化身份（typed check 折叠为 `kind:target`，遗留文本按原文）上进行，不得依赖对象身份——typed check 携带不可哈希的 `args` 映射，直接做集合比较会崩溃而非给出可处理的拒接。
+
 ---
 
 ## 5. 十条不可破坏的不变式

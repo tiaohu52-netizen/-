@@ -361,7 +361,7 @@
     },
     {
       "id": "mcp-server-and-skill",
-      "statement": "MCP server 薄层（DESIGN §11.1、§17）+ §17 longtask-contract skill：任何 MCP 兼容的 agent harness 可通过 stdio JSON-RPC 2.0 发现并调用长任务协议。当前暴露 18 个面向 AI 任务流的工具（7 个 legacy 工具、7 个 canonical 别名、attempt 状态/通知/中断/写回 4 个控制扩展），不暴露 24 个 RPC 方法——工具是 AI 任务流语义不是 RPC 隧道。skill 教模型怎么起草合同（objective 写验收不是方法、acceptance.checks 逐条可独立核对、workload_initial_hours 如实填决定紧迫度）。stdio 输出强制 ASCII（ensure_ascii=True）避免 Windows pipe 编码转换破坏非 ASCII 字节；协议错误码透传（StrEnum 值），JSON-RPC 标准错误码用于客户端层。",
+      "statement": "MCP server 薄层（DESIGN §11.1、§17）+ §17 longtask-contract skill：任何 MCP 兼容的 agent harness 可通过 stdio JSON-RPC 2.0 发现并调用长任务协议。当前暴露 28 个面向 AI 任务流的工具（15 个 lhgp_ 规范别名 + 13 个 longtask_ 遗留别名），不暴露 RPC 方法——工具是 AI 任务流语义不是 RPC 隧道。skill 教模型怎么起草合同（objective 写验收不是方法、acceptance.checks 逐条可独立核对、workload_initial_hours 如实填决定紧迫度）。stdio 输出强制 ASCII（ensure_ascii=True）避免 Windows pipe 编码转换破坏非 ASCII 字节；协议错误码透传（StrEnum 值），JSON-RPC 标准错误码用于客户端层。",
       "lifecycle": "verified",
       "scope_paths": [
         "src/longtask/mcp_server.py",
@@ -375,7 +375,7 @@
           "kind": "integration_real_store",
           "path": "tests/integration/test_mcp_server.py",
           "recorded_at": "2026-09-01",
-          "summary": "5 个 stdio 集成场景：discover（initialize + tools.list 断言 18 个工具，含 7 个 legacy、7 个 canonical 和 4 个控制扩展）、health、立合同→批准→查询→执行者认领四步走通（contract_id 格式合法、approve 后 state 变 active、attach 读 lease + 上下文快照 hint）、未知工具/缺必填回 JSON-RPC error。真实 spawn longtask-mcp 子进程 + 真实 SQLite + 真实 stdio JSON-RPC。"
+          "summary": "5 个 stdio 集成场景：discover（initialize + tools.list 断言 28 个工具，含 15 个 lhgp_ 规范别名与 13 个 longtask_ 遗留别名）、health、立合同→批准→查询→执行者认领四步走通（contract_id 格式合法、approve 后 state 变 active、attach 读 lease + 上下文快照 hint）、未知工具/缺必填回 JSON-RPC error。真实 spawn longtask-mcp 子进程 + 真实 SQLite + 真实 stdio JSON-RPC。"
         },
         {
           "kind": "manual_review",
@@ -455,6 +455,42 @@
           "path": "tests/integration/test_attempt_runner.py",
           "recorded_at": "2026-09-01",
           "summary": "真实子进程四场景：成功路径产出落工作区 + attempt/succeeded + 租约释放；spawn OSError -> attempt/failed + 释放 + 可再派；死租约 redispatch 走 lease/reclaimed 代次 +1；预算事件计数 1/1 触顶转 blocked(need-user) 不再派工。"
+        }
+      ]
+    },
+    {
+      "id": "goal-stage-acceptance-binding",
+      "statement": "goal/prepare 指定 stage_id 时，运行时强制检查 Goal 存在、阶段存在于 plan、阶段未被其他合同占用、合同 acceptance checks 覆盖阶段声明的全部 acceptance_checks，并在通过后把 contract_id 写回阶段（SPEC §4.3）。typed check（SPEC §12.1）与遗留字符串 check 在规范化身份（typed 折叠为 kind:target）上可比；typed check 可持久化并原样读回为 CheckSpec。",
+      "lifecycle": "verified",
+      "scope_paths": [
+        "src/longtask/rpc/handlers/goal.py",
+        "src/longtask/persistence/store.py",
+        "tests/conformance/test_goal_stage_binding.py"
+      ],
+      "evidence": [
+        {
+          "kind": "integration_real_store",
+          "path": "tests/conformance/test_goal_stage_binding.py",
+          "recorded_at": "2026-09-03",
+          "summary": "10 个一致性场景覆盖全部分支：无要求通过；遗留文本一致通过；文本不一致/部分覆盖拒接并列出缺失项；typed check 满足 kind:target（回归旧实现 TypeError）；args 不影响身份；阶段不在 plan 拒接；已被其他合同占用拒接；goal 不存在拒接；typed check 经真实 SQLite 持久化并原样读回为 CheckSpec。"
+        },
+        {
+          "kind": "source_static",
+          "path": "src/longtask/persistence/store.py",
+          "recorded_at": "2026-09-03",
+          "summary": "新增 _serialize_acceptance_checks / _parse_acceptance_checks：写入时 CheckSpec 经 to_dict() 投影（旧实现直接 json.dumps CheckSpec 导致 typed check 合同无法落库），读回时经 parse_check 重建为 CheckSpec，保证往返一致。"
+        },
+        {
+          "kind": "manual_review",
+          "path": "src/lhgp/acceptance/checks.py",
+          "recorded_at": "2026-09-03",
+          "summary": "新增 check_identity(check)：typed check 折叠为 kind:target，遗留文本按原文，使「覆盖判定」在规范化身份而非对象身份上进行；绑定逻辑据此给出可处理的 VALIDATION_FAILED（载明缺失项），而非 500 式 TypeError。"
+        },
+        {
+          "kind": "source_static",
+          "path": "docs/LHGP-SPEC.md",
+          "recorded_at": "2026-09-03",
+          "summary": "SPEC §4.3 新增「Goal 计划与阶段」模型与「阶段绑定不变式」，将代码已实现的 stage acceptance 绑定落到语义权威，并明确检查身份比较 MUST 在规范化身份上进行。"
         }
       ]
     }
