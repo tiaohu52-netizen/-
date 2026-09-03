@@ -7,10 +7,10 @@ import sqlite3
 from datetime import datetime
 from typing import Any
 
+from lhgp.persistence.errors import StoreError
 from lhgp.persistence.events import EventType
+from lhgp.persistence.schema import STORE_SCHEMA_VERSION, format_event_type, transaction
 from lhgp.persistence.types import StoredEvent
-from longtask.persistence.errors import StoreError
-from longtask.persistence.schema import STORE_SCHEMA_VERSION, format_event_type, transaction
 
 _COLS = (
     "event_id",
