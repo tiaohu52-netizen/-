@@ -4,4 +4,4 @@
 - [x] Canonical Deadline snapshot model and calculator
 - [x] Tick integration and deduplicated forecast events
 - [x] Boundary/recovery/conformance tests
-- [ ] Full quality gate and evidence refresh
+- [x] Full quality gate and evidence refresh
