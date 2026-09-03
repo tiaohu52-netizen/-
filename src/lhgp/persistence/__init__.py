@@ -8,13 +8,21 @@ __all__ = [
     "STORE_SCHEMA_VERSION",
     "EventInput",
     "EventType",
+    "Notification",
     "StoreConfig",
     "StoredEvent",
     "StoredLease",
     "WriteBackResult",
+    "claim_notifications",
     "connect",
+    "drain_notifications",
+    "enqueue_notification",
     "ensure_schema",
     "get_events",
+    "list_notifications",
+    "mark_failed",
+    "mark_sent",
+    "prune_sent",
     "transaction",
 ]
 
@@ -25,6 +33,19 @@ def __getattr__(name: str) -> object:
         from lhgp.persistence.events import EventType
 
         return EventType
+    if name in {
+        "Notification",
+        "claim_notifications",
+        "drain_notifications",
+        "enqueue_notification",
+        "list_notifications",
+        "mark_failed",
+        "mark_sent",
+        "prune_sent",
+    }:
+        from lhgp.persistence import notifications
+
+        return getattr(notifications, name)
     if name in {"EventInput", "StoredEvent", "StoredLease", "WriteBackResult"}:
         from lhgp.persistence import types
 
