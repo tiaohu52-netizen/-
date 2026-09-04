@@ -216,6 +216,12 @@ class AttemptRunner:
         """本进程无活 attempt（主循环据此决定能否睡到下一个决策点）。"""
         return not self._running
 
+    def running_attempts(self) -> tuple[tuple[str, str], ...]:
+        """返回当前进程持有的 (contract_id, attempt_id) 快照。"""
+        return tuple(
+            (str(info["contract_id"]), attempt_id) for attempt_id, info in self._running.items()
+        )
+
     def _persist_handle(
         self,
         adapter: ExecutorAdapter,
@@ -560,7 +566,13 @@ class AttemptRunner:
             )
 
     def cancel_attempt(
-        self, now: datetime, *, contract_id: str, attempt_id: str, reason: str
+        self,
+        now: datetime,
+        *,
+        contract_id: str,
+        attempt_id: str,
+        reason: str,
+        actor: str = "user",
     ) -> bool:
         """control/interrupt：打断执行中的 attempt（DESIGN §10 用户可干涉）。
 
@@ -584,7 +596,7 @@ class AttemptRunner:
             event_type=EventType.ATTEMPT_CANCELLED,
             payload={"reason": reason},
             now=now,
-            actor="user",
+            actor=actor,
         )
         set_attempt_state(
             self._conn,
