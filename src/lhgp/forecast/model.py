@@ -6,6 +6,7 @@ The canonical ``lhgp`` namespace owns this implementation.  The historical
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -197,10 +198,11 @@ def build_deadline_snapshot(
 
 
 def _opt_float(value: Any) -> float | None:
-    if value is None:
+    if value is None or isinstance(value, bool):
         return None
     try:
-        return float(value)
+        parsed = float(value)
+        return parsed if math.isfinite(parsed) else None
     except (TypeError, ValueError):
         return None
 
