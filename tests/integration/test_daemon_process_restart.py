@@ -191,6 +191,26 @@ def test_real_daemon_restart_reattaches_live_subprocess(
             assert get_contract(conn, contract_id).state == ContractState.ACTIVE
         finally:
             conn.close()
+
+        # The second daemon must have adopted the reattached run into its
+        # Runner table, not merely renewed it in reconcile.  Cancelling the
+        # contract now should terminate the still-sleeping child before it can
+        # create its output file.
+        assert main(["--data-dir", str(root), "cancel", contract_id]) == 0
+        capsys.readouterr()
+
+        def cancelled() -> bool:
+            conn = connect(StoreConfig(db_path=root / "state.db"))
+            try:
+                row = conn.execute(
+                    "SELECT state FROM attempts WHERE attempt_id=?", (first_attempt_id,)
+                ).fetchone()
+                return row is not None and row[0] == "cancelled"
+            finally:
+                conn.close()
+
+        assert _wait_for(cancelled), "reattached attempt was not cancelled by new daemon"
+        assert not (root / "ws" / "restart-survived.txt").exists()
     finally:
         halt_daemon(root, grace_seconds=3.0)
         if external_pid is not None:

@@ -31,6 +31,7 @@ from longtask.adapters.factory import build_adapter
 from longtask.adapters.registry import ExecutorRegistry, RegistryEntry
 from longtask.contracts.schema import AttemptRole, AttemptState, ContractDraft, ContractView
 from longtask.persistence.attempts import (
+    list_reconcilable_attempts,
     register_attempt_handle,
     set_attempt_state,
 )
@@ -221,6 +222,46 @@ class AttemptRunner:
         return tuple(
             (str(info["contract_id"]), attempt_id) for attempt_id, info in self._running.items()
         )
+
+    def adopt_reconciled_attempts(self) -> int:
+        """把 reconcile 已重绑的 running attempts 纳入本 Runner 的观察表。
+
+        ``reconcile_attempts`` 负责身份校验和租约续期，但不依赖执行层，
+        因而不会直接修改 Runner 的内存进程表。daemon 重启后若不在此处
+        接管，新的 Runner 只能反复 reconcile，无法 poll/collect/cancel
+        该外部 run。仅接纳当前租约 holder 且 adapter 已能 observe 为 running
+        的行，避免把未知或已被 fencing 的 attempt 误纳入。
+        """
+        adopted = 0
+        for attempt in list_reconcilable_attempts(self._conn):
+            if attempt.attempt_id in self._running or attempt.state != AttemptState.RUNNING.value:
+                continue
+            contract_id = attempt.contract_id
+            if not contract_id or not attempt.executor_id:
+                continue
+            lease = get_lease(self._conn, contract_id)
+            if lease is None or lease.holder_attempt_id != attempt.attempt_id:
+                continue
+            adapter = self._adapter_for(attempt.executor_id)
+            if adapter is None:
+                continue
+            try:
+                observation = adapter.observe(attempt.attempt_id)
+            except (KeyError, OSError):
+                continue
+            if str(observation.get("state")) != AttemptState.RUNNING.value:
+                continue
+            self._running[attempt.attempt_id] = {
+                "contract_id": contract_id,
+                "executor_id": attempt.executor_id,
+                "model": attempt.model_id or "*",
+                "role": attempt.role,
+                "contract_revision": attempt.contract_revision,
+                "session_ref": attempt.session_locator or "",
+                "generation": lease.generation,
+            }
+            adopted += 1
+        return adopted
 
     def _persist_handle(
         self,

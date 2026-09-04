@@ -157,6 +157,7 @@ def run_daemon_loop(
                 locally_tracked=runner.is_tracking,
                 emit=emit_fn,
             )
+            runner.adopt_reconciled_attempts()
             # 合同进入 cancelled/expired 后，控制面已不再允许继续推进；
             # 在 poll 前终止本进程持有的外部 attempt，避免已终止承诺
             # 继续消耗资源或产生迟到写回。
