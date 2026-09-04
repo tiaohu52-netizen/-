@@ -115,6 +115,34 @@ def test_mcp_prepare_rejects_string_acceptance_checks(tmp_path: Path) -> None:
         conn.close()
 
 
+def test_mcp_prepare_cannot_impersonate_user_client(tmp_path: Path) -> None:
+    from longtask.adapters.registry import ExecutorRegistry
+    from longtask.mcp_server import tool_prepare_contract
+    from longtask.persistence.events import EventType
+    from longtask.persistence.store import StoreConfig, connect, ensure_schema, get_events
+
+    conn = connect(StoreConfig(db_path=tmp_path / "state.db"))
+    ensure_schema(conn)
+    args = {
+        "title": "actor boundary",
+        "objective": "MCP identity must remain model",
+        "deadline_at": (datetime.now(UTC) + timedelta(hours=2)).isoformat(),
+        "acceptance_standard": "contract exists",
+        "acceptance_checks": ["contract exists"],
+        "client_id": "longtask-cli",
+    }
+    try:
+        result = tool_prepare_contract(
+            args, {"conn": conn, "registry": ExecutorRegistry(), "root": tmp_path}
+        )
+        assert result["ok"] is True
+        prepared = [e for e in get_events(conn) if e.event_type == EventType.CONTRACT_PREPARED]
+        assert prepared
+        assert prepared[-1].actor == "model"
+    finally:
+        conn.close()
+
+
 def _spawn_mcp(data_dir: Path) -> subprocess.Popen[bytes]:
     """启动 longtask-mcp 子进程，stdio 用 bytes 收发。"""
     return subprocess.Popen(  # noqa: S603
