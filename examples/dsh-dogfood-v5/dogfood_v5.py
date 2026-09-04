@@ -46,12 +46,16 @@ from longtask.persistence.events_query import get_events  # noqa: E402
 from longtask.persistence.store import (  # noqa: E402
     StoreConfig,
     connect,
+    get_contract,
     ensure_schema,
     get_goal,
 )
 from longtask.rpc.handlers.goal import (  # noqa: E402
     handle_goal_prepare,
     handle_goal_update,
+)
+from longtask.rpc.handlers.contract import (  # noqa: E402
+    handle_contract_request_verification,
 )
 from longtask.rpc.methods import Method  # noqa: E402
 from longtask.rpc.server import RequestEnvelope  # noqa: E402
@@ -126,22 +130,40 @@ def _dsh_entry() -> dict[str, Any]:
         "id": "dsh-headless",
         "kind": "subprocess",
         "launch": {
-            "argv": [str(REPO / ".venv" / "Scripts" / "python.exe"),
-                     str(REPO / ".dogfood" / "dsh_executor_wrap.py")],
+            "argv": [
+                str(REPO / ".venv" / "Scripts" / "python.exe"),
+                str(REPO / ".dogfood" / "dsh_executor_wrap.py"),
+            ],
             "cwd": None,
             "env_allowlist": [
-                "DSH_HOME", "MINIMAX_CN_API_KEY", "PATH", "SYSTEMROOT",
-                "SYSTEMDRIVE", "WINDIR", "COMSPEC", "TEMP", "TMP",
-                "APPDATA", "USERPROFILE", "NODE_PATH",
+                "DSH_HOME",
+                "MINIMAX_CN_API_KEY",
+                "PATH",
+                "SYSTEMROOT",
+                "SYSTEMDRIVE",
+                "WINDIR",
+                "COMSPEC",
+                "TEMP",
+                "TMP",
+                "APPDATA",
+                "USERPROFILE",
+                "NODE_PATH",
             ],
         },
         "capabilities": {
-            "spawn": True, "observe": True, "cancel": True, "notify": False,
-            "followup": False, "steer": False, "interrupt": True,
+            "spawn": True,
+            "observe": True,
+            "cancel": True,
+            "notify": False,
+            "followup": False,
+            "steer": False,
+            "interrupt": True,
             "context": "optional",
             "sandbox": {
-                "file_effects": "workspace-write", "network": "allow",
-                "process": "unsupported", "enforcement": "partial",
+                "file_effects": "workspace-write",
+                "network": "allow",
+                "process": "unsupported",
+                "enforcement": "partial",
             },
             "acceptance_evidence": True,
         },
@@ -168,22 +190,41 @@ def _kimi_entry() -> dict[str, Any]:
         "launch": {
             # 包装器在子进程侧强制 DSH_HOME=dsh-home-verifier（deepseek 默认
             # 模型）；协议 spawn 环境继承无法表达 per-entry 环境覆盖
-            "argv": [str(REPO / ".venv" / "Scripts" / "python.exe"),
-                     str(REPO / ".dogfood" / "dsh_verifier_wrap.py")],
+            "argv": [
+                str(REPO / ".venv" / "Scripts" / "python.exe"),
+                str(REPO / ".dogfood" / "dsh_verifier_wrap.py"),
+            ],
             "cwd": None,
             "env_allowlist": [
-                "DSH_HOME", "MINIMAX_CN_API_KEY", "X5M1_API_KEY", "PATH",
-                "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "COMSPEC", "TEMP",
-                "TMP", "APPDATA", "USERPROFILE", "NODE_PATH",
+                "DSH_HOME",
+                "MINIMAX_CN_API_KEY",
+                "X5M1_API_KEY",
+                "PATH",
+                "SYSTEMROOT",
+                "SYSTEMDRIVE",
+                "WINDIR",
+                "COMSPEC",
+                "TEMP",
+                "TMP",
+                "APPDATA",
+                "USERPROFILE",
+                "NODE_PATH",
             ],
         },
         "capabilities": {
-            "spawn": True, "observe": True, "cancel": True, "notify": False,
-            "followup": False, "steer": False, "interrupt": True,
+            "spawn": True,
+            "observe": True,
+            "cancel": True,
+            "notify": False,
+            "followup": False,
+            "steer": False,
+            "interrupt": True,
             "context": "optional",
             "sandbox": {
-                "file_effects": "workspace-write", "network": "allow",
-                "process": "unsupported", "enforcement": "partial",
+                "file_effects": "workspace-write",
+                "network": "allow",
+                "process": "unsupported",
+                "enforcement": "partial",
             },
             "acceptance_evidence": True,
         },
@@ -205,17 +246,32 @@ def _kimi_executor_entry() -> dict[str, Any]:
             ],
             "cwd": None,
             "env_allowlist": [
-                "PATH", "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "COMSPEC",
-                "TEMP", "TMP", "APPDATA", "USERPROFILE", "NODE_PATH",
+                "PATH",
+                "SYSTEMROOT",
+                "SYSTEMDRIVE",
+                "WINDIR",
+                "COMSPEC",
+                "TEMP",
+                "TMP",
+                "APPDATA",
+                "USERPROFILE",
+                "NODE_PATH",
             ],
         },
         "capabilities": {
-            "spawn": True, "observe": True, "cancel": True, "notify": False,
-            "followup": False, "steer": False, "interrupt": True,
+            "spawn": True,
+            "observe": True,
+            "cancel": True,
+            "notify": False,
+            "followup": False,
+            "steer": False,
+            "interrupt": True,
             "context": "optional",
             "sandbox": {
-                "file_effects": "workspace-write", "network": "allow",
-                "process": "unsupported", "enforcement": "partial",
+                "file_effects": "workspace-write",
+                "network": "allow",
+                "process": "unsupported",
+                "enforcement": "partial",
             },
             "acceptance_evidence": True,
         },
@@ -272,8 +328,10 @@ def _stage_draft(
         },
         "workload_estimate": {"initial_hours": 1.5},
         "budget": {
-            "max_dispatches": 5, "max_escalations": 1,
-            "max_concurrent_attempts": 1, "max_attempt_minutes": 30,
+            "max_dispatches": 5,
+            "max_escalations": 1,
+            "max_concurrent_attempts": 1,
+            "max_attempt_minutes": 30,
             "max_output_bytes": 1048576,
         },
     }
@@ -314,12 +372,17 @@ def setup() -> None:
     now = _now()
     # 第一步：无 stage 起草 → 创建 Goal + 合同
     result = handle_goal_prepare(
-        _envelope(Method.GOAL_PREPARE, "req-v5-setup", {
-            "contract_id": GOAL_ID,
-            "goal_id": GOAL_ID,
-            "draft": _stage_draft(STAGES[0]),
-        }),
-        conn=conn, now=now,
+        _envelope(
+            Method.GOAL_PREPARE,
+            "req-v5-setup",
+            {
+                "contract_id": GOAL_ID,
+                "goal_id": GOAL_ID,
+                "draft": _stage_draft(STAGES[0]),
+            },
+        ),
+        conn=conn,
+        now=now,
     )
     assert result["ok"], result
     # 第二步：写入完整阶段计划
@@ -330,10 +393,17 @@ def setup() -> None:
         if stage["id"] == "stage-1":
             stage["contract_id"] = GOAL_ID
     handle_goal_update(
-        _envelope(Method.GOAL_UPDATE, "req-v5-plan", {
-            "goal_id": GOAL_ID, "revision": goal["revision"], "plan": plan,
-        }),
-        conn=conn, now=now,
+        _envelope(
+            Method.GOAL_UPDATE,
+            "req-v5-plan",
+            {
+                "goal_id": GOAL_ID,
+                "revision": goal["revision"],
+                "plan": plan,
+            },
+        ),
+        conn=conn,
+        now=now,
     )
     verified = get_goal(conn, GOAL_ID)
     assert verified is not None
@@ -351,7 +421,9 @@ def status() -> None:
         conn.close()
         return
     print("=== Goal ===")
-    print(f"revision={goal['revision']} progress={json.dumps(goal['progress'], ensure_ascii=False)}")
+    print(
+        f"revision={goal['revision']} progress={json.dumps(goal['progress'], ensure_ascii=False)}"
+    )
     for s in goal["plan"]["stages"]:
         print(f"  {s['id']}: bound={s.get('contract_id')}")
     print("=== Contracts ===")
@@ -395,11 +467,17 @@ def _require_current_stage(goal: dict[str, Any], stage_id: str) -> None:
 def _executor_pids() -> list[int]:
     """dsh 执行进程的真实 PID（按命令行匹配 dsh bin.js）。"""
     out = subprocess.run(
-        ["powershell", "-NoProfile", "-Command",
-         "Get-CimInstance Win32_Process -Filter \"name='node.exe'\" | "
-         "Where-Object {$_.CommandLine -like '*dsh*bin.js*'} | "
-         "Select-Object -ExpandProperty ProcessId"],
-        capture_output=True, text=True, timeout=30,
+        [
+            "powershell",
+            "-NoProfile",
+            "-Command",
+            "Get-CimInstance Win32_Process -Filter \"name='node.exe'\" | "
+            "Where-Object {$_.CommandLine -like '*dsh*bin.js*'} | "
+            "Select-Object -ExpandProperty ProcessId",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
     )
     return [int(line) for line in out.stdout.split() if line.strip().isdigit()]
 
@@ -407,8 +485,7 @@ def _executor_pids() -> list[int]:
 def _kill_session(pids: list[int]) -> None:
     """断裂①：硬杀执行进程 = 原会话死亡（无优雅退出、无 write-back）。"""
     for pid in pids:
-        subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)],
-                       capture_output=True, timeout=15)
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], capture_output=True, timeout=15)
         print(f"[v5] BREAK-1 injected: killed executor pid {pid}")
 
 
@@ -469,7 +546,7 @@ def run_stage1() -> None:
             "SELECT state FROM contracts WHERE contract_id=?", (GOAL_ID,)
         ).fetchone()[0]
         if i % 6 == 0:
-            print(f"[v5][stage-1] t+{(i+1)*10}s attempts={rows} contract={contract_state}")
+            print(f"[v5][stage-1] t+{(i + 1) * 10}s attempts={rows} contract={contract_state}")
         if contract_state == "complete":
             print(f"[v5][stage-1] CONTRACT COMPLETE (via verifier): {rows}")
             break
@@ -504,6 +581,23 @@ def run_stage1_verify() -> None:
 
     conn = _conn()
     now = _now()
+    # 当前协议首选路径：若旧合同因执行预算耗尽而 blocked，先请求只验收
+    # 现状；只有明确拒接（终态/验证预算耗尽等）才继续下方修订合同 fallback。
+    existing = get_contract(conn, GOAL_ID)
+    if existing is not None and existing.state.value == "blocked":
+        verification_result = handle_contract_request_verification(
+            _envelope(
+                Method.CONTRACT_REQUEST_VERIFICATION,
+                f"req-v5-request-verification-{now.strftime('%H%M%S')}",
+                {"contract_id": GOAL_ID, "reason": "dogfood: verify existing delivery"},
+            ),
+            conn=conn,
+            now=now,
+        )
+        print(f"[v5][stage-1v] request-verification: {verification_result}")
+        if verification_result.get("ok"):
+            conn.close()
+            return
     # 解绑旧 blocked 合同（stage 绑定不变式：一个阶段一份合同）。
     # 旧合同留在 goal.contract_ids 历史里；blocked(need-user) 态如实保留。
     goal = get_goal(conn, GOAL_ID)
@@ -515,10 +609,17 @@ def run_stage1_verify() -> None:
             s["contract_id"] = None
     plan["stages"] = stages
     handle_goal_update(
-        _envelope(Method.GOAL_UPDATE, f"req-v5-s1unbind-{now.strftime('%H%M%S')}", {
-            "goal_id": GOAL_ID, "revision": goal["revision"], "plan": plan,
-        }),
-        conn=conn, now=now,
+        _envelope(
+            Method.GOAL_UPDATE,
+            f"req-v5-s1unbind-{now.strftime('%H%M%S')}",
+            {
+                "goal_id": GOAL_ID,
+                "revision": goal["revision"],
+                "plan": plan,
+            },
+        ),
+        conn=conn,
+        now=now,
     )
     print("[v5][stage-1v] unbound blocked contract from stage-1")
 
@@ -526,17 +627,23 @@ def run_stage1_verify() -> None:
     draft = _stage_draft(STAGES[0])
     draft["budget"]["verification_attempts_reserved"] = 3
     result = handle_goal_prepare(
-        _envelope(Method.GOAL_PREPARE, f"req-v5-s1v2-{now.strftime('%H%M%S')}", {
-            "contract_id": "lt-20260904-s1v2",
-            "goal_id": GOAL_ID,
-            "stage_id": "stage-1",
-            "draft": draft,
-        }),
-        conn=conn, now=now,
+        _envelope(
+            Method.GOAL_PREPARE,
+            f"req-v5-s1v2-{now.strftime('%H%M%S')}",
+            {
+                "contract_id": "lt-20260904-s1v2",
+                "goal_id": GOAL_ID,
+                "stage_id": "stage-1",
+                "draft": draft,
+            },
+        ),
+        conn=conn,
+        now=now,
     )
     assert result["ok"], result
-    update_contract_state(conn, contract_id="lt-20260904-s1v2",
-                          new_state=ContractState.ACTIVE, now=now)
+    update_contract_state(
+        conn, contract_id="lt-20260904-s1v2", new_state=ContractState.ACTIVE, now=now
+    )
     print("[v5][stage-1v] revision contract ACTIVE: lt-20260904-s1v2")
 
     registry = ExecutorRegistry.load_from_file(ROOT / "registry.json")
@@ -565,7 +672,7 @@ def run_stage1_verify() -> None:
             "SELECT state FROM attempts WHERE role='verifier' ORDER BY admitted_at DESC LIMIT 1"
         ).fetchone()
         if i % 6 == 0:
-            print(f"[v5][stage-1v] t+{(i+1)*10}s contract={row} verifier={ver}")
+            print(f"[v5][stage-1v] t+{(i + 1) * 10}s contract={row} verifier={ver}")
         if ver and ver[0] in ("succeeded", "failed"):
             _judge_verifier_outcomes(ROOT, conn, _now())
             final = conn.execute(
@@ -596,24 +703,34 @@ def run_stage2() -> None:
             raise RuntimeError("goal not found; run setup first")
         _require_current_stage(goal, "stage-2")
         draft = _stage_draft(
-            STAGES[1], executor_id="kimi-code", executor_model="kimi-k3",
-            verifier_id="dsh-verifier", verifier_model="deepseek-v4-pro",
+            STAGES[1],
+            executor_id="kimi-code",
+            executor_model="kimi-k3",
+            verifier_id="dsh-verifier",
+            verifier_model="deepseek-v4-pro",
         )
         result = handle_goal_prepare(
-            _envelope(Method.GOAL_PREPARE, f"req-v5-stage2-{int(time.time())}", {
-                "contract_id": contract_id, "goal_id": GOAL_ID,
-                "stage_id": "stage-2", "draft": draft,
-            }),
-            conn=conn, now=_now(),
+            _envelope(
+                Method.GOAL_PREPARE,
+                f"req-v5-stage2-{int(time.time())}",
+                {
+                    "contract_id": contract_id,
+                    "goal_id": GOAL_ID,
+                    "stage_id": "stage-2",
+                    "draft": draft,
+                },
+            ),
+            conn=conn,
+            now=_now(),
         )
         if not result.get("ok"):
             raise RuntimeError(result)
-        update_contract_state(conn, contract_id=contract_id,
-                              new_state=ContractState.ACTIVE, now=_now())
+        update_contract_state(
+            conn, contract_id=contract_id, new_state=ContractState.ACTIVE, now=_now()
+        )
         print(f"[v5][stage-2] contract ACTIVE; executor=kimi-code: {contract_id}")
     finally:
         conn.close()
-
 
     daemon = get_daemon_status(ROOT)
     if not daemon.get("running"):
@@ -627,7 +744,8 @@ def run_stage2() -> None:
             time.sleep(10)
             rows = conn.execute(
                 "SELECT attempt_id, role, executor_id, state FROM attempts "
-                "WHERE goal_id=? ORDER BY admitted_at", (GOAL_ID,)
+                "WHERE goal_id=? ORDER BY admitted_at",
+                (GOAL_ID,),
             ).fetchall()
             if any(r[1] == "executor" and r[2] == "kimi-code" for r in rows):
                 print(f"[v5][stage-2] kimi attempt observed: {rows}")
@@ -651,21 +769,35 @@ def plan_stage2() -> None:
     registry = ExecutorRegistry.load_from_file(registry_path)
     draft = parse_contract_draft(
         _stage_draft(
-            STAGES[1], executor_id="kimi-code", executor_model="kimi-k3",
-            verifier_id="dsh-verifier", verifier_model="deepseek-v4-pro",
+            STAGES[1],
+            executor_id="kimi-code",
+            executor_model="kimi-k3",
+            verifier_id="dsh-verifier",
+            verifier_model="deepseek-v4-pro",
         )
     )
-    executor_ids = [entry.id for entry in registry.match_candidates(draft, requested_role="executor")]
-    verifier_ids = [entry.id for entry in registry.match_candidates(draft, requested_role="verifier")]
-    print(json.dumps({
-        "stage": "stage-2",
-        "external_process_started": False,
-        "executor_candidates": executor_ids,
-        "verifier_candidates": verifier_ids,
-        "expected": {"executor": "kimi-code", "verifier": "dsh-verifier"},
-    }, ensure_ascii=False, indent=2))
+    executor_ids = [
+        entry.id for entry in registry.match_candidates(draft, requested_role="executor")
+    ]
+    verifier_ids = [
+        entry.id for entry in registry.match_candidates(draft, requested_role="verifier")
+    ]
+    print(
+        json.dumps(
+            {
+                "stage": "stage-2",
+                "external_process_started": False,
+                "executor_candidates": executor_ids,
+                "verifier_candidates": verifier_ids,
+                "expected": {"executor": "kimi-code", "verifier": "dsh-verifier"},
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
     if executor_ids != ["kimi-code"] or verifier_ids != ["dsh-verifier"]:
         raise RuntimeError("stage-2 authority preflight failed: default-deny mismatch")
+
 
 def run_stage3() -> None:
     """阶段 3：重启 daemon 后再立约，验证 Goal/事件/阶段状态无损。"""
@@ -691,20 +823,29 @@ def run_stage3() -> None:
             raise RuntimeError("goal not found; run setup first")
         _require_current_stage(goal, "stage-3")
         result = handle_goal_prepare(
-            _envelope(Method.GOAL_PREPARE, f"req-v5-stage3-{int(time.time())}", {
-                "contract_id": contract_id, "goal_id": GOAL_ID,
-                "stage_id": "stage-3",
-                "draft": _stage_draft(STAGES[2], executor_id="dsh-headless",
-                                       verifier_id="dsh-verifier"),
-            }),
-            conn=conn, now=_now(),
+            _envelope(
+                Method.GOAL_PREPARE,
+                f"req-v5-stage3-{int(time.time())}",
+                {
+                    "contract_id": contract_id,
+                    "goal_id": GOAL_ID,
+                    "stage_id": "stage-3",
+                    "draft": _stage_draft(
+                        STAGES[2], executor_id="dsh-headless", verifier_id="dsh-verifier"
+                    ),
+                },
+            ),
+            conn=conn,
+            now=_now(),
         )
         if not result.get("ok"):
             raise RuntimeError(result)
         from longtask.contracts.schema import ContractState
         from longtask.persistence.store import update_contract_state
-        update_contract_state(conn, contract_id=contract_id,
-                              new_state=ContractState.ACTIVE, now=_now())
+
+        update_contract_state(
+            conn, contract_id=contract_id, new_state=ContractState.ACTIVE, now=_now()
+        )
         goal = get_goal(conn, GOAL_ID)
         assert goal is not None
         print(f"[v5][stage-3] state survived restart; goal revision={goal['revision']}")
