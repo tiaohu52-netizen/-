@@ -112,7 +112,7 @@ def run_daemon_loop(
                         dispatch=dispatch_rpc,
                         stop_event=rpc_stop,
                     )
-                except OSError as exc:
+                except (OSError, RuntimeError) as exc:
                     if emit_fn is not None:
                         emit_fn(f"rpc/degraded: local socket unavailable: {exc}")
 
