@@ -8,6 +8,7 @@ run_daemon_tick 只做调度簿记：ticker 扫描、过期仲裁、紧迫度分
 from __future__ import annotations
 
 import json
+import math
 import sqlite3
 from collections.abc import Callable
 from datetime import datetime, timedelta
@@ -274,8 +275,10 @@ def run_daemon_tick(
         successful_minutes = _completed_attempt_durations(conn, c.goal_id, successful_only=True)
         if successful_minutes:
             ordered = sorted(successful_minutes)
-            p50_index = (len(ordered) - 1) // 2
-            p90_index = min(len(ordered) - 1, max(0, int(len(ordered) * 0.9) - 1))
+            # nearest-rank：小样本时 p90 必须保守地落到更慢的样本，不能
+            # 用 floor(n*0.9)-1 把 3 个样本的 p90 错取成中位数。
+            p50_index = max(0, math.ceil(len(ordered) * 0.5) - 1)
+            p90_index = max(0, math.ceil(len(ordered) * 0.9) - 1)
             forecast_p50 = ordered[p50_index] + 10.0
             forecast_p90 = ordered[p90_index] + 15.0
         else:

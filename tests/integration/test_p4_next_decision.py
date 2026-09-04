@@ -275,8 +275,8 @@ class TestTickIntegration:
         setup_contract(data_dir, "lt-p4-history", NOW + timedelta(hours=2))
         conn = connect(StoreConfig(db_path=data_dir / "state.db"))
         try:
-            # 失败样本只有 1 分钟，成功样本 10 分钟；若误用全部样本，p50 会变成
-            # 11 分钟（含启动边际），而正确基线应为 20 分钟。
+            # 失败样本只有 1 分钟，成功样本为 10/20/40 分钟；失败样本不能
+            # 污染基线，且 p90 必须落到最慢的成功样本。
             conn.executemany(
                 """
                 INSERT INTO attempts (
@@ -295,16 +295,19 @@ class TestTickIntegration:
                         (NOW + timedelta(minutes=1)).isoformat(),
                         (NOW + timedelta(minutes=1)).isoformat(),
                     ),
-                    (
-                        "attempt-succeeded",
-                        "lt-p4-history",
-                        "lt-p4-history",
-                        "succeeded",
-                        NOW.isoformat(),
-                        NOW.isoformat(),
-                        (NOW + timedelta(minutes=10)).isoformat(),
-                        (NOW + timedelta(minutes=10)).isoformat(),
-                    ),
+                    *[
+                        (
+                            f"attempt-succeeded-{minutes}",
+                            "lt-p4-history",
+                            "lt-p4-history",
+                            "succeeded",
+                            NOW.isoformat(),
+                            NOW.isoformat(),
+                            (NOW + timedelta(minutes=minutes)).isoformat(),
+                            (NOW + timedelta(minutes=minutes)).isoformat(),
+                        )
+                        for minutes in (10, 20, 40)
+                    ],
                 ],
             )
             conn.commit()
@@ -317,8 +320,9 @@ class TestTickIntegration:
             ]
             assert len(forecast_events) == 1
             payload = json.loads(forecast_events[0].payload_json)
-            assert payload["sample_count"] == 1
-            assert payload["forecast_p50_minutes"] == pytest.approx(20.0)
+            assert payload["sample_count"] == 3
+            assert payload["forecast_p50_minutes"] == pytest.approx(30.0)
+            assert payload["forecast_p90_minutes"] == pytest.approx(55.0)
         finally:
             conn.close()
 
