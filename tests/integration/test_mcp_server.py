@@ -173,6 +173,34 @@ class TestMCPDiscovery:
                     "destructiveHint": True,
                     "openWorldHint": False,
                 }
+            read_only = {
+                "longtask_health",
+                "longtask_doctor",
+                "longtask_list_executors",
+                "longtask_get_contract",
+                "longtask_list_contracts",
+                "longtask_get_goal",
+                "longtask_list_goals",
+                "longtask_next_goal_action",
+                "longtask_goal_contract_draft",
+                "lhgp_health",
+                "lhgp_doctor",
+                "lhgp_list_executors",
+                "lhgp_get_contract",
+                "lhgp_list_contracts",
+                "lhgp_get_goal",
+                "lhgp_list_goals",
+                "lhgp_next_goal_action",
+                "lhgp_goal_contract_draft",
+                "lhgp_attempt_status",
+                "lhgp_notifications",
+            }
+            for name in read_only:
+                assert by_name[name]["annotations"] == {
+                    "readOnlyHint": True,
+                    "destructiveHint": False,
+                    "openWorldHint": False,
+                }
         finally:
             _stop_mcp(proc)
 
