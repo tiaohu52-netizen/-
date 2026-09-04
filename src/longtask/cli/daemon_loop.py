@@ -53,6 +53,29 @@ from longtask.scheduler.wakeup import (
     guard_needed,
 )
 
+# User control-plane mutations must preempt adaptive idle sleep.  A read-only
+# RPC may wait for the next decision point; these methods cannot, because their
+# effect is specifically to change what the next decision should be.
+_WAKE_ON_RPC = frozenset(
+    {
+        Method.CONTRACT_APPROVE,
+        Method.CONTRACT_PATCH,
+        Method.CONTRACT_PAUSE,
+        Method.CONTRACT_RESUME,
+        Method.CONTRACT_CANCEL,
+        Method.CONTRACT_ARBITRATE,
+        Method.CONTRACT_REQUEST_VERIFICATION,
+        Method.CONTROL_NOTIFY,
+        Method.CONTROL_FOLLOWUP,
+        Method.CONTROL_STEER,
+        Method.CONTROL_INTERRUPT,
+        Method.CONTROL_SPAWN,
+        Method.LEASE_RENEW,
+        Method.LEASE_RELEASE,
+        Method.ATTEMPT_WRITE_BACK,
+    }
+)
+
 
 def run_daemon_loop(
     root: Path,
@@ -110,6 +133,8 @@ def run_daemon_loop(
                         if isinstance(task_id, str):
                             fired_tasks.put(task_id)
                             wake_event.set()
+                    elif envelope.method in _WAKE_ON_RPC and result.get("ok"):
+                        wake_event.set()
                     return result
                 finally:
                     rpc_conn.close()

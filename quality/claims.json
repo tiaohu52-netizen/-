@@ -531,6 +531,30 @@
       ]
     },
     {
+      "id": "control-rpc-preempts-idle-daemon",
+      "statement": "会改变调度语义的本机 RPC（批准、修订、暂停/恢复/取消、仲裁、验收请求、控制和执行者写回）会唤醒正在自适应休眠的 daemon，使用户控制不必等待下一个自然 Deadline 决策点。",
+      "lifecycle": "verified",
+      "scope_paths": [
+        "src/longtask/cli/daemon_loop.py",
+        "tests/integration/test_daemon_lifecycle.py",
+        "tests/integration/test_control_interrupt.py"
+      ],
+      "evidence": [
+        {
+          "kind": "source_static",
+          "path": "src/longtask/cli/daemon_loop.py",
+          "recorded_at": "2026-09-05",
+          "summary": "RPC dispatch 对控制面 mutation 使用 wake_event.set()；daemon 主循环以 wake_event.wait(timeout) 代替固定阻塞 sleep，控制请求可立即打断休眠。"
+        },
+        {
+          "kind": "integration_real_store",
+          "path": "tests/integration/test_control_interrupt.py",
+          "recorded_at": "2026-09-05",
+          "summary": "控制请求写盘与 daemon 消费、取消、释放租约的集成场景通过。"
+        }
+      ]
+    },
+    {
       "id": "terminal-contract-cancels-attempts",
       "statement": "合同进入 cancelled 或 expired 后，daemon 在下一轮主动终止本进程持有的外部 attempt，记录取消事件并释放租约，防止已终止承诺继续消耗资源或迟到写回。",
       "lifecycle": "verified",

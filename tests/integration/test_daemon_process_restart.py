@@ -209,7 +209,9 @@ def test_real_daemon_restart_reattaches_live_subprocess(
             finally:
                 conn.close()
 
-        assert _wait_for(cancelled), "reattached attempt was not cancelled by new daemon"
+        assert _wait_for(cancelled, timeout=5.0), (
+            "reattached attempt was not cancelled by new daemon"
+        )
         assert not (root / "ws" / "restart-survived.txt").exists()
     finally:
         halt_daemon(root, grace_seconds=3.0)
