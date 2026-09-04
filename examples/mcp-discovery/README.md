@@ -9,7 +9,12 @@
 - 本目录的 `mcp-trace.example.log` 是一次完整 e2e 复验日志：8 步走通
   合同生命周期。
 
-## 暴露的 MCP 工具（精选 7 个，不是 24 个 RPC 透传）
+## 历史复验中的核心工具（2026-09-01）
+
+下面是本目录归档时的 7 个核心工具，并非当前完整工具清单。当前版本还提供
+`lhgp_*` 规范别名、验收请求、通知、attempt 审计和中断/写回控制；请以运行时
+`tools/list` 返回值为准（当前完整清单由 server 自动生成）。这组工具仍保留在
+示例中，用于复现当日的最小合同生命周期，不是 24 个 RPC 方法的 1:1 透传。
 
 | 工具 | 用途 |
 |---|---|
@@ -29,7 +34,7 @@
 
 ```
 1) initialize: longtask-mcp/0.1.0a0
-2) tools/list: 7 个 longtask_* 工具全部发现
+2) tools/list: 归档时发现 7 个 longtask_* 核心工具
 3) longtask_health: protocol=1
 4) longtask_list_executors: [exec-a, exec-b]
 5) longtask_prepare_contract: cid=lt-20260901-mcpe2e state=drafted

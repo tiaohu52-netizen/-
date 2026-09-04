@@ -1,3 +1,5 @@
+// Historical archive from 2026-09-01: this trace intentionally shows the
+// original seven core tools. Use a live tools/list response for the current set.
 1) initialize: {'name': 'longtask-mcp', 'version': '0.1.0a0'}
 2) tools/list: ['longtask_approve_contract', 'longtask_attach_to_executor', 'longtask_get_contract', 'longtask_health', 'longtask_list_contracts', 'longtask_list_executors', 'longtask_prepare_contract']
 3) health: protocol=1
