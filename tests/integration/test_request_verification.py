@@ -333,3 +333,24 @@ def test_daemon_does_not_reconsume_same_request_after_verifier_terminal(
         assert len(consumed) == 1
     finally:
         conn.close()
+
+
+def test_verification_request_survives_store_reopen_before_daemon_consumes(
+    tmp_path: Path,
+) -> None:
+    """请求写入后 daemon 重启/重开数据库仍能唯一兑现它。"""
+    root, conn, cid, reg = _setup(tmp_path, state=ContractState.BLOCKED)
+    _request(conn, cid)
+    conn.close()
+
+    reopened = connect(StoreConfig(db_path=root / "state.db"))
+    try:
+        runner = AttemptRunner(root, reopened, reg)
+        _consume_verification_requests(root, reopened, runner, NOW + timedelta(seconds=3))
+        assert (
+            reopened.execute("SELECT COUNT(*) FROM attempts WHERE role='verifier'").fetchone()[0]
+            == 1
+        )
+        reopened.commit()
+    finally:
+        reopened.close()
