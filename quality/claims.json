@@ -317,6 +317,7 @@
       "lifecycle": "verified",
       "scope_paths": [
         "src/longtask/rpc/",
+        "src/lhgp/rpc/handlers/_common.py",
         "src/longtask/contracts/state_machine.py",
         "tests/integration/test_rpc_lifecycle.py"
       ],
@@ -325,7 +326,7 @@
           "kind": "integration_real_store",
           "path": "tests/integration/test_rpc_lifecycle.py",
           "recorded_at": "2026-09-01",
-          "summary": "真实 SQLite 集成测试：prepare→approve→patch→pause→resume→cancel 正向流、非法迁移/终态拦截、冻结字段拒改、revision 冲突、分页续读、request_id 重放、UNKNOWN_CONTRACT。"
+          "summary": "真实 SQLite 集成测试：prepare→approve→patch→pause→resume→cancel 正向流、非法迁移/终态拦截、冻结字段拒改、预算布尔值拒接、revision 冲突、分页续读、request_id 重放、UNKNOWN_CONTRACT。"
         },
         {
           "kind": "focused_test",
