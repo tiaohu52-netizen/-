@@ -605,7 +605,7 @@
     },
     {
       "id": "forecast-level-honesty",
-      "statement": "仅基于本地历史 attempt 时长的 Deadline 预测明确标记为 historical，并用样本相对剩余时间的经验 CDF 计算 p_finish；只有经过独立回放校准与置信区间验证才可标记 calibrated，避免模型把样本回退误读为精确保证。",
+      "statement": "仅基于本地历史 attempt 时长的 Deadline 预测明确标记为 historical，并在扣除排队、启动、验收和安全边际后用经验 CDF 计算 p_finish；只有经过独立回放校准与置信区间验证才可标记 calibrated，避免模型把样本回退误读为精确保证。",
       "lifecycle": "verified",
       "scope_paths": [
         "src/lhgp/forecast/model.py",
@@ -618,7 +618,7 @@
           "kind": "integration_real_store",
           "path": "tests/unit/test_p4_forecast.py",
           "recorded_at": "2026-09-05",
-          "summary": "完整 forecast 输入与 3 个样本时，快照 confidence 为 high 但 forecast_level 明确为 historical；p_finish 按样本相对 deadline 剩余时间的经验 CDF 计算，低样本仍为 coarse。"
+          "summary": "完整 forecast 输入与 3 个样本时，快照 confidence 为 high 但 forecast_level 明确为 historical；p_finish 按扣除固定交付开销后的经验 CDF 计算，低样本仍为 coarse。"
         }
       ]
     },

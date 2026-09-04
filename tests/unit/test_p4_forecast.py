@@ -142,6 +142,8 @@ def test_historical_finish_probability_uses_empirical_deadline_cdf() -> None:
         computed_at=now,
         due_at=now + timedelta(minutes=30),
         sample_count=3,
-        sample_durations_minutes=(10.0, 20.0, 40.0),
+        sample_durations_minutes=(10.0, 27.0, 40.0),
     )
-    assert snapshot.forecast.p_finish == pytest.approx(2 / 3)
+    # 排队/启动/验收/安全开销共 4 分钟，只有 10 分钟样本能在
+    # 合同剩余的执行窗口内完成；不能把 27 分钟样本误算为可交付。
+    assert snapshot.forecast.p_finish == pytest.approx(1 / 3)
