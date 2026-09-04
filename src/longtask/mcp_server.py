@@ -77,6 +77,7 @@ def tool_health(_args: dict[str, Any], _ctx: dict[str, Any]) -> dict[str, Any]:
         "implementation_version": __version__,
         "status": "ok",
         "tools": TOOL_NAMES,
+        "tool_count": len(TOOL_NAMES),
     }
 
 
