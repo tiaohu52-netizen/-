@@ -30,6 +30,7 @@ from longtask.contracts.state_machine import (
 )
 from longtask.persistence.events import EventType
 from longtask.persistence.store import (
+    STORE_SCHEMA_VERSION,
     IdempotencyMismatchError,
     RevisionConflictError,
     StoreError,
@@ -392,6 +393,11 @@ def handle_contract_request_verification(
             )
         except StoreError as exc:
             raise RpcError(code=ErrorCode.INTERNAL, message=str(exc)) from exc
+        # 状态迁移会产生新的不可变合同 revision；验收请求必须绑定最新版本。
+        refreshed = get_contract(conn, contract_id)
+        if refreshed is None:
+            raise RpcError(code=ErrorCode.INTERNAL, message="contract disappeared after resume")
+        current = refreshed
     append_event(
         conn,
         contract_id=contract_id,
@@ -405,6 +411,9 @@ def handle_contract_request_verification(
         },
         now=now,
         actor=actor,
+        contract_revision=current.revision,
+        role="user",
+        payload_schema_version=STORE_SCHEMA_VERSION,
     )
     return {
         "ok": True,
