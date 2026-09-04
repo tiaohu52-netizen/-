@@ -216,6 +216,7 @@ class TestHandoverPromptAddendum:
         addendum = handover_prompt_addendum(root, cid)
         assert "改 assertFalse" in addendum
         assert "修复断言" in addendum
+        assert "不可信" in addendum
         conn.close()
 
 
@@ -247,6 +248,7 @@ def test_attempt_input_carries_context_and_prompt_addendum(tmp_path: Path) -> No
     assert "active.md" in input_.context_snapshot_path
     assert "验证临时上下文" in input_.task_prompt  # objective 仍在
     assert "改 assertFalse" in input_.task_prompt  # 交接附言已融入
+    assert "不可信" in input_.task_prompt  # 历史模型文本不得伪装成当前指令
 
     # probe 路径：不物化快照、无附言（§10 时序：探针先于租约）
     probe = build_attempt_input(root, conn, contract, "att-3", NOW, with_context=False)
