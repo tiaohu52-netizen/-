@@ -725,6 +725,8 @@ verifier 报告验收结果的通道有两条，按 harness 能力选择：
 调用方可用 `attempt_limit` 限制返回条数（参考实现默认 20，最大 100）。
 参考实现还提供 `verification_history`（最近 20 条），明确呈现用户验收请求、
 daemon 消费结果和 verifier 启动事件，模型无需扫描原始事件流即可判断验收请求是否已兑现。
+`lhgp doctor` SHOULD also validate the launch executable of every enabled registry
+entry and report missing commands before dispatch, without consuming contract budget.
 
 唤醒层降级事件（`wakeup/degraded`）按状态边沿记录：同一层持续不可用时
 MUST NOT 按 daemon tick 重复写入；该层恢复后再次失效时 SHOULD 重新记录，
