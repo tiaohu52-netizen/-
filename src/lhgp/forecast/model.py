@@ -113,8 +113,18 @@ def build_deadline_snapshot(
         for duration in (sample_durations_minutes or ())
         if isinstance(duration, (int, float)) and duration >= 0
     )
+    fixed_overhead = sum(
+        value or 0.0
+        for value in (
+            forecast.queue_minutes,
+            forecast.startup_minutes,
+            forecast.verification_minutes,
+            forecast.safety_margin_minutes,
+        )
+    )
+    available_for_executor = max(remaining - fixed_overhead, 0.0)
     p_finish = (
-        sum(duration <= max(remaining, 0.0) for duration in observed) / len(observed)
+        sum(duration <= available_for_executor for duration in observed) / len(observed)
         if observed
         else forecast.p_finish
     )
