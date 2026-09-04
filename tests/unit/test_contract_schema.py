@@ -115,6 +115,13 @@ class TestContractSerialization:
         with pytest.raises(TypeError, match=r"budget\.max_dispatches must be an integer"):
             draft_from_dict(payload)
 
+    @pytest.mark.parametrize("field", ["max_dispatches", "max_attempt_minutes"])
+    def test_budget_float_is_rejected_during_deserialization(self, field: str) -> None:
+        payload = make_draft().to_dict()
+        payload["budget"][field] = 1.5
+        with pytest.raises(TypeError, match=rf"budget\.{field} must be an integer"):
+            draft_from_dict(payload)
+
     def test_draft_and_view_to_dict(self) -> None:
         draft = make_draft()
         d_dict = draft.to_dict()
@@ -164,6 +171,10 @@ def test_continuity_checkpoint_flag_rejects_non_boolean() -> None:
 def test_continuity_numeric_flags_reject_boolean_values() -> None:
     with pytest.raises(TypeError, match=r"checkpoint_max_age_minutes must be an integer"):
         continuity_from_dict({"checkpoint_max_age_minutes": True})
+
+    def test_continuity_numeric_fields_reject_float_values() -> None:
+        with pytest.raises(TypeError, match=r"checkpoint_max_age_minutes must be an integer"):
+            continuity_from_dict({"checkpoint_max_age_minutes": 1.5})
 
 
 def test_workload_estimate_rejects_boolean_and_non_finite_values() -> None:

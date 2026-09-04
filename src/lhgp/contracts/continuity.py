@@ -69,7 +69,7 @@ def _strict_bool(value: Any, field: str) -> bool:
 
 
 def _strict_int(value: Any, field: str) -> int:
-    if isinstance(value, bool):
+    if isinstance(value, (bool, float)):
         raise TypeError(f"{field} must be an integer")
     return int(value)
 

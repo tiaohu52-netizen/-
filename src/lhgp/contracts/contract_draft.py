@@ -22,7 +22,7 @@ SCHEMA_VERSION = 2
 
 def _strict_int(value: Any, field: str) -> int:
     """Parse a budget integer without treating booleans as 0/1."""
-    if isinstance(value, bool):
+    if isinstance(value, (bool, float)):
         raise TypeError(f"budget.{field} must be an integer")
     try:
         return int(value)
