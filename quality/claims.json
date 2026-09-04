@@ -531,6 +531,24 @@
       ]
     },
     {
+      "id": "cross-attempt-progress-context",
+      "statement": "执行者通过 attempt/write-back 提交的 context/scratch-updated 进度，会在下一 attempt 的 active.md 快照中以 untrusted progress data 形式保留，支持跨会话恢复且不把模型文本升级为系统指令。",
+      "lifecycle": "verified",
+      "scope_paths": [
+        "src/longtask/persistence/context.py",
+        "src/longtask/rpc/executor_api.py",
+        "tests/unit/test_context.py"
+      ],
+      "evidence": [
+        {
+          "kind": "integration_real_store",
+          "path": "tests/unit/test_context.py",
+          "recorded_at": "2026-09-05",
+          "summary": "scratch-updated 事件被编译进后续 active.md，并明确带 untrusted 标记。"
+        }
+      ]
+    },
+    {
       "id": "real-multi-executor-handoff",
       "statement": "合同授权池内的不同 executor 可以跨 attempt 串行接力：首个真实 subprocess 执行器失败后被停用，下一轮由另一个授权 executor 修复，独立 verifier 验收后合同完成。",
       "lifecycle": "verified",
