@@ -487,8 +487,9 @@ class AttemptRunner:
         del self._running[attempt_id]
         self.finished_count += 1
         self._emit(f"runner/attempt-{payload['state']}:{contract_id}:{attempt_id}")
-        if succeeded:
-            # 执行者 succeeded 后派生交叉 verifier（DESIGN §5.2：防止同源盲区）
+        if succeeded and role == "executor":
+            # 只有执行者成功才派生交叉 verifier；verifier 自身成功不能
+            # 再递归派生 verifier，否则真实多执行器注册表会形成无限验证链。
             self._dispatch_verifier(now, contract_id=contract_id, executor_id=executor_id)
 
     def _fail_attempt(self, now: datetime, contract_id: str, attempt_id: str, reason: str) -> None:
@@ -670,8 +671,17 @@ class AttemptRunner:
             )
             return False
 
-        # verifier attempt id：v-<ts>-<seq> 区分
-        verifier_id = f"ver-{now.strftime('%Y%m%d%H%M%S')}-{contract_id[-4:]}"
+        # verifier attempt id：秒级时间戳只是可读前缀，必须再查库补序号。
+        # 同一秒内的 repair/reverify 不得复用 attempt_id，否则适配器会把
+        # 新 verifier 误判为旧进程的重复 spawn（也会破坏 request/事件追溯）。
+        verifier_prefix = f"ver-{now.strftime('%Y%m%d%H%M%S')}-{contract_id[-4:]}"
+        verifier_id = verifier_prefix
+        sequence = 1
+        while self._conn.execute(
+            "SELECT 1 FROM attempts WHERE attempt_id = ? LIMIT 1", (verifier_id,)
+        ).fetchone():
+            verifier_id = f"{verifier_prefix}-{sequence}"
+            sequence += 1
         adapter = self._adapter_for(verifier_entry.id)
         if adapter is None:
             self._fail_attempt(
