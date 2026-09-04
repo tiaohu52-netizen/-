@@ -538,7 +538,11 @@ TOOLS: dict[
     "longtask_get_contract": (
         tool_get_contract,
         {
-            "description": "查询单份合同权威视图（§11.6 字段表）。",
+            "description": (
+                "查询单份合同权威视图（§11.6 字段表），并返回该合同隔离的"
+                " decision_history 与 attempt_history；可用 decision_limit /"
+                " attempt_limit 控制上下文大小。"
+            ),
             "inputSchema": {
                 "type": "object",
                 "required": ["contract_id"],
