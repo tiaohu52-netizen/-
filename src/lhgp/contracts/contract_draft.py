@@ -19,6 +19,16 @@ from lhgp.contracts.continuity import from_dict as continuity_from_dict
 SCHEMA_VERSION = 2
 
 
+def _strict_int(value: Any, field: str) -> int:
+    """Parse a budget integer without treating booleans as 0/1."""
+    if isinstance(value, bool):
+        raise TypeError(f"budget.{field} must be an integer")
+    try:
+        return int(value)
+    except (TypeError, ValueError) as exc:
+        raise TypeError(f"budget.{field} must be an integer") from exc
+
+
 @dataclass(frozen=True, slots=True)
 class ContractDraft:
     """Contract draft composed from the five protocol field groups."""
@@ -116,13 +126,16 @@ def from_dict(data: dict[str, Any]) -> ContractDraft:
         raise KeyError("workload_estimate.initial_hours")
     budget_raw = data["budget"]
     budget = Budget(
-        max_dispatches=int(budget_raw["max_dispatches"]),
-        max_escalations=int(budget_raw["max_escalations"]),
-        max_concurrent_attempts=int(budget_raw["max_concurrent_attempts"]),
-        max_attempt_minutes=int(budget_raw["max_attempt_minutes"]),
-        max_output_bytes=int(budget_raw["max_output_bytes"]),
-        verification_attempts_reserved=int(
-            budget_raw.get("verification_attempts_reserved", DEFAULT_VERIFICATION_RESERVED)
+        max_dispatches=_strict_int(budget_raw["max_dispatches"], "max_dispatches"),
+        max_escalations=_strict_int(budget_raw["max_escalations"], "max_escalations"),
+        max_concurrent_attempts=_strict_int(
+            budget_raw["max_concurrent_attempts"], "max_concurrent_attempts"
+        ),
+        max_attempt_minutes=_strict_int(budget_raw["max_attempt_minutes"], "max_attempt_minutes"),
+        max_output_bytes=_strict_int(budget_raw["max_output_bytes"], "max_output_bytes"),
+        verification_attempts_reserved=_strict_int(
+            budget_raw.get("verification_attempts_reserved", DEFAULT_VERIFICATION_RESERVED),
+            "verification_attempts_reserved",
         ),
     )
     return ContractDraft(
