@@ -347,6 +347,10 @@ draft → active ↔ paused
 - `succeeded` 表示该 attempt 正常交回候选成果，不表示 Goal 满足。
 - `orphaned` 表示运行时重启后无法确认外部运行状态；宽限期后才可 fence 并重新派发。
 - 所有终态不可变；重试创建新 attempt id。
+- Attempt MUST 持久化其所属的 `contract_id` 与稳定 `goal_id`。同一 Goal
+  可以按阶段绑定多份合同；恢复、预算、租约和验收不得仅凭 `goal_id`
+  猜测当前合同。旧数据若无法唯一解析合同，运行时 MUST fail-closed，
+  不得对错误合同续租或写回。
 
 ---
 
@@ -700,7 +704,7 @@ verifier 报告验收结果的通道有两条，按 harness 能力选择：
 - `goals`：稳定 goal identity；
 - `contract_revisions`：不可变合同版本与批准信息；
 - `events`：追加式领域事件；
-- `attempts`：角色、executor、model、外部句柄和终态；
+- `attempts`：所属 contract、Goal、角色、executor、model、外部句柄和终态；
 - `leases`：contract/partition、generation、holder、expiry；
 - `checkpoints`：结构化进度与估计；
 - `artifacts`：位置、hash、media type 与产生 attempt；
