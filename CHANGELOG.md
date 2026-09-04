@@ -45,6 +45,8 @@ follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
   tick, preventing stale OS scheduler entries after transient errors.
 - dogfood v5 now preflights `request-verification` for blocked deliveries and
   falls back to a revision contract only after an explicit protocol refusal.
+- Verification request consumption is now recorded by request event ID, so a
+  terminal verifier cannot cause the same user request to be dispatched again.
 
 ## [0.1.0a0] - 2026-09-01
 
