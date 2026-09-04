@@ -120,6 +120,17 @@ longtask arbitrate lt-20260903-001 --decision hand_to_user --note "需要确认 
 DESIGN §5.2 强调"自己考自己不算数"——协议会派一个 verifier 独立核对，
 你的 checks 要让 verifier 能照着判（不要写"看起来对"）。
 
+**两条硬约定（模型第一次用就踩过的坑，见 `examples/agent-cli-dogfood-v5/`）**：
+
+1. **typed check 的 `target` 相对 `workspace_root` 解析**。合同声明了
+   `workspace_root=/x/ws`，那么 `file-exists:charfreq.py` 指向
+   `/x/ws/charfreq.py`。写成 `file-exists:ws/charfreq.py` 会找
+   `/x/ws/ws/charfreq.py`（双层前缀，不存在）。
+2. **command check 在守护进程环境执行**（`shell=False`、cwd 为
+   workspace_root、PATH 继承 daemon）——daemon 的 PATH 通常**没有**
+   项目虚拟环境。命令里引用解释器要么写绝对路径，要么接受协议侧
+   `undetermined`、由 verifier 的判定块填补裁决（SPEC §12.4）。
+
 ### 4.3 hard_constraints：声明而非禁止
 
 `hard_constraints` 是适配器**翻译前的声明**。翻译不了 = 拒接。所以写

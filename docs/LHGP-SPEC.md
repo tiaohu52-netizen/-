@@ -610,6 +610,18 @@ MVP 默认串行接力。只有计划显式给出互斥分区、写入范围、�
 
 自然语言 verifier 判断是可用证据，但置信等级低于确定性 check。合同应明确哪些 check 是 mandatory，哪些允许 undetermined。
 
+**target 解析约定**：文件类与命令类 check 的 `target` 一律**相对
+`workspace_root` 解析**（不是相对仓库根、不带 workspace 前缀重复）。
+声明 `charfreq.py` 在 `workspace_root=ws/` 下即指向 `ws/charfreq.py`；
+声明 `ws/charfreq.py` 会指向 `ws/ws/charfreq.py`。
+
+**command check 的执行环境契约**：命令以结构化 argv、`shell=False`、
+`cwd=workspace_root`、**守护进程环境**（继承 daemon 的 PATH）执行。
+守护进程环境通常不含项目虚拟环境——声明者 SHOULD 使用可解析的
+解释器绝对路径，或依赖 §12.4 的裁决合成（协议侧 undetermined 由
+verifier 的判定块填补）。命令不可执行（解释器缺失等）产出
+`undetermined` 而非 `fail`——「跑不了」与「跑挂了」是不同的事实。
+
 ### 12.2 独立性
 
 默认 verifier：

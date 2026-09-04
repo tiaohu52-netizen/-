@@ -110,17 +110,25 @@
     },
     {
       "id": "lhgp-spec-typed-acceptance",
-      "statement": "验收 checks 分为 7 种 typed checks（SPEC §12.1），每条 check 关联 evidence 实体；mandatory / optional 分类；verifier 必须独立于 executor（不同 attempt / 不同 session / 优先不同 model family）；属 P5 范围。",
+      "statement": "验收 checks 分为 7 种 typed checks（SPEC §12.1），每条 check 关联 evidence 实体；mandatory / optional 分类；verifier 必须独立于 executor（不同 attempt / 不同 session / 优先不同 model family）；target 一律相对 workspace_root 解析；command check 在守护进程环境执行（shell=False、cwd=workspace_root、继承 daemon PATH），解释器缺失产出 undetermined 并给可行动指引（区别于 fail）；属 P5 范围。",
       "lifecycle": "verified",
       "scope_paths": [
-        "docs/LHGP-SPEC.md"
+        "docs/LHGP-SPEC.md",
+        "src/lhgp/acceptance/evaluator.py",
+        "tests/unit/test_p5_acceptance.py"
       ],
       "evidence": [
         {
           "kind": "source_static",
           "path": "docs/LHGP-SPEC.md",
-          "recorded_at": "2026-09-01",
-          "summary": "SPEC §12.1 七种 check；§12.2 evidence 实体；§12.3 verifier 独立性（历史 verifier 不得阻止新 verifier）。当前实现支持确定性 typed checks、结构化 evidence 与独立 verifier；模型/人工观察仍需显式证据。"
+          "recorded_at": "2026-09-04",
+          "summary": "SPEC §12.1 七种 check + target 解析约定（相对 workspace_root，不带重复前缀）+ command check 环境契约（守护进程环境、解释器缺失 undetermined 非 fail）；§12.2 evidence 实体；§12.3 verifier 独立性；§12.4 证据双通道与裁决合成。"
+        },
+        {
+          "kind": "focused_test",
+          "path": "tests/unit/test_p5_acceptance.py",
+          "recorded_at": "2026-09-04",
+          "summary": "command-not-found → undetermined 且 details 带 daemon PATH 指引（绝对路径 / verifier 判定块）——dogfood v5 发现 5 的回归；target 相对 workspace_root 解析（直接名 pass、双层前缀 fail）——发现 6 的协议侧事实。"
         }
       ]
     },
