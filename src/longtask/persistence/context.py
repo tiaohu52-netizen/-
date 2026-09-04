@@ -68,8 +68,11 @@ class ContextPolicy:
 
     @classmethod
     def from_contract(cls, draft: ContractDraft) -> ContextPolicy:
-        """从合同 context 字段解析；形状不对按默认值（fail-open 只对
-        可选字段，required 显式声明 true 即生效）。"""
+        """从合同 context 字段解析。
+
+        可选 limits 字段形状错误时回落默认值；required 是语义开关，类型
+        错误必须拒绝，只有显式布尔值才生效。
+        """
         raw: Any = draft.context
         if not isinstance(raw, dict):
             raw = {}
