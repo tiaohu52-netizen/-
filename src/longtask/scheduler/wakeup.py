@@ -84,7 +84,8 @@ class WindowsTaskSchedulerPort:
     任务动作只调用本机认证 RPC ``daemon/wake``，不直接读取或修改合同；
     daemon 仍是唯一仲裁者。所有 ``schtasks.exe`` 参数以 argv 传入，避免
     shell 解释用户提供的合同 ID。``schtasks`` 只有分钟精度，因此带秒的
-    目标一律向上取整，绝不提前触发。
+    目标一律向下取整，确保唤醒不晚于 Deadline 安全边界；提前唤醒由
+    daemon 的事件幂等性吸收。
     """
 
     _TASK_ID_RE = re.compile(r"^[A-Za-z0-9._-]{1,200}$")
@@ -107,8 +108,6 @@ class WindowsTaskSchedulerPort:
         if at.tzinfo is None or at.utcoffset() is None:
             raise ValueError("scheduled wakeup time must include a timezone")
         local = at.astimezone()
-        if local.second or local.microsecond:
-            local += timedelta(minutes=1)
         local = local.replace(second=0, microsecond=0)
         # Windows 11 的 schtasks 解析器要求 yyyy/mm/dd，即使系统区域设置
         # 使用其他日期显示格式；固定该格式避免本地化导致 arm 失败。
@@ -137,8 +136,6 @@ class WindowsTaskSchedulerPort:
     def _task_xml(self, task_id: str, at: datetime) -> str:
         """生成允许唤醒/电池运行的 Task Scheduler XML。"""
         local = at.astimezone()
-        if local.second or local.microsecond:
-            local += timedelta(minutes=1)
         local = local.replace(second=0, microsecond=0, tzinfo=None)
         argv = self._wake_argv(task_id)
         command = xml_escape(argv[0])
