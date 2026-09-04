@@ -166,7 +166,10 @@ def tool_get_contract(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, An
             "request_id": args.get("request_id", _now().isoformat()),
             "client_id": "mcp",
             "protocol_version": PROTOCOL_VERSION,
-            "params": {"contract_id": args["contract_id"]},
+            "params": {
+                "contract_id": args["contract_id"],
+                "decision_limit": args.get("decision_limit", 50),
+            },
         }
     )
     return route(envelope, conn=ctx["conn"], now=_now(), registry=ctx["registry"])
@@ -538,7 +541,16 @@ TOOLS: dict[
             "inputSchema": {
                 "type": "object",
                 "required": ["contract_id"],
-                "properties": {"contract_id": {"type": "string"}},
+                "properties": {
+                    "contract_id": {"type": "string"},
+                    "decision_limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 200,
+                        "default": 50,
+                        "description": "返回该合同最近决策历史条数",
+                    },
+                },
             },
         },
     ),
