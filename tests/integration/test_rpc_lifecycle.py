@@ -1059,12 +1059,21 @@ def test_contract_get_exposes_latest_deadline_snapshot(tmp_path: Path) -> None:
             conn=conn,
             now=NOW,
         )
+        for index in range(205):
+            append_event(
+                conn,
+                contract_id=cid,
+                event_type=EventType.FORECAST_UPDATED,
+                payload={"risk": "yellow", "sequence": index},
+                now=NOW + timedelta(seconds=index),
+                actor="promoter",
+            )
         append_event(
             conn,
             contract_id=cid,
             event_type=EventType.FORECAST_UPDATED,
             payload={"risk": "orange", "forecast_p90_minutes": 42.0},
-            now=NOW,
+            now=NOW + timedelta(seconds=205),
             actor="promoter",
         )
         result = route(
