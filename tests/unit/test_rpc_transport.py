@@ -8,6 +8,7 @@ import threading
 import time
 
 from longtask import PROTOCOL_VERSION
+from longtask.rpc.client import call_unix_socket
 from longtask.rpc.errors import ErrorCode
 from longtask.rpc.transport import process_lines, serve_unix_socket
 
@@ -110,3 +111,37 @@ def test_unix_socket_does_not_delete_regular_file(tmp_path) -> None:
     else:
         raise AssertionError("regular endpoint file must not be deleted")
     assert endpoint.read_text(encoding="utf-8") == "sentinel"
+
+
+def test_windows_loopback_fallback_round_trip(tmp_path) -> None:
+    """Windows Python 无 AF_UNIX 时仍能通过本机 token RPC 通信。"""
+    if hasattr(socket, "AF_UNIX"):
+        return
+    endpoint = tmp_path / "rpc.sock"
+    stopped = threading.Event()
+    thread = threading.Thread(
+        target=serve_unix_socket,
+        kwargs={
+            "endpoint": endpoint,
+            "token": "secret",
+            "dispatch": lambda _: {"ok": True, "result": {"ready": True}},
+            "stop_event": stopped,
+        },
+        daemon=True,
+    )
+    thread.start()
+    for _ in range(50):
+        if endpoint.exists():
+            break
+        time.sleep(0.01)
+    response = call_unix_socket(
+        endpoint,
+        token="secret",
+        method="attempt/status",
+        request_id="r-loopback",
+        client_id="client",
+    )
+    assert response["result"]["ready"] is True
+    stopped.set()
+    thread.join(timeout=2)
+    assert not endpoint.exists()

@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import sys
 from datetime import UTC, datetime
@@ -80,6 +81,11 @@ def build_parser() -> argparse.ArgumentParser:
     rpc_p = sub.add_parser("rpc-call", help="通过 daemon 本机 socket 调用 JSON-RPC 方法")
     rpc_p.add_argument("method", type=str, help="方法名，例如 attempt/status")
     rpc_p.add_argument("--params", default="{}", help="JSON 参数对象")
+    rpc_p.add_argument(
+        "--params-b64",
+        default=None,
+        help="URL-safe base64 编码的 JSON 参数（计划任务动作使用，避免 Windows quoting）",
+    )
     rpc_p.add_argument("--request-id", default=None, help="幂等请求 ID（默认自动生成）")
     rpc_p.add_argument("--client-id", default="longtask-cli", help="客户端标识")
     # P6：数据目录迁移——安全默认：不带 --execute 只打印计划不动数据
@@ -337,7 +343,12 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "rpc-call":
         try:
-            rpc_params = json.loads(args.params)
+            if args.params_b64 is not None:
+                encoded = str(args.params_b64)
+                encoded += "=" * (-len(encoded) % 4)
+                rpc_params = json.loads(base64.urlsafe_b64decode(encoded).decode("utf-8"))
+            else:
+                rpc_params = json.loads(args.params)
             if not isinstance(rpc_params, dict):
                 raise ValueError("--params must be a JSON object")
             token_path = root / "daemon.token"
