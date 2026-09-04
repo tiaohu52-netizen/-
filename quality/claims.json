@@ -428,7 +428,8 @@
         "tests/conformance/test_lhgp_tool_namespace.py",
         "examples/agent-cli-model-provider-run-v2/",
         "examples/mcp-discovery/README.md",
-        "examples/mcp-discovery/mcp-trace.example.log"
+        "examples/mcp-discovery/mcp-trace.example.log",
+        "docs/evidence/P6-fresh-machine-smoke-2026-09-05.md"
       ],
       "evidence": [
         {
@@ -448,6 +449,12 @@
           "path": "examples/mcp-discovery/mcp-trace.example.log",
           "recorded_at": "2026-09-01",
           "summary": "模拟模型侧 e2e（agent-cli 本体未配置 longtask-mcp 客户端，配置 agent-cli 客户端是 agent-cli 侧能力）：归档日志通过 longtask-mcp 8 步走通（initialize → tools.list → health → list_executors → prepare → approve → get → attach），事件链完整；README 与日志明确标注这是 2026-09-01 的七工具历史快照，当前工具清单以运行时 tools/list 为准。"
+        },
+        {
+          "kind": "manual_review",
+          "path": "docs/evidence/P6-fresh-machine-smoke-2026-09-05.md",
+          "recorded_at": "2026-09-05",
+          "summary": "当前提交重新构建并在全新 CPython 3.13 隔离环境安装 wheel；canonical/legacy CLI、空目录 doctor 和 lhgp-mcp tools/list 均成功，响应包含双命名空间及审计/控制扩展。"
         }
       ],
       "notes": "agent-cli 客户端的 MCP server 注册不在本协议范围——每个 MCP 客户端（Claude Desktop / agent-cli / agent-zero 等）需独立配置 longtask-mcp 路径。stdin/stdout pipe 在 Windows 上透明用系统编码（cp936）转换 utf-8——强制 ensure_ascii=True 让编码无关；模型侧按 UTF-8 解析 JSON 字符串 \\u 转义即可。"
