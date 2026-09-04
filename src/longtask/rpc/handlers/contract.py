@@ -352,7 +352,7 @@ def handle_contract_request_verification(
         "WHERE goal_id = ? AND role = 'verifier' "
         "AND state NOT IN ('succeeded', 'failed', 'cancelled', 'stale', 'orphaned') "
         "LIMIT 1",
-        (contract_id,),
+        (current.goal_id,),
     ).fetchone()
     if running_verifier is not None:
         raise RpcError(

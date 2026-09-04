@@ -128,7 +128,7 @@ def _estimate_stalled_from_attempts(conn: sqlite3.Connection, contract_id: str) 
         return False
     return (
         conn.execute(
-            "SELECT 1 FROM attempts WHERE goal_id = ? AND role = 'verifier' LIMIT 1", (contract_id,)
+            "SELECT 1 FROM attempts WHERE goal_id = ? AND role = 'verifier' LIMIT 1", (goal_id,)
         ).fetchone()
         is None
     )
