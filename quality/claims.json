@@ -536,6 +536,7 @@
       "lifecycle": "verified",
       "scope_paths": [
         "src/longtask/cli/runner.py",
+        "src/longtask/cli/dispatch.py",
         "tests/integration/test_real_subprocess_repair_loop.py"
       ],
       "evidence": [
@@ -550,6 +551,12 @@
           "path": "src/longtask/cli/runner.py",
           "recorded_at": "2026-09-05",
           "summary": "_finish_attempt 仅在 role=executor 且 succeeded 时派生 verifier；verifier 成功不再递归派生。verifier ID 同秒冲突时按 attempts 表补序号。"
+        },
+        {
+          "kind": "source_static",
+          "path": "src/longtask/cli/dispatch.py",
+          "recorded_at": "2026-09-05",
+          "summary": "executor attempt ID 同秒冲突时按 attempts 表补序号后再占租约、写入 started 事件，避免重复 attempt 覆盖。"
         }
       ]
     },
