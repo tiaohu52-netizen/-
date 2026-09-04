@@ -523,6 +523,10 @@ TOOLS: dict[
                     "context": {"type": "object"},
                     "execution": {"type": "object"},
                     "contract_id": {"type": "string", "description": "可选自定义 ID"},
+                    "request_id": {
+                        "type": "string",
+                        "description": "幂等重试键；重试同一变更时必须复用",
+                    },
                 },
             },
         },
@@ -537,6 +541,7 @@ TOOLS: dict[
                 "properties": {
                     "contract_id": {"type": "string"},
                     "revision": {"type": "integer", "description": "CAS 期望版本号（可选）"},
+                    "request_id": {"type": "string", "description": "幂等重试键；重试时复用"},
                 },
             },
         },
@@ -553,7 +558,10 @@ TOOLS: dict[
             "inputSchema": {
                 "type": "object",
                 "required": ["contract_id"],
-                "properties": {"contract_id": {"type": "string"}},
+                "properties": {
+                    "contract_id": {"type": "string"},
+                    "request_id": {"type": "string", "description": "幂等重试键；重试时复用"},
+                },
             },
         },
     ),
@@ -646,6 +654,7 @@ TOOLS: dict[
                     "revision": {"type": "integer"},
                     "plan": {"type": "object"},
                     "progress": {"type": "object"},
+                    "request_id": {"type": "string", "description": "幂等重试键；重试时复用"},
                 },
             },
         },
@@ -661,6 +670,7 @@ TOOLS: dict[
                     "goal_id": {"type": "string"},
                     "stage_id": {"type": "string"},
                     "revision": {"type": "integer"},
+                    "request_id": {"type": "string", "description": "幂等重试键；重试时复用"},
                 },
             },
         },
@@ -712,6 +722,10 @@ TOOLS: dict[
                     "progress_note": {
                         "type": "string",
                         "description": "进度要点（落 context/scratch-updated 事件）",
+                    },
+                    "request_id": {
+                        "type": "string",
+                        "description": "写回幂等重试键；重试同一报告时必须复用",
                     },
                 },
             },
@@ -789,6 +803,7 @@ TOOLS.update(
                         "contract_id": {"type": "string"},
                         "attempt_id": {"type": "string"},
                         "reason": {"type": "string"},
+                        "request_id": {"type": "string", "description": "幂等重试键；重试时复用"},
                     },
                 },
             },
@@ -808,6 +823,7 @@ TOOLS.update(
                         "progress_note": {"type": "string"},
                         "model_id": {"type": "string"},
                         "evidence": {"type": "array", "items": {"type": "object"}},
+                        "request_id": {"type": "string", "description": "幂等重试键；重试时复用"},
                     },
                 },
             },

@@ -64,6 +64,8 @@ executor；调用 `lhgp_request_verification`（兼容名
   由 daemon 在安全仲裁点兑现。
 - `lhgp_write_back` 只接受执行者持有的 generation，并必须携带真实进度或
   evidence；不要用它伪造完成状态。
+- 所有会改变状态的 MCP 工具都支持 `request_id`。网络或模型重试时必须复用
+  同一个 `request_id`，否则协议会把它视为新的变更请求；只读查询无需依赖它。
 
 没有 MCP 时，可用等价的只读 CLI 审计：
 `lhgp notifications --goal-id <id>`（payload 默认隐藏）。
