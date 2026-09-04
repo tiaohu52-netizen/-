@@ -12,6 +12,7 @@ L1 RTC：next_decision_at 纳入注册目标。
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -244,6 +245,64 @@ class TestEarliestAcrossContracts:
 
 
 class TestTickIntegration:
+    def test_forecast_duration_baseline_ignores_failed_attempts(self, tmp_path: Path) -> None:
+        """Deadline 快照的历史时长基线只采纳 succeeded executor。"""
+        from longtask.adapters.registry import ExecutorRegistry
+        from longtask.cli.tick import run_daemon_tick
+        from longtask.persistence.events import EventType
+
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        setup_contract(data_dir, "lt-p4-history", NOW + timedelta(hours=2))
+        conn = connect(StoreConfig(db_path=data_dir / "state.db"))
+        try:
+            # 失败样本只有 1 分钟，成功样本 10 分钟；若误用全部样本，p50 会变成
+            # 11 分钟（含启动边际），而正确基线应为 20 分钟。
+            conn.executemany(
+                """
+                INSERT INTO attempts (
+                    attempt_id, goal_id, contract_id, contract_revision, role,
+                    state, admitted_at, started_at, terminal_at, updated_at
+                ) VALUES (?, ?, ?, 2, 'executor', ?, ?, ?, ?, ?)
+                """,
+                [
+                    (
+                        "attempt-failed",
+                        "lt-p4-history",
+                        "lt-p4-history",
+                        "failed",
+                        NOW.isoformat(),
+                        NOW.isoformat(),
+                        (NOW + timedelta(minutes=1)).isoformat(),
+                        (NOW + timedelta(minutes=1)).isoformat(),
+                    ),
+                    (
+                        "attempt-succeeded",
+                        "lt-p4-history",
+                        "lt-p4-history",
+                        "succeeded",
+                        NOW.isoformat(),
+                        NOW.isoformat(),
+                        (NOW + timedelta(minutes=10)).isoformat(),
+                        (NOW + timedelta(minutes=10)).isoformat(),
+                    ),
+                ],
+            )
+            conn.commit()
+
+            run_daemon_tick(data_dir, conn, ExecutorRegistry(), now=NOW)
+            forecast_events = [
+                event
+                for event in get_events(conn, contract_id="lt-p4-history")
+                if event.event_type == EventType.FORECAST_UPDATED
+            ]
+            assert len(forecast_events) == 1
+            payload = json.loads(forecast_events[0].payload_json)
+            assert payload["sample_count"] == 1
+            assert payload["forecast_p50_minutes"] == pytest.approx(20.0)
+        finally:
+            conn.close()
+
     def test_tick_sets_next_decision_for_active_contract(self, tmp_path: Path) -> None:
         """run_daemon_tick 端到端：active 合同跑完一轮后落了决策点。"""
         from longtask.adapters.registry import ExecutorRegistry
