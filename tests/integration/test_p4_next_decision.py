@@ -147,6 +147,25 @@ class TestComputeNextDecisionAt:
         finally:
             conn.close()
 
+    def test_imminent_deadline_clamps_decision_to_now(self, tmp_path: Path) -> None:
+        """不足安全边际时立即决策，绝不产生过去的调度时间。"""
+        from longtask.cli.tick import _compute_next_decision_at
+
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        deadline = NOW + timedelta(milliseconds=500)
+        setup_contract(data_dir, "lt-p4-imminent", deadline)
+        conn = connect(StoreConfig(db_path=data_dir / "state.db"))
+        try:
+            view = get_contract(conn, "lt-p4-imminent")
+            next_at = _compute_next_decision_at(
+                view, now=NOW, lease=None, decision_tier=UrgencyTier.QUEUED
+            )
+            assert next_at == NOW
+            assert next_at >= NOW
+        finally:
+            conn.close()
+
 
 class TestSetNextDecisionAt:
     def test_write_does_not_bump_revision(self, tmp_path: Path) -> None:
