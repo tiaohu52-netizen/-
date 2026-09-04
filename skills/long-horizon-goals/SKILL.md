@@ -72,6 +72,12 @@ executor；调用 `lhgp_request_verification`（兼容名
 - **authority.executors** — 你知道哪些 CLI 可用；未列即拒（default-deny）
 - **deadline** — 给时区，ISO-8601
 
+`acceptance.checks[].kind` 必须使用协议线值：
+`file-exists`、`file-content-matches`、`command-exit-zero`、
+`artifact-present`、`structure-valid`、`observable` 或 `user-assertion`。
+不要把设计文档里的 `artifact_exists`、`command`、`schema` 等概念名直接
+写进合同；它们不是当前 wire 枚举。
+
 对于 `command-exit-zero` 验收，若命令可能耗时较长，可在 check 的
 `args.timeout_seconds` 中给出更短上限。运行时还会以合同剩余 Deadline
 进一步收紧超时；超时只代表 `undetermined`，不要把它解释成通过或失败，
