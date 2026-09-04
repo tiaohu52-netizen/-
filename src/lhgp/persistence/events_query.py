@@ -148,10 +148,10 @@ def get_recent_events(
     """Return newest contract events using a database-side limit."""
     if not isinstance(limit, int) or isinstance(limit, bool) or limit < 1:
         raise ValueError("limit must be a positive integer")
-    query = (  # noqa: S608 — _SELECT_LIST is a fixed internal column list
-        "SELECT "
+    query = (
+        "SELECT "  # noqa: S608 — fixed internal column list
         + _SELECT_LIST
-        + " FROM events WHERE contract_id = ? ORDER BY event_id DESC LIMIT ?"
+        + (" FROM events WHERE contract_id = ? ORDER BY event_id DESC LIMIT ?")
     )
     rows = conn.execute(query, (contract_id, limit)).fetchall()
     return [_row_to_stored_event(row) for row in reversed(rows)]
