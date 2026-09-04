@@ -586,6 +586,24 @@
       ]
     },
     {
+      "id": "contract-list-resource-bound",
+      "statement": "contract/list 的 RPC 与 MCP 边界统一限制 page size 为 1–200，避免模型请求异常大页面拖垮 daemon 或上下文。",
+      "lifecycle": "verified",
+      "scope_paths": [
+        "src/longtask/rpc/handlers/contract.py",
+        "src/longtask/mcp_server.py",
+        "tests/integration/test_rpc_lifecycle.py"
+      ],
+      "evidence": [
+        {
+          "kind": "integration_real_store",
+          "path": "tests/integration/test_rpc_lifecycle.py",
+          "recorded_at": "2026-09-05",
+          "summary": "真实 RPC 集成测试验证 contract/list 对非正和超过 200 的 limit 返回 VALIDATION_FAILED；MCP schema 同步声明 minimum/maximum。"
+        }
+      ]
+    },
+    {
       "id": "real-multi-executor-handoff",
       "statement": "合同授权池内的不同 executor 可以跨 attempt 串行接力：首个真实 subprocess 执行器失败后被停用，下一轮由另一个授权 executor 修复，独立 verifier 验收后合同完成。",
       "lifecycle": "verified",

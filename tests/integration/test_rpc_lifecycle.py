@@ -809,6 +809,7 @@ class TestHandlerValidationBranches:
                     now=NOW,
                 )
             assert exc.value.code is ErrorCode.VALIDATION_FAILED
+
         finally:
             conn.close()
 
@@ -829,6 +830,15 @@ class TestHandlerValidationBranches:
             with pytest.raises(RpcError) as exc:
                 route(
                     make_env(Method.PROTOCOL_EVENTS, "r2", {"limit": 0}),
+                    conn=conn,
+                    now=NOW,
+                )
+            assert exc.value.code is ErrorCode.VALIDATION_FAILED
+
+            # 过大 limit 也必须拒绝，防止一次性构造过大的模型上下文
+            with pytest.raises(RpcError) as exc:
+                route(
+                    make_env(Method.CONTRACT_LIST, "r3", {"limit": 201}),
                     conn=conn,
                     now=NOW,
                 )
