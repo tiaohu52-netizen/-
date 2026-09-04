@@ -709,7 +709,7 @@ verifier 报告验收结果的通道有两条，按 harness 能力选择：
 - `checkpoints`：结构化进度与估计；
 - `artifacts`：位置、hash、media type 与产生 attempt；
 - `evidence`：check、结论、来源与有效 revision；
-- `decisions`：用户/运行时决定；
+- `decisions`：用户/运行时决定及其所属 contract、Goal 与 revision；
 - `idempotency`：request id、payload hash、原结果；
 - `wakeups`：计划、触发、降级与重复去重。
 
