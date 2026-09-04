@@ -78,6 +78,10 @@ class ContextPolicy:
             raw = {}
         limits_raw = raw.get("limits")
         limits: dict[str, Any] = limits_raw if isinstance(limits_raw, dict) else {}
+        if isinstance(limits.get("max_bytes"), bool):
+            raise TypeError("context.limits.max_bytes must be an integer")
+        if isinstance(limits.get("expires_after_minutes"), bool):
+            raise TypeError("context.limits.expires_after_minutes must be an integer")
         try:
             max_bytes = int(limits.get("max_bytes", DEFAULT_MAX_BYTES))
             expires = int(limits.get("expires_after_minutes", DEFAULT_EXPIRES_MINUTES))
