@@ -84,6 +84,11 @@ class TestContextPolicy:
         assert policy.max_bytes == 500
         assert policy.expires_after_minutes == 30
 
+    def test_rejects_non_boolean_required_flag(self) -> None:
+        draft = make_draft(context={"required": "false"})
+        with pytest.raises(TypeError, match=r"context\.required must be a boolean"):
+            ContextPolicy.from_contract(draft)
+
     def test_malformed_limits_fall_back_to_defaults(self) -> None:
         draft = make_draft(context={"required": True, "limits": {"max_bytes": "abc"}})
         policy = ContextPolicy.from_contract(draft)

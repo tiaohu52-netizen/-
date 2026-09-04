@@ -80,8 +80,11 @@ class ContextPolicy:
             expires = int(limits.get("expires_after_minutes", DEFAULT_EXPIRES_MINUTES))
         except (TypeError, ValueError):
             max_bytes, expires = DEFAULT_MAX_BYTES, DEFAULT_EXPIRES_MINUTES
+        raw_required = raw.get("required", False)
+        if not isinstance(raw_required, bool):
+            raise TypeError("context.required must be a boolean")
         return cls(
-            required=bool(raw.get("required", False)),
+            required=raw_required,
             max_bytes=max(1, max_bytes),
             expires_after_minutes=max(1, expires),
         )
