@@ -274,8 +274,11 @@ class TestMCPHealth:
             assert result["status"] == "ok"
             assert "protocol_version" in result
             assert "longtask_prepare_contract" in result["tools"]
+            listed = _roundtrip(proc, "tools/list", {}, _id=3)
+            assert result["tool_count"] == len(listed["result"]["tools"])
+            assert result["tool_count"] == len(result["tools"])
             doctor = _result_text(
-                _roundtrip(proc, "tools/call", {"name": "lhgp_doctor", "arguments": {}}, _id=2)
+                _roundtrip(proc, "tools/call", {"name": "lhgp_doctor", "arguments": {}}, _id=4)
             )
             assert doctor["all_ok"] is True
         finally:
