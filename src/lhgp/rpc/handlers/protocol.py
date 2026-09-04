@@ -135,6 +135,11 @@ def handle_daemon_wake(
 def _coerce_int(raw: Any, name: str) -> int | None:
     if raw is None:
         return None
+    if isinstance(raw, bool):
+        raise RpcError(
+            code=ErrorCode.VALIDATION_FAILED,
+            message=f"{name} must be an integer",
+        )
     try:
         return int(raw)
     except (TypeError, ValueError) as exc:
