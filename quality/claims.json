@@ -131,7 +131,7 @@
           "summary": "command-not-found 分支：FileNotFoundError → undetermined 且 details 带 daemon PATH 指引（绝对解释器路径 / §12.4 verifier 判定块）——区别于 fail（「跑不了」与「跑挂了」是不同的事实）。对应测试见 tests/unit/test_p5_acceptance.py（undetermined 带指引回归、target 相对 workspace_root 解析）——focused_test 证据挂在与实现绑定的 ephemeral-context-and-verifier 声明下。"
         },
         {
-          "kind": "focused_test",
+          "kind": "source_static",
           "path": "tests/unit/test_p5_acceptance.py",
           "recorded_at": "2026-09-05",
           "summary": "CheckSpec 的 mandatory 字段只接受 JSON boolean；字符串等错误类型明确拒绝，避免 optional check 被隐式升级为 mandatory。"
