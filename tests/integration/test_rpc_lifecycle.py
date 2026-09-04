@@ -20,8 +20,10 @@ import pytest
 
 from longtask import PROTOCOL_VERSION
 from longtask.contracts.schema import ContractState
+from longtask.persistence.events import EventType
 from longtask.persistence.store import (
     StoreConfig,
+    append_event,
     connect,
     ensure_schema,
     update_contract_state,
@@ -1039,6 +1041,41 @@ def test_contract_get_exposes_isolated_decision_history(tmp_path: Path) -> None:
             now=NOW,
         )
         assert len(limited["result"]["attempt_history"]) == 1
+    finally:
+        conn.close()
+
+
+def test_contract_get_exposes_latest_deadline_snapshot(tmp_path: Path) -> None:
+    """合同查询直接提供最新风险快照，模型无需重放全量事件。"""
+    conn = connect(setup_test_db(tmp_path))
+    try:
+        cid = "lt-20260831-deadline-snapshot"
+        route(
+            make_env(
+                Method.CONTRACT_PREPARE,
+                "req-snapshot-prep",
+                {"contract_id": cid, "draft": make_valid_draft_payload()},
+            ),
+            conn=conn,
+            now=NOW,
+        )
+        append_event(
+            conn,
+            contract_id=cid,
+            event_type=EventType.FORECAST_UPDATED,
+            payload={"risk": "orange", "forecast_p90_minutes": 42.0},
+            now=NOW,
+            actor="promoter",
+        )
+        result = route(
+            make_env(Method.CONTRACT_GET, "req-snapshot-get", {"contract_id": cid}),
+            conn=conn,
+            now=NOW,
+        )
+        assert result["result"]["deadline_snapshot"] == {
+            "risk": "orange",
+            "forecast_p90_minutes": 42.0,
+        }
     finally:
         conn.close()
 
