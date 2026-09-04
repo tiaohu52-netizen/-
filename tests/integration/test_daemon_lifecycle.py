@@ -20,7 +20,9 @@ from longtask.cli.daemon import (
     get_daemon_status,
     halt_daemon,
 )
+from longtask.cli.daemon_loop import run_daemon_loop
 from longtask.cli.main import main
+from longtask.persistence.store import StoreConfig, connect, ensure_schema
 
 pytestmark = pytest.mark.integration
 
@@ -55,6 +57,29 @@ def test_start_stop_roundtrip(tmp_path: Path, capsys: pytest.CaptureFixture[str]
     finally:
         # 兜底清理：断言失败时不遗留孤儿进程
         halt_daemon(data_dir, grace_seconds=1.0)
+
+
+def test_rpc_unavailable_is_audited_without_thread_traceback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Windows 无 Unix socket 时，RPC 降级不应产生未捕获线程异常。"""
+    import longtask.cli.daemon_loop as daemon_loop
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    conn = connect(StoreConfig(db_path=data_dir / "state.db"))
+    ensure_schema(conn)
+    conn.close()
+    (data_dir / TOKEN_FILE).write_text("test-token\n", encoding="utf-8")
+    messages: list[str] = []
+
+    def unavailable(**_kwargs: object) -> None:
+        raise RuntimeError("this platform does not provide Unix domain sockets")
+
+    monkeypatch.setattr(daemon_loop, "serve_unix_socket", unavailable)
+    result = run_daemon_loop(data_dir, interval_seconds=0, max_cycles=1, emit_fn=messages.append)
+    assert result["ok"] is True
+    assert any(message.startswith("rpc/degraded:") for message in messages)
 
 
 def test_start_rejects_when_already_running(
