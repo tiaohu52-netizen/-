@@ -49,6 +49,8 @@ follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
   terminal verifier cannot cause the same user request to be dispatched again.
 - `contract/get` and MCP `get_contract` now expose bounded verification history,
   making request, consumption, and verifier-start state directly model-readable.
+- `lhgp doctor` now checks launch executables for enabled registry entries and
+  reports actionable missing-CLI diagnostics before dispatch.
 
 ## [0.1.0a0] - 2026-09-01
 
