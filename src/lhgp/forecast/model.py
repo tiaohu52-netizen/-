@@ -6,6 +6,7 @@ The canonical ``lhgp`` namespace owns this implementation.  The historical
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
@@ -94,6 +95,7 @@ def build_deadline_snapshot(
     sample_count: int = 0,
     stale_after: timedelta = timedelta(hours=1),
     forecast_updated_at: datetime | None = None,
+    sample_durations_minutes: Sequence[float] | None = None,
 ) -> DeadlineSnapshot:
     """Derive conservative Deadline risk without promising completion.
 
@@ -106,6 +108,16 @@ def build_deadline_snapshot(
     remaining = (due_at - computed_at).total_seconds() / 60.0
     slack_p50 = remaining - p50 if p50 is not None else None
     slack_p90 = remaining - p90 if p90 is not None else None
+    observed = tuple(
+        duration
+        for duration in (sample_durations_minutes or ())
+        if isinstance(duration, (int, float)) and duration >= 0
+    )
+    p_finish = (
+        sum(duration <= max(remaining, 0.0) for duration in observed) / len(observed)
+        if observed
+        else forecast.p_finish
+    )
     stale = forecast_updated_at is not None and computed_at - forecast_updated_at > stale_after
     complete_components = all(
         value is not None
@@ -118,7 +130,7 @@ def build_deadline_snapshot(
             forecast.safety_margin_minutes,
             p50,
             p90,
-            forecast.p_finish,
+            p_finish,
         )
     )
     low_confidence = sample_count < 3 or not complete_components or stale
@@ -126,7 +138,6 @@ def build_deadline_snapshot(
     # 历史样本只能说明估计来自真实运行记录；在尚未做回放校准和
     # 置信区间校验前，不得把它标成 calibrated，避免模型误读精度。
     forecast_level = "coarse" if low_confidence else "historical"
-    p_finish = forecast.p_finish
     if p_finish is not None:
         p_finish = max(0.0, min(1.0, p_finish))
     if computed_at > due_at:

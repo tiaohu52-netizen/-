@@ -122,3 +122,26 @@ def test_historical_samples_are_not_presented_as_calibrated() -> None:
     )
     assert snapshot.confidence == "high"
     assert snapshot.forecast_level == "historical"
+
+
+def test_historical_finish_probability_uses_empirical_deadline_cdf() -> None:
+    now = datetime(2026, 9, 3, 12, tzinfo=UTC)
+    forecast = Forecast(
+        queue_minutes=1,
+        startup_minutes=1,
+        remaining_minutes=10,
+        verification_minutes=1,
+        retry_reserve_minutes=1,
+        safety_margin_minutes=1,
+        forecast_p50_minutes=15,
+        forecast_p90_minutes=25,
+        p_finish=0.99,  # 显式样本应覆盖未经证实的先验值
+    )
+    snapshot = build_deadline_snapshot(
+        forecast,
+        computed_at=now,
+        due_at=now + timedelta(minutes=30),
+        sample_count=3,
+        sample_durations_minutes=(10.0, 20.0, 40.0),
+    )
+    assert snapshot.forecast.p_finish == pytest.approx(2 / 3)
