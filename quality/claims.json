@@ -623,6 +623,23 @@
       ]
     },
     {
+      "id": "attempt-context-deadline-visibility",
+      "statement": "daemon 为新 attempt 编译 active.md 时会注入当前合同的协议生成 deadline_snapshot，并明确只读、仅供风险判断而非按时完成保证，使跨会话模型获得与 MCP 查询一致的风险事实。",
+      "lifecycle": "verified",
+      "scope_paths": [
+        "src/longtask/persistence/context.py",
+        "tests/unit/test_context.py"
+      ],
+      "evidence": [
+        {
+          "kind": "integration_real_store",
+          "path": "tests/unit/test_context.py",
+          "recorded_at": "2026-09-05",
+          "summary": "真实 SQLite 上的 active.md 编译测试验证风险快照、只读语义和非保证声明均进入新 attempt 上下文。"
+        }
+      ]
+    },
+    {
       "id": "real-multi-executor-handoff",
       "statement": "合同授权池内的不同 executor 可以跨 attempt 串行接力：首个真实 subprocess 执行器失败后被停用，下一轮由另一个授权 executor 修复，独立 verifier 验收后合同完成。",
       "lifecycle": "verified",
