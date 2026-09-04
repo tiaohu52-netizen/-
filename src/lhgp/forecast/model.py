@@ -123,7 +123,9 @@ def build_deadline_snapshot(
     )
     low_confidence = sample_count < 3 or not complete_components or stale
     confidence = "low" if low_confidence else "high"
-    forecast_level = "coarse" if low_confidence else "calibrated"
+    # 历史样本只能说明估计来自真实运行记录；在尚未做回放校准和
+    # 置信区间校验前，不得把它标成 calibrated，避免模型误读精度。
+    forecast_level = "coarse" if low_confidence else "historical"
     p_finish = forecast.p_finish
     if p_finish is not None:
         p_finish = max(0.0, min(1.0, p_finish))
