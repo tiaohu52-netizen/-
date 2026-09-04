@@ -267,7 +267,10 @@ def _consume_verification_requests(
         # contract_id here would miss an existing verifier and break the
         # request-consumption idempotence guarantee.
         already = conn.execute(
-            "SELECT attempt_id FROM attempts WHERE goal_id = ? AND role = 'verifier' LIMIT 1",
+            "SELECT attempt_id FROM attempts "
+            "WHERE goal_id = ? AND role = 'verifier' "
+            "AND state NOT IN ('succeeded', 'failed', 'cancelled', 'stale', 'orphaned') "
+            "LIMIT 1",
             (contract.goal_id,),
         ).fetchone()
         if already is not None:
