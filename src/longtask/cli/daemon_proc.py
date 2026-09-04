@@ -267,10 +267,11 @@ def lhgpd_entrypoint() -> int:
 
     from longtask.cli.daemon_loop import run_daemon_loop
     from longtask.cli.paths import default_data_root
+    from longtask.scheduler.wakeup import default_schedule_port
 
     root = default_data_root()
     root.mkdir(parents=True, exist_ok=True)
-    res = run_daemon_loop(root, emit_fn=print)
+    res = run_daemon_loop(root, emit_fn=print, schedule_port=default_schedule_port(root))
     import json as _json
 
     print(_json.dumps(res, ensure_ascii=False))

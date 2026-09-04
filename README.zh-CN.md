@@ -78,7 +78,7 @@ LHGP **不是**工作流引擎。Agent 可以在租约仍然有效时被换掉�
 | 执行者注册表 + 能力匹配 + 成本优先级分发 | 已验证 | `executor-registry-matching` |
 | 文件投影 + handover.md 模式 | 已验证 | `file-projections-and-handover` |
 | CLI + 守护进程控制面 + --dry-run | 已验证 | `cli-and-daemon-control-plane` |
-| 严格 Deadline 分层唤醒（L0/L1 已落地；L2/L3 仅设计） | 已接受的债（2026-12-01 复审） | `strict-deadline-wakeup-design` |
+| 严格 Deadline 分层唤醒（L0/L1 本机适配器已落地；L2/L3 仅设计） | 已接受的债（2026-12-01 复审） | `strict-deadline-wakeup-design` |
 | MCP server + 模型侧 skill（核心工具、LHGP 别名、合同/目标读取、决策与 attempt 历史及审计/控制扩展，不是 1:1 RPC 隧道） | 已验证 | `mcp-server-and-skill` |
 | 临时上下文 + 交叉核对 verifier | 已验证 | `ephemeral-context-and-verifier` |
 | 用户触发验收（不重派 executor） | 已验证 | `ephemeral-context-and-verifier` |

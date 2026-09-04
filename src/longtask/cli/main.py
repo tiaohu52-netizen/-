@@ -358,7 +358,14 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
     if args.command == "_daemon-run":
-        res = run_daemon_loop(root, interval_seconds=args.interval, emit_fn=print)
+        from longtask.scheduler.wakeup import default_schedule_port
+
+        res = run_daemon_loop(
+            root,
+            interval_seconds=args.interval,
+            emit_fn=print,
+            schedule_port=default_schedule_port(root),
+        )
         print(json.dumps(res, ensure_ascii=False))
         return 0
 

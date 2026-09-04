@@ -32,6 +32,7 @@ from longtask.scheduler.wakeup import (
     NullSchedulePort,
     RtcAlarm,
     SleepGuard,
+    WindowsTaskSchedulerPort,
     guard_needed,
 )
 
@@ -281,6 +282,17 @@ class TestRtcAlarm:
         assert port.disarmed == ["longtask-wakeup-lt-w11"]
         conn.close()
 
+    def test_note_fired_forces_one_shot_task_to_be_rearmed(self, tmp_path: Path) -> None:
+        conn = make_store(tmp_path)
+        save_active_contract(conn, "lt-w10d", deadline=NOW + timedelta(hours=10))
+        port = FakeSchedulePort()
+        alarm = RtcAlarm(port)
+        alarm.refresh(conn, now=NOW)
+
+        assert alarm.note_fired("longtask-wakeup-lt-w10d") is True
+        assert alarm.note_fired("longtask-wakeup-lt-w10d") is False
+        conn.close()
+
     def test_unavailable_port_records_degraded(self, tmp_path: Path) -> None:
         conn = make_store(tmp_path)
         save_active_contract(conn, "lt-w12", deadline=NOW + timedelta(hours=10))
@@ -340,6 +352,53 @@ class TestRtcAlarm:
     def test_null_schedule_port_is_unavailable(self) -> None:
         port = NullSchedulePort()
         assert port.is_available() is False
+
+    def test_windows_task_scheduler_arms_rounded_local_time(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls: list[list[str]] = []
+
+        class Completed:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        monkeypatch.setattr("longtask.scheduler.wakeup.sys.platform", "win32")
+        monkeypatch.setattr("longtask.scheduler.wakeup.shutil.which", lambda _: "schtasks.exe")
+        monkeypatch.setattr(
+            "longtask.scheduler.wakeup.subprocess.run",
+            lambda args, **kwargs: calls.append(list(args)) or Completed(),
+        )
+
+        port = WindowsTaskSchedulerPort(tmp_path)
+        assert port.is_available() is True
+        port.arm("longtask-wakeup-lt-safe", NOW + timedelta(hours=8, seconds=1))
+
+        assert calls
+        command = calls[0]
+        assert command[:2] == ["schtasks.exe", "/Create"]
+        assert "/SC" in command and command[command.index("/SC") + 1] == "ONCE"
+        # schtasks 精度为分钟；带秒的目标必须向上取整，不能提前唤醒。
+        expected_local = (NOW + timedelta(hours=8, seconds=1)).astimezone() + timedelta(minutes=1)
+        assert command[command.index("/ST") + 1] == expected_local.strftime("%H:%M")
+        assert command[command.index("/SD") + 1] == expected_local.strftime("%m/%d/%Y")
+        assert "daemon/wake" in command[command.index("/TR") + 1]
+
+    def test_windows_task_scheduler_disarm_reports_access_failure(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        class Completed:
+            returncode = 1
+            stdout = ""
+            stderr = "Access is denied"
+
+        monkeypatch.setattr("longtask.scheduler.wakeup.sys.platform", "win32")
+        monkeypatch.setattr("longtask.scheduler.wakeup.shutil.which", lambda _: "schtasks.exe")
+        monkeypatch.setattr("longtask.scheduler.wakeup.subprocess.run", lambda *a, **k: Completed())
+
+        port = WindowsTaskSchedulerPort(tmp_path)
+        with pytest.raises(OSError, match="Access is denied"):
+            port.disarm("longtask-wakeup-lt-safe")
 
 
 def test_wakeup_event_vocabulary_matches_adr() -> None:

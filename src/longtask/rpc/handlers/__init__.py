@@ -56,6 +56,7 @@ def _build_handlers() -> dict[Method, Callable[..., dict[str, Any]]]:
     return {
         Method.PROTOCOL_HELLO: protocol.handle_protocol_hello,
         Method.PROTOCOL_EVENTS: protocol.handle_protocol_events,
+        Method.DAEMON_WAKE: protocol.handle_daemon_wake,
         Method.CONTRACT_PREPARE: contract.handle_contract_prepare,
         Method.CONTRACT_APPROVE: contract.handle_contract_approve,
         Method.CONTRACT_GET: contract.handle_contract_get,

@@ -20,9 +20,15 @@
 
 from __future__ import annotations
 
+import json
+import re
+import shutil
 import sqlite3
+import subprocess
+import sys
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any, Protocol
 
 from longtask.persistence.events import EventType
@@ -64,6 +70,113 @@ class NullSchedulePort:
 
     def disarm(self, task_id: str) -> None:
         raise OSError(f"schedule port unavailable: cannot disarm {task_id}")
+
+
+class WindowsTaskSchedulerPort:
+    """Windows Task Scheduler 的一次性唤醒端口（L1）。
+
+    任务动作只调用本机认证 RPC ``daemon/wake``，不直接读取或修改合同；
+    daemon 仍是唯一仲裁者。所有 ``schtasks.exe`` 参数以 argv 传入，避免
+    shell 解释用户提供的合同 ID。``schtasks`` 只有分钟精度，因此带秒的
+    目标一律向上取整，绝不提前触发。
+    """
+
+    _TASK_ID_RE = re.compile(r"^[A-Za-z0-9._-]{1,200}$")
+
+    def __init__(self, root: Path) -> None:
+        self._root = Path(root).resolve()
+
+    def is_available(self) -> bool:
+        """仅在 Windows 且系统能找到 schtasks.exe 时报告可用。"""
+        return sys.platform == "win32" and shutil.which("schtasks.exe") is not None
+
+    @classmethod
+    def _task_name(cls, task_id: str) -> str:
+        if not isinstance(task_id, str) or not cls._TASK_ID_RE.fullmatch(task_id):
+            raise ValueError("task_id must contain only ASCII letters, digits, '.', '_' or '-'")
+        return rf"\LHGP\{task_id}"
+
+    @staticmethod
+    def _schedule_time(at: datetime) -> tuple[str, str]:
+        if at.tzinfo is None or at.utcoffset() is None:
+            raise ValueError("scheduled wakeup time must include a timezone")
+        local = at.astimezone()
+        if local.second or local.microsecond:
+            local += timedelta(minutes=1)
+        local = local.replace(second=0, microsecond=0)
+        return local.strftime("%H:%M"), local.strftime("%m/%d/%Y")
+
+    def _wake_command(self, task_id: str) -> str:
+        params = json.dumps({"task_id": task_id}, separators=(",", ":"))
+        argv = [
+            sys.executable,
+            "-m",
+            "longtask.cli.main",
+            "--data-dir",
+            str(self._root),
+            "rpc-call",
+            "daemon/wake",
+            "--client-id",
+            "daemon-wakeup",
+            "--params",
+            params,
+        ]
+        return subprocess.list2cmdline(argv)
+
+    @staticmethod
+    def _run(args: list[str]) -> None:
+        try:
+            completed = subprocess.run(  # noqa: S603 — fixed schtasks argv, shell disabled
+                args,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except OSError as exc:
+            raise OSError(f"failed to invoke schtasks.exe: {exc}") from exc
+        if completed.returncode == 0:
+            return
+        detail = (completed.stderr or completed.stdout or "command failed").strip()
+        raise OSError(f"schtasks.exe failed ({completed.returncode}): {detail}")
+
+    def arm(self, task_id: str, at: datetime) -> None:
+        task_name = self._task_name(task_id)
+        start_time, start_date = self._schedule_time(at)
+        self._run(
+            [
+                "schtasks.exe",
+                "/Create",
+                "/TN",
+                task_name,
+                "/TR",
+                self._wake_command(task_id),
+                "/SC",
+                "ONCE",
+                "/ST",
+                start_time,
+                "/SD",
+                start_date,
+                "/F",
+            ]
+        )
+
+    def disarm(self, task_id: str) -> None:
+        task_name = self._task_name(task_id)
+        try:
+            self._run(["schtasks.exe", "/Delete", "/TN", task_name, "/F"])
+        except OSError as exc:
+            # 删除本来就不存在的任务是幂等成功；权限、参数和系统错误仍必须暴露。
+            detail = str(exc).lower()
+            if not any(
+                marker in detail for marker in ("does not exist", "cannot find", "not found")
+            ):
+                raise
+
+
+def default_schedule_port(root: Path) -> SchedulePort:
+    """返回本机可用的 L1 端口；不可用时显式降级为 NullSchedulePort。"""
+    port = WindowsTaskSchedulerPort(root)
+    return port if port.is_available() else NullSchedulePort()
 
 
 class WindowsPowerPort:
@@ -196,6 +309,16 @@ class RtcAlarm:
         self._armed: dict[str, datetime] = {}
         self._degraded_reported = False
         self._degraded_contracts: set[str] = set()
+
+    def note_fired(self, task_id: str) -> bool:
+        """消费一次性任务的 fired 信号，使下一轮能按新决策点重新登记。"""
+        prefix = "longtask-wakeup-"
+        if not isinstance(task_id, str) or not task_id.startswith(prefix):
+            return False
+        contract_id = task_id[len(prefix) :]
+        if not contract_id:
+            return False
+        return self._armed.pop(contract_id, None) is not None
 
     def refresh(
         self,
