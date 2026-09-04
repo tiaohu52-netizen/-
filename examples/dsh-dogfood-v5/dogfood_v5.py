@@ -382,6 +382,16 @@ def _wait_executor_terminal(conn, timeout_s: int = 600) -> str | None:
     return None
 
 
+def _require_current_stage(goal: dict[str, Any], stage_id: str) -> None:
+    """拒绝跳阶段运行，避免 dogfood 产生不可解释的伪证据。"""
+    current = goal.get("progress", {}).get("current")
+    if current != stage_id:
+        raise RuntimeError(
+            f"expected current stage {stage_id!r}, got {current!r}; "
+            "complete the previous stage and re-run status first"
+        )
+
+
 def _executor_pids() -> list[int]:
     """dsh 执行进程的真实 PID（按命令行匹配 dsh bin.js）。"""
     out = subprocess.run(
@@ -584,6 +594,7 @@ def run_stage2() -> None:
         goal = get_goal(conn, GOAL_ID)
         if goal is None:
             raise RuntimeError("goal not found; run setup first")
+        _require_current_stage(goal, "stage-2")
         draft = _stage_draft(
             STAGES[1], executor_id="kimi-code", executor_model="kimi-k3",
             verifier_id="dsh-verifier", verifier_model="deepseek-v4-pro",
@@ -675,6 +686,10 @@ def run_stage3() -> None:
     conn = _conn()
     try:
         contract_id = f"{GOAL_ID}-stage3"
+        goal = get_goal(conn, GOAL_ID)
+        if goal is None:
+            raise RuntimeError("goal not found; run setup first")
+        _require_current_stage(goal, "stage-3")
         result = handle_goal_prepare(
             _envelope(Method.GOAL_PREPARE, f"req-v5-stage3-{int(time.time())}", {
                 "contract_id": contract_id, "goal_id": GOAL_ID,
