@@ -7,6 +7,7 @@ temporarily delegated until their persistence dependencies are migrated.
 
 from __future__ import annotations
 
+import math
 import sqlite3
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
@@ -41,6 +42,15 @@ def _budget_int(value: Any, field: str) -> int:
     if isinstance(value, bool):
         raise TypeError(f"budget.{field} must be an integer")
     return int(value)
+
+
+def _workload_float(value: Any) -> float:
+    if isinstance(value, bool):
+        raise TypeError("workload_estimate.initial_hours must be a finite number")
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        raise TypeError("workload_estimate.initial_hours must be a finite number")
+    return parsed
 
 
 def _parse_iso(value: str) -> datetime:
@@ -87,9 +97,9 @@ def parse_contract_draft(params: dict[str, Any]) -> ContractDraft:
         )
         workload_estimate = draft_data.get("workload_estimate")
         if isinstance(workload_estimate, dict):
-            workload_initial_hours = float(workload_estimate["initial_hours"])
+            workload_initial_hours = _workload_float(workload_estimate["initial_hours"])
         else:
-            workload_initial_hours = float(draft_data["workload_initial_hours"])
+            workload_initial_hours = _workload_float(draft_data["workload_initial_hours"])
         budget_raw = draft_data["budget"]
         budget = Budget(
             max_dispatches=_budget_int(budget_raw["max_dispatches"], "max_dispatches"),

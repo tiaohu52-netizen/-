@@ -164,3 +164,18 @@ def test_continuity_checkpoint_flag_rejects_non_boolean() -> None:
 def test_continuity_numeric_flags_reject_boolean_values() -> None:
     with pytest.raises(TypeError, match=r"checkpoint_max_age_minutes must be an integer"):
         continuity_from_dict({"checkpoint_max_age_minutes": True})
+
+
+def test_workload_estimate_rejects_boolean_and_non_finite_values() -> None:
+    payload = make_draft().to_dict()
+    payload["workload_estimate"]["initial_hours"] = True
+    with pytest.raises(
+        TypeError, match=r"workload_estimate\.initial_hours must be a finite number"
+    ):
+        draft_from_dict(payload)
+
+    payload["workload_estimate"]["initial_hours"] = float("nan")
+    with pytest.raises(
+        TypeError, match=r"workload_estimate\.initial_hours must be a finite number"
+    ):
+        draft_from_dict(payload)
