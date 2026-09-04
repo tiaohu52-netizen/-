@@ -780,6 +780,20 @@ class TestHandlerValidationBranches:
         finally:
             conn.close()
 
+    def test_list_rejects_boolean_limit(self, tmp_path: Path) -> None:
+        config = setup_test_db(tmp_path)
+        conn = connect(config)
+        try:
+            with pytest.raises(RpcError) as exc_info:
+                route(
+                    make_env(Method.CONTRACT_LIST, "limit-bool", {"limit": True}),
+                    conn=conn,
+                    now=NOW,
+                )
+            assert exc_info.value.code is ErrorCode.VALIDATION_FAILED
+        finally:
+            conn.close()
+
     def test_prepare_auto_generated_id_and_validation(self, tmp_path: Path) -> None:
         config = setup_test_db(tmp_path)
         conn = connect(config)
