@@ -22,6 +22,7 @@ from datetime import time as datetime_time
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from lhgp.contracts.budget import DEFAULT_VERIFICATION_RESERVED
 from longtask.acceptance.checks import parse_check
 from longtask.contracts.attention import from_dict as attention_from_dict
 from longtask.contracts.attention import to_dict as attention_to_dict
@@ -188,8 +189,10 @@ def _row_to_contract_view(row: sqlite3.Row | tuple[Any, ...]) -> ContractView:
         max_concurrent_attempts=budget_dict["max_concurrent_attempts"],
         max_attempt_minutes=budget_dict["max_attempt_minutes"],
         max_output_bytes=budget_dict["max_output_bytes"],
-        # P5 验证预算：老库存 JSON 无此字段 → 兜底 1（至少一次 reverify）
-        verification_attempts_reserved=int(budget_dict.get("verification_attempts_reserved", 1)),
+        # P5 验证预算：老库存 JSON 无此字段 → 兜底 2（允许失败后重验）
+        verification_attempts_reserved=int(
+            budget_dict.get("verification_attempts_reserved", DEFAULT_VERIFICATION_RESERVED)
+        ),
     )
     draft = ContractDraft(
         title=title,

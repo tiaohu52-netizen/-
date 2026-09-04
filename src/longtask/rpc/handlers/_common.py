@@ -15,6 +15,7 @@ import sqlite3
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+from lhgp.contracts.budget import DEFAULT_VERIFICATION_RESERVED
 from longtask.acceptance.checks import parse_check
 from longtask.contracts.attention import from_dict as attention_from_dict
 from longtask.contracts.authority import from_dict as authority_from_dict
@@ -98,7 +99,9 @@ def parse_contract_draft(params: dict[str, Any]) -> ContractDraft:
             max_concurrent_attempts=int(budget_raw["max_concurrent_attempts"]),
             max_attempt_minutes=int(budget_raw["max_attempt_minutes"]),
             max_output_bytes=int(budget_raw["max_output_bytes"]),
-            verification_attempts_reserved=int(budget_raw.get("verification_attempts_reserved", 1)),
+            verification_attempts_reserved=int(
+                budget_raw.get("verification_attempts_reserved", DEFAULT_VERIFICATION_RESERVED)
+            ),
         )
 
         soft_guidance = dict(draft_data.get("soft_guidance", {}))

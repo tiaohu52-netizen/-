@@ -71,11 +71,11 @@ def setup_contract(data_dir: Path, cid: str, *, verification_reserved: int = 1) 
 
 class TestVerificationBudget:
     def test_budget_field_serializes_and_defaults(self) -> None:
-        """字段序列化 + 未声明兜底 1（老库存兼容）。"""
+        """字段序列化 + 未声明兜底 2（老库存兼容）。"""
         draft = make_draft(verification_reserved=3)
         d = draft.to_dict()
         assert d["budget"]["verification_attempts_reserved"] == 3
-        # 未声明 → 兜底 1
+        # 未声明 → 兜底 2
         raw = dict(d)
         raw["budget"] = {
             k: v for k, v in d["budget"].items() if k != "verification_attempts_reserved"
@@ -83,7 +83,7 @@ class TestVerificationBudget:
         from longtask.contracts.contract_draft import from_dict
 
         restored = from_dict(raw)
-        assert restored.budget.verification_attempts_reserved == 1
+        assert restored.budget.verification_attempts_reserved == 2
 
     def test_zero_reserved_is_legal_but_blocks_dispatch(self) -> None:
         """reserved=0 合法（用户明确不要自动验证）——但不能是负数。"""

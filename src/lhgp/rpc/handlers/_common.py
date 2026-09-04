@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 from lhgp.acceptance.checks import parse_check
 from lhgp.contracts.attention import from_dict as attention_from_dict
 from lhgp.contracts.authority import from_dict as authority_from_dict
+from lhgp.contracts.budget import DEFAULT_VERIFICATION_RESERVED
 from lhgp.contracts.continuity import from_dict as continuity_from_dict
 from lhgp.contracts.schema import Acceptance, Budget, ContractDraft
 from lhgp.persistence.store import get_contract, get_events_by_request_id
@@ -88,7 +89,9 @@ def parse_contract_draft(params: dict[str, Any]) -> ContractDraft:
             max_concurrent_attempts=int(budget_raw["max_concurrent_attempts"]),
             max_attempt_minutes=int(budget_raw["max_attempt_minutes"]),
             max_output_bytes=int(budget_raw["max_output_bytes"]),
-            verification_attempts_reserved=int(budget_raw.get("verification_attempts_reserved", 1)),
+            verification_attempts_reserved=int(
+                budget_raw.get("verification_attempts_reserved", DEFAULT_VERIFICATION_RESERVED)
+            ),
         )
         draft = ContractDraft(
             title=title,

@@ -2,7 +2,8 @@
 
 提供：
 1. `doctor`：系统自检与诊断；
-2. 合同生命周期命令（prepare/approve/get/list/patch/pause/resume/cancel/arbitrate）；
+2. 合同生命周期命令（prepare/approve/get/list/patch/pause/resume/cancel/
+   arbitrate/request-verification）；
 3. `executor`：执行器注册与框定控制；
 4. `kill-switch`：全局 Emergency Stop 熔断控制；
 5. `rebuild`：从数据库重建文件投影；
@@ -179,6 +180,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="裁决目标状态",
     )
     arb_p.add_argument("--note", type=str, default=None, help="裁决附注说明")
+
+    # request-verification
+    verify_p = sub.add_parser(
+        "request-verification",
+        help="请求仅验收当前交付物（不再派 executor）",
+    )
+    verify_p.add_argument("contract_id", type=str, help="合同 ID")
+    verify_p.add_argument(
+        "--reason",
+        type=str,
+        default="user requested verification of the current delivery",
+        help="请求原因（写入审计事件）",
+    )
 
     # kill-switch
     ks_p = sub.add_parser("kill-switch", help="全局 Emergency Stop 熔断控制")
@@ -548,6 +562,14 @@ def main(argv: list[str] | None = None) -> int:
         return _dispatch_rpc(
             Method.CONTRACT_ARBITRATE,
             {"contract_id": args.contract_id, "decision": args.decision, "note": args.note},
+            data_dir=root,
+            dry_run=dry_run,
+        )
+
+    if args.command == "request-verification":
+        return _dispatch_rpc(
+            Method.CONTRACT_REQUEST_VERIFICATION,
+            {"contract_id": args.contract_id, "reason": args.reason},
             data_dir=root,
             dry_run=dry_run,
         )

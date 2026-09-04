@@ -12,7 +12,7 @@ from lhgp.contracts.attention import Attention
 from lhgp.contracts.attention import from_dict as attention_from_dict
 from lhgp.contracts.authority import Authority
 from lhgp.contracts.authority import from_dict as authority_from_dict
-from lhgp.contracts.budget import Budget
+from lhgp.contracts.budget import DEFAULT_VERIFICATION_RESERVED, Budget
 from lhgp.contracts.continuity import Continuity
 from lhgp.contracts.continuity import from_dict as continuity_from_dict
 
@@ -121,7 +121,9 @@ def from_dict(data: dict[str, Any]) -> ContractDraft:
         max_concurrent_attempts=int(budget_raw["max_concurrent_attempts"]),
         max_attempt_minutes=int(budget_raw["max_attempt_minutes"]),
         max_output_bytes=int(budget_raw["max_output_bytes"]),
-        verification_attempts_reserved=int(budget_raw.get("verification_attempts_reserved", 1)),
+        verification_attempts_reserved=int(
+            budget_raw.get("verification_attempts_reserved", DEFAULT_VERIFICATION_RESERVED)
+        ),
     )
     return ContractDraft(
         title=str(data["title"]),

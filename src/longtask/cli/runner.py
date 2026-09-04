@@ -630,7 +630,7 @@ class AttemptRunner:
         # P5 验证预算独立记账（§12.4）：verifier 派发消耗
         # verification_attempts_reserved 而非 max_dispatches——否则一轮
         # 验证就能吃光执行预算，repair 闭环直接饿死。计数源是 attempts
-        # 表 role='verifier' 的行（可审计），兜底 reserved=1。
+        # 表 role='verifier' 的行（可审计），默认保留两次验证机会。
         reserved = contract.draft.budget.verification_attempts_reserved
         used = _count_verifier_attempts(self._conn, contract_id)
         if used >= reserved:

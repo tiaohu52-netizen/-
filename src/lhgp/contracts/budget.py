@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-DEFAULT_VERIFICATION_RESERVED = 1
+DEFAULT_VERIFICATION_RESERVED = 2
 
 
 @dataclass(frozen=True, slots=True)

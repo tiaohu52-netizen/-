@@ -92,6 +92,21 @@ longtask cancel lt-20260903-001
 longtask arbitrate lt-20260903-001 --decision hand_to_user --note "需要确认 X"
 ```
 
+当执行预算耗尽但交付物可能已经就绪时，不要重新起草合同；直接请求一次
+“验收现状”。该命令只派 verifier，不会再派 executor：
+
+```bash
+longtask contract/request-verification lt-20260903-001 \
+  --reason "执行预算已耗尽，请核对当前工作区是否满足验收"
+```
+
+在 MCP 中使用 `lhgp_request_verification`（兼容名
+`longtask_request_verification`）。请求会先写入 `verification/requested`
+事件，再由 daemon 在下一次 tick 幂等地派生独立 verifier。终态合同、已有
+verifier 进行中、或验证预算也已耗尽时，协议会拒接并说明下一步；`blocked`
+会在成功请求后恢复为 `active`，原升级历史仍保留。默认每份新合同保留两次
+verifier 机会；若用户明确设置 `verification_attempts_reserved`，以显式值为准。
+
 完整子命令：`longtask --help`。
 
 ## 4. 起草一份好合同（最重要的一节）
