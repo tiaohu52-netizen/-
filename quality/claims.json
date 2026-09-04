@@ -573,6 +573,7 @@
         "src/longtask/rpc/handlers/contract.py",
         "src/longtask/mcp_server.py",
         "src/lhgp/persistence/events_query.py",
+        "src/longtask/persistence/schema.py",
         "tests/integration/test_rpc_lifecycle.py"
       ],
       "evidence": [

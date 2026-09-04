@@ -159,6 +159,12 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
     )
     conn.execute(
         """
+        CREATE INDEX IF NOT EXISTS idx_events_contract_type
+        ON events(contract_id, event_type, event_id)
+        """
+    )
+    conn.execute(
+        """
         CREATE INDEX IF NOT EXISTS idx_events_goal_id
         ON events(goal_id, event_id)
         WHERE goal_id IS NOT NULL
