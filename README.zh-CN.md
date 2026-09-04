@@ -81,6 +81,7 @@ LHGP **不是**工作流引擎。Agent 可以在租约仍然有效时被换掉�
 | 严格 Deadline 分层唤醒（L0/L1 已落地；L2/L3 仅设计） | 已接受的债（2026-12-01 复审） | `strict-deadline-wakeup-design` |
 | MCP server + 模型侧 skill（核心工具、LHGP 别名及审计/控制扩展，不是 1:1 RPC 隧道） | 已验证 | `mcp-server-and-skill` |
 | 临时上下文 + 交叉核对 verifier | 已验证 | `ephemeral-context-and-verifier` |
+| 用户触发验收（不重派 executor） | 已验证 | `ephemeral-context-and-verifier` |
 | 执行者侧 RPC（status / renew / write-back） | 已验证 | `executor-session-rpc` |
 | 本机认证 Unix-socket RPC（daemon + `rpc-call` 客户端） | 已验证 | `local-rpc-transport` |
 | 持久化通知 outbox（幂等、重试、安静时间） | 已验证 | `notification-outbox` |
