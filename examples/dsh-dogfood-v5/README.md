@@ -51,12 +51,15 @@ contract blocked(need-user)                 ← 如实升级，不假装
 3. **（协议张力）verification_attempts_reserved 默认 1 太小**：
    一轮外部抖动（kimi provider 超时）就耗尽验证预算，repair 闭环
    饿死。§12.4 独立记账正确，默认值与外部世界稳定性不匹配。
-4. **（协议缺口，最重要）模型 verifier 的结构化结论不进裁决**：
-   verifier（deepseek）实际核验了 checks（激活 venv 跑测试）并在
-   stdout 结论「两条 pass / succeeded」，但 `_judge_verifier_outcomes`
-   的裁决链不消费模型写回的验收结论——只有协议自动评估器的
-   outcome 参与。模型 write-back 通道（attempt/write-back）存在但
-   验收裁决路径不读它。
+4. **（协议缺口，最重要）CLI 型 verifier 的结论进不了证据通道**：
+   `attempt/write-back` RPC 完整存在（verifier 终态强制 evidence 列表
+   落 attempt/succeeded 事件），但 dsh 这类 headless 一次性子进程
+   verifier 无法调 RPC——它的结论只出现在 stdout，而
+   `_judge_verifier_outcomes` 的裁决链不读 stdout 里的结论，只信
+   协议自动评估器的 outcome。本例中 deepseek 实际核验通过（它激活
+   venv 跑了测试、结论 succeeded），协议却因裸 PATH 无 python 判
+   undetermined → verifier failed。需要「CLI 结论 → 结构化证据」
+   的桥（如 stdout 协议格式或 verifier 包装器写回）。
 5. **（协议缺口）command-exit-zero 的执行环境未定义**：评估器在
    daemon 进程环境跑 `python test_charfreq.py`，裸 PATH 无 python →
    WinError 2 → undetermined。连 verifier 模型都发现并自行解决了
