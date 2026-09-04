@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import sqlite3
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from longtask.contracts.authority import binding_for_executor, models_allow
 from longtask.contracts.schema import ContractState
@@ -55,7 +55,7 @@ def _strict_int(value: Any, *, field: str) -> int:
             code=ErrorCode.VALIDATION_FAILED,
             message=f"{field} must be an integer",
         )
-    return value
+    return cast(int, value)
 
 
 def _require_contract(conn: sqlite3.Connection, contract_id: str) -> Any:
