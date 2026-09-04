@@ -102,3 +102,23 @@ def test_deadline_snapshot_treats_due_at_equality_as_not_missed() -> None:
     forecast = Forecast(forecast_p50_minutes=0, forecast_p90_minutes=0, p_finish=0.9)
     snapshot = build_deadline_snapshot(forecast, computed_at=now, due_at=now, sample_count=3)
     assert snapshot.risk != "missed"
+
+
+def test_historical_samples_are_not_presented_as_calibrated() -> None:
+    now = datetime(2026, 9, 3, 12, tzinfo=UTC)
+    forecast = Forecast(
+        queue_minutes=1,
+        startup_minutes=1,
+        remaining_minutes=10,
+        verification_minutes=1,
+        retry_reserve_minutes=1,
+        safety_margin_minutes=1,
+        forecast_p50_minutes=15,
+        forecast_p90_minutes=20,
+        p_finish=0.8,
+    )
+    snapshot = build_deadline_snapshot(
+        forecast, computed_at=now, due_at=now + timedelta(hours=1), sample_count=3
+    )
+    assert snapshot.confidence == "high"
+    assert snapshot.forecast_level == "historical"

@@ -459,6 +459,10 @@ slack_p = (due_at - now) - T_required,p
 
 有历史样本时 SHOULD 计算 `P(finish <= due_at)`；样本不足时 MUST 标记 `confidence: low`，可使用 p90 加总作为保守回退。只用 `initial_hours / time_left` 的实现只能声明 `forecast_level: coarse`，不得称为精确风险预测。
 
+`forecast_level: historical` 表示估计主要来自本地历史 attempt 时长，尚未完成
+回放校准与置信区间验证；只有经过独立校准流程的实现才能使用
+`forecast_level: calibrated`。模型不得仅凭样本数量把 historical 解读为高精度保证。
+
 ### 10.3 风险档与动作
 
 默认档位可配置，但语义固定：
