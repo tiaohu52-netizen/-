@@ -32,7 +32,7 @@ from longtask.contracts.state_machine import (
 from longtask.persistence.attempts import list_contract_attempts
 from longtask.persistence.decisions import list_decisions
 from longtask.persistence.events import EventType
-from longtask.persistence.events_query import get_events
+from longtask.persistence.events_query import get_events, get_recent_events
 from longtask.persistence.store import (
     STORE_SCHEMA_VERSION,
     IdempotencyMismatchError,
@@ -226,7 +226,7 @@ def handle_contract_get(
         EventType.VERIFICATION_STARTED,
     }
     verification_history: list[dict[str, Any]] = []
-    for event in reversed(get_events(conn, contract_id=contract_id)):
+    for event in reversed(get_recent_events(conn, contract_id=contract_id, limit=20)):
         if event.event_type not in verification_events:
             continue
         try:
