@@ -113,6 +113,11 @@ verifier 机会；若用户明确设置 `verification_attempts_reserved`，以�
 `attempt_history`。需要控制上下文大小时，可传 `--decision-limit N` 和
 `--attempt-limit N`；MCP 的 `get_contract` 使用同名参数。
 
+返回值还包含最近的 `verification_history`（最多 20 条）。验收请求后应按
+`requested → consumed → started` 顺序判断进度：只有 `started` 才代表 verifier
+已实际派发；若出现 `consumed` 但没有 `started`，应读取同一合同的事件和升级记录，
+按拒接原因决定是否修订预算、调整候选或交给用户仲裁。
+
 ## 4. 起草一份好合同（最重要的一节）
 
 **决定这四点就够了**，其余字段都有合理默认：
