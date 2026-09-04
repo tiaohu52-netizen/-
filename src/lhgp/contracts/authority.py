@@ -105,8 +105,14 @@ def from_dict(data: dict[str, Any] | None) -> Authority:
         executors=executors,
         required_capabilities=tuple(str(cap) for cap in data.get("required_capabilities") or ()),
         allowed_controls=tuple(str(control) for control in data.get("allowed_controls") or ()),
-        allow_parallel=bool(data.get("allow_parallel") or False),
+        allow_parallel=_strict_bool(data.get("allow_parallel", False), "allow_parallel"),
     )
+
+
+def _strict_bool(value: Any, field: str) -> bool:
+    if not isinstance(value, bool):
+        raise TypeError(f"{field} must be a boolean")
+    return value
 
 
 __all__ = [
