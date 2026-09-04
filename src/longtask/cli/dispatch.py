@@ -132,6 +132,7 @@ def _dispatch_attempt(
         _record_attempt(
             conn,
             goal_id=contract.goal_id,
+            contract_id=contract.contract_id,
             attempt_id=attempt_id,
             contract_revision=contract.revision,
             role="executor",
