@@ -58,6 +58,7 @@ from longtask.rpc.handlers.contract import (  # noqa: E402
     handle_contract_request_verification,
 )
 from longtask.rpc.methods import Method  # noqa: E402
+from longtask.rpc.errors import RpcError  # noqa: E402
 from longtask.rpc.server import RequestEnvelope  # noqa: E402
 
 ROOT = REPO / ".dogfood-v5"
@@ -585,15 +586,21 @@ def run_stage1_verify() -> None:
     # 现状；只有明确拒接（终态/验证预算耗尽等）才继续下方修订合同 fallback。
     existing = get_contract(conn, GOAL_ID)
     if existing is not None and existing.state.value == "blocked":
-        verification_result = handle_contract_request_verification(
-            _envelope(
-                Method.CONTRACT_REQUEST_VERIFICATION,
-                f"req-v5-request-verification-{now.strftime('%H%M%S')}",
-                {"contract_id": GOAL_ID, "reason": "dogfood: verify existing delivery"},
-            ),
-            conn=conn,
-            now=now,
-        )
+        try:
+            verification_result = handle_contract_request_verification(
+                _envelope(
+                    Method.CONTRACT_REQUEST_VERIFICATION,
+                    f"req-v5-request-verification-{now.strftime('%H%M%S')}",
+                    {"contract_id": GOAL_ID, "reason": "dogfood: verify existing delivery"},
+                ),
+                conn=conn,
+                now=now,
+            )
+        except RpcError as exc:
+            verification_result = {
+                "ok": False,
+                "error": {"code": exc.code.value, "message": str(exc)},
+            }
         print(f"[v5][stage-1v] request-verification: {verification_result}")
         if verification_result.get("ok"):
             conn.close()
