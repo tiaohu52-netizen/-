@@ -300,3 +300,36 @@ def test_daemon_can_consume_new_request_after_terminal_verifier(tmp_path: Path) 
         assert count == 2
     finally:
         conn.close()
+
+
+def test_daemon_does_not_reconsume_same_request_after_verifier_terminal(
+    tmp_path: Path,
+) -> None:
+    """一个请求事件只兑现一次；重验必须由新的请求事件触发。"""
+    root, conn, cid, reg = _setup(tmp_path, state=ContractState.BLOCKED)
+    try:
+        _request(conn, cid)
+        runner = AttemptRunner(root, conn, reg)
+        _consume_verification_requests(root, conn, runner, NOW + timedelta(seconds=1))
+        verifier_id = conn.execute(
+            "SELECT attempt_id FROM attempts WHERE role='verifier'"
+        ).fetchone()[0]
+        conn.execute(
+            "UPDATE attempts SET state='failed', terminal_at=?, updated_at=? WHERE attempt_id=?",
+            (NOW.isoformat(), NOW.isoformat(), verifier_id),
+        )
+        conn.commit()
+
+        # The original request is already consumed, so terminalising its
+        # verifier must not silently spend another verification reservation.
+        _consume_verification_requests(root, conn, runner, NOW + timedelta(seconds=2))
+        count = conn.execute("SELECT COUNT(*) FROM attempts WHERE role='verifier'").fetchone()[0]
+        assert count == 1
+        consumed = [
+            event
+            for event in get_events(conn, contract_id=cid)
+            if event.event_type == EventType.VERIFICATION_CONSUMED
+        ]
+        assert len(consumed) == 1
+    finally:
+        conn.close()

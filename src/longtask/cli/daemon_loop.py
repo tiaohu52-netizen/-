@@ -262,6 +262,23 @@ def _consume_verification_requests(
         ]
         if not requested:
             continue
+        consumed_request_ids: set[int] = set()
+        for event in get_events(conn, contract_id=contract.contract_id):
+            if event.event_type != EventType.VERIFICATION_CONSUMED:
+                continue
+            try:
+                payload = _json.loads(event.payload_json or "{}")
+                consumed_request_ids.add(int(payload["request_event_id"]))
+            except (KeyError, TypeError, ValueError, _json.JSONDecodeError):
+                # A malformed marker cannot prove consumption; leave the
+                # request eligible and let the next tick retry it.
+                continue
+        pending = next(
+            (event for event in requested if event.event_id not in consumed_request_ids),
+            None,
+        )
+        if pending is None:
+            continue
         # attempts.goal_id stores the owning Goal identity, not the contract
         # identity.  A contract may be bound to a long-lived goal, so using
         # contract_id here would miss an existing verifier and break the
@@ -285,13 +302,31 @@ def _consume_verification_requests(
         ok = runner._dispatch_verifier(
             now, contract_id=contract.contract_id, executor_id=executor_id
         )
+        append_event(
+            conn,
+            contract_id=contract.contract_id,
+            goal_id=contract.goal_id,
+            event_type=EventType.VERIFICATION_CONSUMED,
+            payload={
+                "request_event_id": pending.event_id,
+                "outcome": "dispatched" if ok else "refused",
+            },
+            now=now,
+            actor="daemon",
+            contract_revision=contract.revision,
+            role="verifier",
+        )
         if ok:
             append_event(
                 conn,
                 contract_id=contract.contract_id,
                 goal_id=contract.goal_id,
                 event_type=EventType.VERIFICATION_STARTED,
-                payload={"requested_by": "user", "executor_of_record": executor_id},
+                payload={
+                    "requested_by": "user",
+                    "executor_of_record": executor_id,
+                    "request_event_id": pending.event_id,
+                },
                 now=now,
                 actor="daemon",
             )
