@@ -240,7 +240,9 @@ class RtcAlarm:
             ]
             if not candidates:
                 continue
-            targets[cid] = min(candidates)
+            # 过去的决策点代表“立即重算”，不能把过去时间交给平台调度器；
+            # 统一钳制到当前时刻，让可用的 L1 端口执行一次即时唤醒。
+            targets[cid] = max(now, min(candidates))
 
         # 目标时刻已变或新出现的合同：重新注册
         for cid, at in targets.items():

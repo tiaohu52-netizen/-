@@ -55,7 +55,8 @@ follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
   can run the same preflight diagnostics before selecting an executor.
 - L1 RTC wakeup targets now use the earliest available decision, wakeup, or
   deadline-safety point; a later safety margin can no longer postpone an
-  earlier `next_decision_at`.
+  earlier `next_decision_at`, and past decision points are clamped to an
+  immediate wakeup.
 - L1 RTC wakeup targets now use the earliest available decision, wakeup, or
   deadline-safety point; a later safety margin can no longer postpone an
   earlier `next_decision_at`.
