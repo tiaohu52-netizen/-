@@ -10,6 +10,7 @@ import time
 from longtask import PROTOCOL_VERSION
 from longtask.rpc.client import call_unix_socket
 from longtask.rpc.errors import ErrorCode
+from lhgp.rpc.transport import _serve_loopback_tcp
 from longtask.rpc.transport import process_lines, serve_unix_socket
 
 
@@ -145,3 +146,33 @@ def test_windows_loopback_fallback_round_trip(tmp_path) -> None:
     stopped.set()
     thread.join(timeout=2)
     assert not endpoint.exists()
+
+
+def test_loopback_fallback_does_not_displace_live_daemon(tmp_path) -> None:
+    """活动 daemon 的 endpoint metadata 不能被第二个 listener 覆盖。"""
+    endpoint = tmp_path / "rpc.sock"
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as live:
+        live.bind(("127.0.0.1", 0))
+        live.listen(1)
+        endpoint.write_text(
+            json.dumps(
+                {
+                    "transport": "tcp",
+                    "host": "127.0.0.1",
+                    "port": live.getsockname()[1],
+                }
+            ),
+            encoding="utf-8",
+        )
+        try:
+            _serve_loopback_tcp(
+                endpoint,
+                token="secret",
+                dispatch=lambda _: {"ok": True},
+                stop_event=threading.Event(),
+            )
+        except OSError as exc:
+            assert "already in use" in str(exc)
+        else:
+            raise AssertionError("live endpoint must not be displaced")
+        assert endpoint.exists()

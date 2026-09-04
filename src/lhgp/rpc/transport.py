@@ -143,6 +143,8 @@ def _serve_loopback_tcp(
             raise OSError(f"RPC endpoint exists and is not TCP metadata: {endpoint}") from exc
         if not isinstance(metadata, dict) or metadata.get("transport") != "tcp":
             raise OSError(f"RPC endpoint exists and is not TCP metadata: {endpoint}")
+        if _loopback_endpoint_is_live(metadata):
+            raise OSError(f"RPC endpoint is already in use: {endpoint}")
         endpoint.unlink()
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     owned_endpoint = False
@@ -172,6 +174,33 @@ def _serve_loopback_tcp(
         if owned_endpoint:
             with suppress(FileNotFoundError):
                 endpoint.unlink()
+
+
+def _loopback_endpoint_is_live(metadata: object) -> bool:
+    """Return whether an existing loopback endpoint still accepts connections.
+
+    A stale metadata file left by a crashed daemon may be replaced safely, but
+    an active daemon must never be displaced by a second listener.  Only the
+    exact loopback address and a validated TCP port are probed; malformed data
+    is treated as not live and is rejected by the caller's schema check.
+    """
+    if not isinstance(metadata, dict) or metadata.get("host") != "127.0.0.1":
+        return False
+    try:
+        port = int(metadata["port"])
+    except (KeyError, TypeError, ValueError):
+        return False
+    if not 1 <= port <= 65535:
+        return False
+    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        probe.settimeout(0.2)
+        probe.connect(("127.0.0.1", port))
+    except OSError:
+        return False
+    finally:
+        probe.close()
+    return True
 
 
 def _serve_connections(
