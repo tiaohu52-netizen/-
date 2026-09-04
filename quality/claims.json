@@ -604,6 +604,24 @@
       ]
     },
     {
+      "id": "mcp-idempotency-key-discoverability",
+      "statement": "所有有副作用的 MCP 工具 schema 显式暴露 request_id，并指导模型在网络/进程重试时复用同一 ID，以保留 RPC 层 request_id 幂等语义。",
+      "lifecycle": "verified",
+      "scope_paths": [
+        "src/longtask/mcp_server.py",
+        "skills/long-horizon-goals/SKILL.md",
+        "tests/integration/test_mcp_server.py"
+      ],
+      "evidence": [
+        {
+          "kind": "integration_real_store",
+          "path": "tests/integration/test_mcp_server.py",
+          "recorded_at": "2026-09-05",
+          "summary": "MCP 工具发现/元数据测试覆盖双命名空间；有副作用工具 schema 提供 request_id，skill 明确重试复用规则。"
+        }
+      ]
+    },
+    {
       "id": "forecast-level-honesty",
       "statement": "仅基于本地历史 attempt 时长的 Deadline 预测明确标记为 historical，并在扣除排队、启动、验收和安全边际后用真实 succeeded 样本的经验 CDF 计算 p_finish；快照同时暴露 sample_count 与 p_finish_basis。失败运行只参与时长参考，不得伪装成按时完成证据。只有经过独立回放校准与置信区间验证才可标记 calibrated。",
       "lifecycle": "verified",
