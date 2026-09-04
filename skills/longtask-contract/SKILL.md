@@ -109,6 +109,10 @@ verifier 机会；若用户明确设置 `verification_attempts_reserved`，以�
 
 完整子命令：`longtask --help`。
 
+`longtask get <contract_id>` 返回合同快照、隔离的 `decision_history` 与
+`attempt_history`。需要控制上下文大小时，可传 `--decision-limit N` 和
+`--attempt-limit N`；MCP 的 `get_contract` 使用同名参数。
+
 ## 4. 起草一份好合同（最重要的一节）
 
 **决定这四点就够了**，其余字段都有合理默认：
