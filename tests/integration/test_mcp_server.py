@@ -189,6 +189,34 @@ class TestMCPHealth:
         finally:
             _stop_mcp(proc)
 
+    def test_doctor_reports_missing_executor_over_mcp(self, data_dir: Path) -> None:
+        from longtask.adapters.fake_executor import FAKE_MANIFEST
+        from longtask.adapters.registry import CostHint, ExecutorRegistry, LaunchSpec, RegistryEntry
+
+        registry = ExecutorRegistry()
+        registry.register(
+            RegistryEntry(
+                id="missing-cli",
+                kind="subprocess",
+                launch=LaunchSpec(argv=("definitely-missing-lhgp-cli",)),
+                capabilities=FAKE_MANIFEST.capabilities,
+                cost_hint=CostHint.LOW,
+                enabled=True,
+            )
+        )
+        registry.save_to_file(data_dir / "registry.json")
+
+        proc = _spawn_mcp(data_dir)
+        try:
+            doctor = _result_text(
+                _roundtrip(proc, "tools/call", {"name": "lhgp_doctor", "arguments": {}})
+            )
+            assert doctor["all_ok"] is False
+            check = next(item for item in doctor["checks"] if item["name"] == "executor_registry")
+            assert "executable not found" in check["details"]
+        finally:
+            _stop_mcp(proc)
+
 
 class TestMCPLifecycle:
     """AI 工具链完整走一遍：立合同 → 批准 → 拉起执行者（认领 attempt）。"""
