@@ -94,20 +94,30 @@ def _record_decision(
     )
 
 
+def _goal_id_for_contract(conn: sqlite3.Connection, contract_id: str) -> str:
+    """Resolve the owning Goal identity for a contract-bound attempt query."""
+    row = conn.execute(
+        "SELECT goal_id FROM contracts WHERE contract_id = ?", (contract_id,)
+    ).fetchone()
+    return str(row[0]) if row and row[0] else contract_id
+
+
 def _count_verifier_attempts(conn: sqlite3.Connection, contract_id: str) -> int:
+    goal_id = _goal_id_for_contract(conn, contract_id)
     row = conn.execute(
         """SELECT COUNT(*) FROM attempts WHERE goal_id = ?
         AND role = 'verifier' AND state IN ('succeeded','failed','cancelled','stale','orphaned')""",
-        (contract_id,),
+        (goal_id,),
     ).fetchone()
     return int(row[0]) if row else 0
 
 
 def _estimate_stalled_from_attempts(conn: sqlite3.Connection, contract_id: str) -> bool:
+    goal_id = _goal_id_for_contract(conn, contract_id)
     rows = conn.execute(
         """SELECT state, admitted_at, contract_revision, role FROM attempts
         WHERE goal_id = ? ORDER BY admitted_at DESC LIMIT 4""",
-        (contract_id,),
+        (goal_id,),
     ).fetchall()
     recent = [row for row in rows if row[3] == "executor"]
     if (
