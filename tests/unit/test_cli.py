@@ -170,6 +170,27 @@ class TestCliBasics:
         assert "ALL SYSTEMS GO" in out
         assert "python_runtime" in out
 
+    def test_doctor_reports_missing_enabled_executable(self, tmp_path: Path) -> None:
+        from longtask.adapters.fake_executor import FAKE_MANIFEST
+        from longtask.adapters.registry import CostHint, ExecutorRegistry, LaunchSpec, RegistryEntry
+
+        registry = ExecutorRegistry()
+        registry.register(
+            RegistryEntry(
+                id="missing-cli",
+                kind="subprocess",
+                launch=LaunchSpec(argv=("definitely-missing-lhgp-cli",)),
+                capabilities=FAKE_MANIFEST.capabilities,
+                cost_hint=CostHint.LOW,
+                enabled=True,
+            )
+        )
+        registry.save_to_file(tmp_path / "registry.json")
+        report = run_doctor(tmp_path)
+        check = next(item for item in report.checks if item.name == "executor_registry")
+        assert not check.ok
+        assert "executable not found" in check.details
+
 
 class TestCliDryRun:
     def test_dry_run_does_not_touch_db(

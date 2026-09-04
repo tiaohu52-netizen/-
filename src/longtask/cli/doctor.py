@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import shutil
 import sqlite3
 import sys
 from dataclasses import dataclass
@@ -124,6 +125,19 @@ def run_doctor(root: Path | None = None) -> DoctorReport:
         all_executors = reg.list_entries(enabled_only=False)
         enabled_executors = reg.list_entries(enabled_only=True)
         reg_details = f"{len(enabled_executors)} enabled / {len(all_executors)} registered"
+        missing: list[str] = []
+        for entry in enabled_executors:
+            argv = entry.launch.argv
+            if not argv:
+                missing.append(f"{entry.id}: launch argv is empty")
+                continue
+            executable = Path(argv[0])
+            if not executable.is_file() and shutil.which(argv[0]) is None:
+                missing.append(f"{entry.id}: executable not found ({argv[0]})")
+        if missing:
+            reg_ok = False
+            reg_msg = "enabled executor launch checks failed"
+            reg_details += "; " + "; ".join(missing)
     except Exception as exc:
         reg_ok = False
         reg_msg = f"cannot parse registry: {exc}"
