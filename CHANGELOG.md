@@ -38,7 +38,7 @@ follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
   including missing external-handle capability columns, before daemon scans.
 - Doctor output and README quickstart commands now use the canonical LHGP name.
 - Claims evidence is re-anchored to the latest verified implementation commit;
-  the full 7-gate suite remains green with 562 tests at 81.58% coverage.
+  the full 7-gate suite remains green with 563 tests at 81.58% coverage.
 - Unavailable L1 wakeup channels now emit one deduplicated `wakeup/degraded`
   event per daemon lifecycle instead of writing noise on every tick.
 - Failed wakeup task disarms remain tracked and are retried on the next daemon
@@ -47,6 +47,8 @@ follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
   falls back to a revision contract only after an explicit protocol refusal.
 - Verification request consumption is now recorded by request event ID, so a
   terminal verifier cannot cause the same user request to be dispatched again.
+- `contract/get` and MCP `get_contract` now expose bounded verification history,
+  making request, consumption, and verifier-start state directly model-readable.
 
 ## [0.1.0a0] - 2026-09-01
 

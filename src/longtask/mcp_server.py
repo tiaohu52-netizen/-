@@ -540,8 +540,9 @@ TOOLS: dict[
         {
             "description": (
                 "查询单份合同权威视图（§11.6 字段表），并返回该合同隔离的"
-                " decision_history 与 attempt_history；可用 decision_limit /"
-                " attempt_limit 控制上下文大小。"
+                " decision_history、attempt_history 与 verification_history；可用"
+                " decision_limit / attempt_limit 控制上下文大小。verification_history"
+                " 展示验收请求、消费和 verifier 启动状态。"
             ),
             "inputSchema": {
                 "type": "object",
