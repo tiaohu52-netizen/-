@@ -9,6 +9,7 @@ from longtask.acceptance.checks import (
     CheckSpec,
     RepairBrief,
 )
+from lhgp.acceptance.evaluator import _command_timeout_seconds
 from longtask.acceptance.evaluator import evaluate_check
 from longtask.contracts.acceptance import Acceptance
 
@@ -174,3 +175,10 @@ class TestEvaluateCheck:
         )
         assert result.outcome == "undetermined"
         assert "timed out" in result.details.lower()
+
+    @pytest.mark.parametrize("value", [True, float("nan"), float("inf")])
+    def test_command_timeout_rejects_non_finite_or_boolean_values(self, value: object) -> None:
+        spec = CheckSpec(
+            kind=CheckKind.COMMAND_EXIT_ZERO, target="python", args={"timeout_seconds": value}
+        )
+        assert _command_timeout_seconds(spec, None) == 60.0

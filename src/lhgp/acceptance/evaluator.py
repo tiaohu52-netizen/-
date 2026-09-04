@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import subprocess
 from dataclasses import dataclass
@@ -139,11 +140,20 @@ def _command_timeout_seconds(spec: CheckSpec, deadline_budget: float | None) -> 
     """Return a bounded command timeout (contract budget wins over defaults)."""
     requested = spec.args.get("timeout_seconds")
     try:
+        if isinstance(requested, bool):
+            raise ValueError
         timeout = float(requested) if requested is not None else 60.0
+        if not math.isfinite(timeout):
+            raise ValueError
     except (TypeError, ValueError):
         timeout = 60.0
     if deadline_budget is not None:
-        timeout = min(timeout, float(deadline_budget))
+        try:
+            budget = float(deadline_budget)
+            if math.isfinite(budget):
+                timeout = min(timeout, budget)
+        except (TypeError, ValueError):
+            pass
     return min(60.0, max(0.1, timeout))
 
 

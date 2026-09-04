@@ -736,7 +736,7 @@
           "kind": "integration_real_store",
           "path": "tests/unit/test_p5_acceptance.py",
           "recorded_at": "2026-09-05",
-          "summary": "慢 command-exit-zero 在短超时下返回 undetermined，未等待命令自然结束。"
+          "summary": "慢 command-exit-zero 在短超时下返回 undetermined，未等待命令自然结束；布尔值、NaN 与 Infinity timeout 会安全回落到默认 60 秒，不污染 Deadline 计算。"
         },
         {
           "kind": "source_static",
