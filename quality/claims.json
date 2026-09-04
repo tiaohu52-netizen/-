@@ -605,12 +605,13 @@
     },
     {
       "id": "forecast-level-honesty",
-      "statement": "仅基于本地历史 attempt 时长的 Deadline 预测明确标记为 historical，并在扣除排队、启动、验收和安全边际后用真实 succeeded 样本的经验 CDF 计算 p_finish；失败运行只参与时长参考，不得伪装成按时完成证据。只有经过独立回放校准与置信区间验证才可标记 calibrated。",
+      "statement": "仅基于本地历史 attempt 时长的 Deadline 预测明确标记为 historical，并在扣除排队、启动、验收和安全边际后用真实 succeeded 样本的经验 CDF 计算 p_finish；快照同时暴露 sample_count 与 p_finish_basis。失败运行只参与时长参考，不得伪装成按时完成证据。只有经过独立回放校准与置信区间验证才可标记 calibrated。",
       "lifecycle": "verified",
       "scope_paths": [
         "src/lhgp/forecast/model.py",
         "src/longtask/cli/tick.py",
         "docs/LHGP-SPEC.md",
+        "skills/long-horizon-goals/SKILL.md",
         "tests/unit/test_p4_forecast.py"
       ],
       "evidence": [
@@ -618,7 +619,7 @@
           "kind": "integration_real_store",
           "path": "tests/unit/test_p4_forecast.py",
           "recorded_at": "2026-09-05",
-          "summary": "完整 forecast 输入与 3 个样本时，快照 confidence 为 high 但 forecast_level 明确为 historical；p_finish 按扣除固定交付开销后的 succeeded 样本经验 CDF 计算，失败 attempt 不计为成功，低样本仍为 coarse。"
+          "summary": "完整 forecast 输入与 3 个样本时，快照 confidence 为 high 但 forecast_level 明确为 historical；p_finish 按扣除固定交付开销后的 succeeded 样本经验 CDF 计算，并暴露 sample_count/p_finish_basis；失败 attempt 不计为成功，低样本仍为 coarse。"
         }
       ]
     },

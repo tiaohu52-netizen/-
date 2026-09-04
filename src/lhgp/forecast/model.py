@@ -68,6 +68,8 @@ class DeadlineSnapshot:
     risk: str
     reason: str
     next_decision_at: datetime | None = None
+    sample_count: int = 0
+    p_finish_basis: str = "unavailable"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -83,6 +85,8 @@ class DeadlineSnapshot:
             "next_decision_at": (
                 self.next_decision_at.isoformat() if self.next_decision_at else None
             ),
+            "sample_count": self.sample_count,
+            "p_finish_basis": self.p_finish_basis,
         }
 
 
@@ -127,6 +131,11 @@ def build_deadline_snapshot(
         sum(duration <= available_for_executor for duration in observed) / len(observed)
         if observed
         else forecast.p_finish
+    )
+    p_finish_basis = (
+        "empirical-success-cdf"
+        if observed
+        else ("coarse-heuristic" if forecast.p_finish is not None else "unavailable")
     )
     stale = forecast_updated_at is not None and computed_at - forecast_updated_at > stale_after
     complete_components = all(
@@ -182,6 +191,8 @@ def build_deadline_snapshot(
         risk=risk,
         reason=reason,
         next_decision_at=next_decision_at,
+        sample_count=len(observed) if observed else max(sample_count, 0),
+        p_finish_basis=p_finish_basis,
     )
 
 
