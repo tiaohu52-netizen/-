@@ -37,6 +37,12 @@ description: 将需要跨会话、跨 Agent 推进的用户目标转成 LHGP 合
 6. （等待 daemon 派 attempt；轮询 get_contract 或订阅 events）
 7. `list_contracts` — 复盘历史 + 审计事件链
 
+调用 `get_contract` 后，优先读取返回的 `verification_history`：
+`verification/requested` 表示用户已请求验收，`verification/consumed` 表示
+daemon 已接受并处理请求，`verification/started` 表示 verifier 已经启动。
+只有看到后两者之一后才进入等待或读取 `attempt_history`；不要因为请求已写入
+就臆测 verifier 已经运行。
+
 如果执行预算已经耗尽、但工作区可能已经满足验收，不要重新起草或继续派
 executor；调用 `lhgp_request_verification`（兼容名
 `longtask_request_verification`）请求只验收当前交付物。它写入
