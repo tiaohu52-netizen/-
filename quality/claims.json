@@ -125,10 +125,10 @@
           "summary": "SPEC §12.1 七种 check + target 解析约定（相对 workspace_root，不带重复前缀）+ command check 环境契约（守护进程环境、解释器缺失 undetermined 非 fail）；§12.2 evidence 实体；§12.3 verifier 独立性；§12.4 证据双通道与裁决合成。"
         },
         {
-          "kind": "focused_test",
-          "path": "tests/unit/test_p5_acceptance.py",
+          "kind": "source_static",
+          "path": "src/lhgp/acceptance/evaluator.py",
           "recorded_at": "2026-09-04",
-          "summary": "command-not-found → undetermined 且 details 带 daemon PATH 指引（绝对路径 / verifier 判定块）——dogfood v5 发现 5 的回归；target 相对 workspace_root 解析（直接名 pass、双层前缀 fail）——发现 6 的协议侧事实。"
+          "summary": "command-not-found 分支：FileNotFoundError → undetermined 且 details 带 daemon PATH 指引（绝对解释器路径 / §12.4 verifier 判定块）——区别于 fail（「跑不了」与「跑挂了」是不同的事实）。对应测试见 tests/unit/test_p5_acceptance.py（undetermined 带指引回归、target 相对 workspace_root 解析）——focused_test 证据挂在与实现绑定的 ephemeral-context-and-verifier 声明下。"
         }
       ]
     },
