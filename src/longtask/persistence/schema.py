@@ -392,6 +392,20 @@ def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
 
     # 回填 goal_id
     conn.execute("UPDATE contracts SET goal_id = contract_id WHERE goal_id IS NULL OR goal_id = ''")
+    # 旧库只有 goal_id；对历史默认的一合同一 Goal 身份做无歧义回填。
+    # 若一个 Goal 曾绑定多个合同则不猜，保留 NULL，由 reconcile 的兼容
+    # 回退路径按旧语义处理，避免把 attempt 错绑到错误阶段。
+    conn.execute(
+        """
+        UPDATE attempts
+        SET contract_id = goal_id
+        WHERE (contract_id IS NULL OR contract_id = '')
+          AND EXISTS (
+              SELECT 1 FROM contracts c
+              WHERE c.contract_id = attempts.goal_id
+          )
+        """
+    )
     conn.execute("UPDATE events SET goal_id = contract_id WHERE goal_id IS NULL")
     conn.execute(
         "UPDATE events SET payload_schema_version = schema_version "
