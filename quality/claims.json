@@ -609,6 +609,7 @@
       "lifecycle": "verified",
       "scope_paths": [
         "src/longtask/mcp_server.py",
+        "src/longtask/persistence/store.py",
         "skills/long-horizon-goals/SKILL.md",
         "tests/integration/test_mcp_server.py"
       ],
@@ -617,7 +618,7 @@
           "kind": "integration_real_store",
           "path": "tests/integration/test_mcp_server.py",
           "recorded_at": "2026-09-05",
-          "summary": "MCP 工具发现/元数据测试覆盖双命名空间；有副作用工具 schema 提供 request_id，skill 明确重试复用规则。"
+          "summary": "MCP 工具发现/元数据测试覆盖双命名空间；有副作用工具 schema 提供 request_id，默认稳定键穿过 save_contract 幂等重放，重复 prepare 不创建重复合同，skill 明确重试复用规则。"
         }
       ]
     },

@@ -40,6 +40,30 @@ def test_mcp_request_id_is_stable_when_omitted() -> None:
     )
 
 
+def test_mcp_prepare_retry_without_request_id_is_idempotent(tmp_path: Path) -> None:
+    from longtask.adapters.registry import ExecutorRegistry
+    from longtask.mcp_server import tool_prepare_contract
+    from longtask.persistence.store import StoreConfig, connect, ensure_schema
+
+    conn = connect(StoreConfig(db_path=tmp_path / "state.db"))
+    ensure_schema(conn)
+    args = {
+        "title": "stable retry",
+        "objective": "same MCP request must not create duplicate contracts",
+        "deadline_at": (datetime.now(UTC) + timedelta(hours=2)).isoformat(),
+        "acceptance_standard": "contract exists",
+        "acceptance_checks": ["contract exists"],
+    }
+    ctx = {"conn": conn, "registry": ExecutorRegistry(), "root": tmp_path}
+    try:
+        first = tool_prepare_contract(args, ctx)
+        second = tool_prepare_contract(dict(args), ctx)
+        assert first == second
+        assert conn.execute("SELECT COUNT(*) FROM contracts").fetchone()[0] == 1
+    finally:
+        conn.close()
+
+
 def _spawn_mcp(data_dir: Path) -> subprocess.Popen[bytes]:
     """启动 longtask-mcp 子进程，stdio 用 bytes 收发。"""
     return subprocess.Popen(  # noqa: S603

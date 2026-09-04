@@ -586,7 +586,18 @@ def save_contract(
         if request_id:
             existing_events = get_events_by_request_id(conn, request_id)
             if existing_events:
-                existing_contract = get_contract(conn, contract_id)
+                prepared_event = next(
+                    (
+                        event
+                        for event in existing_events
+                        if event.event_type == EventType.CONTRACT_PREPARED and event.contract_id
+                    ),
+                    None,
+                )
+                existing_contract = get_contract(
+                    conn,
+                    prepared_event.contract_id if prepared_event else contract_id,
+                )
                 if existing_contract is not None:
                     return existing_contract
 
