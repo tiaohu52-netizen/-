@@ -89,6 +89,11 @@ class TestContextPolicy:
         with pytest.raises(TypeError, match=r"context\.required must be a boolean"):
             ContextPolicy.from_contract(draft)
 
+    def test_rejects_boolean_context_limits(self) -> None:
+        draft = make_draft(context={"limits": {"max_bytes": True}})
+        with pytest.raises(TypeError, match=r"context\.limits\.max_bytes must be an integer"):
+            ContextPolicy.from_contract(draft)
+
     def test_malformed_limits_fall_back_to_defaults(self) -> None:
         draft = make_draft(context={"required": True, "limits": {"max_bytes": "abc"}})
         policy = ContextPolicy.from_contract(draft)

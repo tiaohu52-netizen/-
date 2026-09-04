@@ -159,3 +159,8 @@ def test_authority_allow_parallel_rejects_non_boolean() -> None:
 def test_continuity_checkpoint_flag_rejects_non_boolean() -> None:
     with pytest.raises(TypeError, match="checkpoint_on_material_change must be a boolean"):
         continuity_from_dict({"checkpoint_on_material_change": "false"})
+
+
+def test_continuity_numeric_flags_reject_boolean_values() -> None:
+    with pytest.raises(TypeError, match=r"checkpoint_max_age_minutes must be an integer"):
+        continuity_from_dict({"checkpoint_max_age_minutes": True})

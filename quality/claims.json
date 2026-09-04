@@ -489,6 +489,7 @@
       "lifecycle": "verified",
       "scope_paths": [
         "src/longtask/persistence/context.py",
+        "src/lhgp/contracts/continuity.py",
         "src/longtask/cli/runner.py",
         "src/lhgp/acceptance/verdict.py",
         "src/longtask/cli/daemon.py",
@@ -504,7 +505,13 @@
           "kind": "focused_test",
           "path": "tests/unit/test_context.py",
           "recorded_at": "2026-09-01",
-          "summary": "9 个 unit 场景：policy 解析（默认值/合同 overrides/形状不对回落）、active.md 物化（含交接与最近 attempt 终态）、scratch.md 初始化、容量超限 fail-closed 记 capacity-refused、交接附言进任务文本（修复再派 attempt 缺上下文缺口）、probe 路径不物化快照（§10 时序）。"
+          "summary": "10 个 unit 场景：policy 解析（默认值/合同 overrides/形状不对回落）、context 数值限制拒绝布尔值、active.md 物化（含交接与最近 attempt 终态）、scratch.md 初始化、容量超限 fail-closed 记 capacity-refused、交接附言进任务文本（修复再派 attempt 缺上下文缺口）、probe 路径不物化快照（§10 时序）。"
+        },
+        {
+          "kind": "focused_test",
+          "path": "tests/unit/test_contract_schema.py",
+          "recorded_at": "2026-09-05",
+          "summary": "continuity 数值字段拒绝布尔值，避免恢复窗口与上下文容量被错误解析为 1。"
         },
         {
           "kind": "integration_real_store",
