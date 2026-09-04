@@ -498,6 +498,37 @@
           "path": "docs/LHGP-SPEC.md",
           "recorded_at": "2026-09-03",
           "summary": "SPEC §4.3 新增「Goal 计划与阶段」模型与「阶段绑定不变式」，将代码已实现的 stage acceptance 绑定落到语义权威，并明确检查身份比较 MUST 在规范化身份上进行。"
+        },
+        {
+          "kind": "integration_real_store",
+          "path": "tests/integration/test_goal_auto_advance.py",
+          "recorded_at": "2026-09-04",
+          "summary": "5 个集成场景补齐完整闭环的「最后一公里」证据（此前仅覆盖 verifier→合同 complete，从未覆盖合同→阶段推进）：绑定合同的 verifier 通过 → 阶段完成且 current 指向下一阶段；最后阶段完成 → goal satisfied；verifier 失败 → 阶段不推进；推进后 goal/next 指向下一阶段 create_contract；推进事件 actor=verifier 落库可审计。"
+        }
+      ]
+    },
+    {
+      "id": "goal-auto-advance-from-verified-contracts",
+      "statement": "完整闭环成立（SPEC §4.3）：Goal stage → 阶段 acceptance 要求 → goal/prepare 绑定（合同覆盖全部要求并写回 contract_id）→ 合同执行与独立 verifier → verifier passed → daemon tick 钩子自动推进阶段（tick._advance_goal_after_verified_contract → advance_goal，actor=verifier）；最后阶段完成时 goal 状态 satisfied。阶段完成只能由 verifier 证据推导，执行者声明或 verifier 失败均不推进。",
+      "lifecycle": "verified",
+      "scope_paths": [
+        "src/longtask/cli/tick.py",
+        "src/longtask/persistence/store.py",
+        "src/lhgp/goals/progress.py",
+        "tests/integration/test_goal_auto_advance.py"
+      ],
+      "evidence": [
+        {
+          "kind": "integration_real_store",
+          "path": "tests/integration/test_goal_auto_advance.py",
+          "recorded_at": "2026-09-04",
+          "summary": "5 个真实 SQLite 集成场景驱动 run_daemon_tick 全链路：verifier succeeded → 阶段推进（completed=[stage-1]、current=stage-2、status=active）；单阶段计划完成 → satisfied 且 current=None；verifier failed → 合同退回 active 且阶段零推进；推进后 goal_next_action 指向 stage-2 create_contract；goal/amendment 事件带 actor=verifier 可审计。"
+        },
+        {
+          "kind": "source_static",
+          "path": "src/longtask/cli/tick.py",
+          "recorded_at": "2026-09-04",
+          "summary": "_judge_verifier_outcomes 在 verifier succeeded 裁决合同 complete 后调用 _advance_goal_after_verified_contract：定位 plan 中 contract_id 匹配的阶段，校验其为当前阶段后经 advance_goal 走 revision-CAS 推进；推进失败不掩盖 verifier 证据（下次读取/推进可安全重试）。"
         }
       ]
     }
