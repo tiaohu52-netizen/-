@@ -1028,6 +1028,17 @@ def test_contract_get_exposes_isolated_decision_history(tmp_path: Path) -> None:
         assert attempts[0]["attempt_id"] == "ver-decision-history"
         assert attempts[0]["role"] == "verifier"
         assert all(item["attempt_id"] != "legacy-unbound" for item in attempts)
+
+        limited = route(
+            make_env(
+                Method.CONTRACT_GET,
+                "req-decision-get-limited",
+                {"contract_id": cid, "attempt_limit": 1},
+            ),
+            conn=conn,
+            now=NOW,
+        )
+        assert len(limited["result"]["attempt_history"]) == 1
     finally:
         conn.close()
 
