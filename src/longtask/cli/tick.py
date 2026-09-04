@@ -271,10 +271,9 @@ def run_daemon_tick(
         # snapshot。当前历史样本尚未接入校准器，因此明确标记 low/coarse，
         # 但仍给出保守 p50/p90、slack 和下一决策点，供 UI/恢复流程使用。
         remaining_minutes = remaining_hours * 60.0
-        historical_minutes = _completed_attempt_durations(conn, c.goal_id)
         successful_minutes = _completed_attempt_durations(conn, c.goal_id, successful_only=True)
-        if historical_minutes:
-            ordered = sorted(historical_minutes)
+        if successful_minutes:
+            ordered = sorted(successful_minutes)
             p50_index = (len(ordered) - 1) // 2
             p90_index = min(len(ordered) - 1, max(0, int(len(ordered) * 0.9) - 1))
             forecast_p50 = ordered[p50_index] + 10.0
