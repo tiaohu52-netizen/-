@@ -36,6 +36,13 @@ _TRUSTED_CLIENT_ACTORS: dict[str, str] = {
 }
 
 
+def _budget_int(value: Any, field: str) -> int:
+    """Parse a budget integer while rejecting bool-as-int coercion."""
+    if isinstance(value, bool):
+        raise TypeError(f"budget.{field} must be an integer")
+    return int(value)
+
+
 def _parse_iso(value: str) -> datetime:
     """Parse an ISO timestamp for handler-side input normalization."""
     return datetime.fromisoformat(value)
@@ -85,13 +92,18 @@ def parse_contract_draft(params: dict[str, Any]) -> ContractDraft:
             workload_initial_hours = float(draft_data["workload_initial_hours"])
         budget_raw = draft_data["budget"]
         budget = Budget(
-            max_dispatches=int(budget_raw["max_dispatches"]),
-            max_escalations=int(budget_raw["max_escalations"]),
-            max_concurrent_attempts=int(budget_raw["max_concurrent_attempts"]),
-            max_attempt_minutes=int(budget_raw["max_attempt_minutes"]),
-            max_output_bytes=int(budget_raw["max_output_bytes"]),
-            verification_attempts_reserved=int(
-                budget_raw.get("verification_attempts_reserved", DEFAULT_VERIFICATION_RESERVED)
+            max_dispatches=_budget_int(budget_raw["max_dispatches"], "max_dispatches"),
+            max_escalations=_budget_int(budget_raw["max_escalations"], "max_escalations"),
+            max_concurrent_attempts=_budget_int(
+                budget_raw["max_concurrent_attempts"], "max_concurrent_attempts"
+            ),
+            max_attempt_minutes=_budget_int(
+                budget_raw["max_attempt_minutes"], "max_attempt_minutes"
+            ),
+            max_output_bytes=_budget_int(budget_raw["max_output_bytes"], "max_output_bytes"),
+            verification_attempts_reserved=_budget_int(
+                budget_raw.get("verification_attempts_reserved", DEFAULT_VERIFICATION_RESERVED),
+                "verification_attempts_reserved",
             ),
         )
         draft = ContractDraft(

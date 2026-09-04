@@ -763,6 +763,23 @@ class TestUnknownContract:
 class TestHandlerValidationBranches:
     """入参格式校验与边缘分支覆盖测试（DESIGN §11.7 VALIDATION_FAILED）。"""
 
+    def test_prepare_rejects_boolean_budget_value(self, tmp_path: Path) -> None:
+        config = setup_test_db(tmp_path)
+        conn = connect(config)
+        try:
+            payload = make_valid_draft_payload()
+            payload["budget"]["max_dispatches"] = True
+            with pytest.raises(RpcError) as exc_info:
+                route(
+                    make_env(Method.CONTRACT_PREPARE, "budget-bool", {"draft": payload}),
+                    conn=conn,
+                    now=NOW,
+                )
+            assert exc_info.value.code is ErrorCode.VALIDATION_FAILED
+            assert "budget.max_dispatches" in exc_info.value.message
+        finally:
+            conn.close()
+
     def test_prepare_auto_generated_id_and_validation(self, tmp_path: Path) -> None:
         config = setup_test_db(tmp_path)
         conn = connect(config)
