@@ -130,7 +130,9 @@ def tool_prepare_contract(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str
         "hard_constraints": args.get("hard_constraints", {}),
         "acceptance": {
             "standard": args["acceptance_standard"],
-            "checks": list(args["acceptance_checks"]),
+            # Keep the original value so the runtime validator can reject a
+            # string (``list("check")`` would silently create character checks).
+            "checks": args["acceptance_checks"],
         },
         # Preserve the model value for the single runtime validator; coercing
         # here would turn true/false into 1.0/0.0 and bypass fail-closed input
