@@ -531,6 +531,25 @@
       ]
     },
     {
+      "id": "real-multi-executor-handoff",
+      "statement": "合同授权池内的不同 executor 可以跨 attempt 串行接力：首个真实 subprocess 执行器失败后被停用，下一轮由另一个授权 executor 修复，独立 verifier 验收后合同完成。",
+      "lifecycle": "verified",
+      "scope_paths": [
+        "src/longtask/adapters/registry.py",
+        "src/longtask/cli/tick.py",
+        "src/longtask/cli/runner.py",
+        "tests/integration/test_real_subprocess_repair_loop.py"
+      ],
+      "evidence": [
+        {
+          "kind": "integration_real_store",
+          "path": "tests/integration/test_real_subprocess_repair_loop.py",
+          "recorded_at": "2026-09-05",
+          "summary": "真实 subprocess 场景明确授权 exec-real/exec-repair 为 executor、ver-real 为 verifier；第一轮失败后停用 exec-real，第二轮实际选择 exec-repair 修复并由 ver-real 独立验收完成。"
+        }
+      ]
+    },
+    {
       "id": "deadline-bounded-command-checks",
       "statement": "typed command-exit-zero 验收不会无限阻塞 daemon：命令超时受 check 参数、60 秒硬上限和合同剩余 Deadline 三重约束，超时以 undetermined 证据交给 verifier/仲裁。",
       "lifecycle": "verified",

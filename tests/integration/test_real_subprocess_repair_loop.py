@@ -21,6 +21,7 @@ from longtask.adapters.registry import CostHint, ExecutorRegistry, LaunchSpec, R
 from longtask.cli.daemon import run_daemon_tick
 from longtask.cli.runner import AttemptRunner
 from longtask.cli.tick import _judge_verifier_outcomes
+from longtask.contracts.authority import Authority, AuthorityBinding
 from longtask.contracts.schema import Acceptance, Budget, ContractDraft, ContractState, Enforcement
 from longtask.persistence.store import (
     StoreConfig,
@@ -71,7 +72,12 @@ def _registry() -> ExecutorRegistry:
         "print('```lhgp-verdict\\n' + json.dumps({'verdict': 'succeeded' if ok else 'failed'}) "
         "+ '\\n```')"
     )
-    for entry_id, code in (("exec-real", executor_code), ("ver-real", verifier_code)):
+    repair_executor_code = "from pathlib import Path; Path('result.txt').write_text('good')"
+    for entry_id, code in (
+        ("exec-real", executor_code),
+        ("exec-repair", repair_executor_code),
+        ("ver-real", verifier_code),
+    ):
         registry.register(
             RegistryEntry(
                 id=entry_id,
@@ -82,7 +88,7 @@ def _registry() -> ExecutorRegistry:
                 ),
                 capabilities=_caps(),
                 limits={"max_concurrent_attempts": 1},
-                cost_hint=CostHint.LOW,
+                cost_hint=(CostHint.HIGH if entry_id == "exec-repair" else CostHint.LOW),
                 enabled=True,
             )
         )
@@ -132,6 +138,14 @@ def _setup(root: Path) -> tuple[Any, str]:
                 max_output_bytes=1048576,
                 verification_attempts_reserved=3,
             ),
+            authority=Authority(
+                executor_policy="explicit_allow",
+                executors=(
+                    AuthorityBinding("exec-real", ("*",), ("executor",)),
+                    AuthorityBinding("exec-repair", ("*",), ("executor",)),
+                    AuthorityBinding("ver-real", ("*",), ("verifier",)),
+                ),
+            ),
         ),
         contract_id="lt-real-subprocess-loop",
         now=NOW,
@@ -172,12 +186,14 @@ def test_real_subprocess_fail_repair_reverify(tmp_path: Path) -> None:
         _judge_verifier_outcomes(root, conn, NOW + timedelta(seconds=3))
         assert get_contract(conn, contract_id).state == ContractState.ACTIVE
 
-        # Round 2: the same real executor observes its durable counter and
-        # writes the repaired artifact; a fresh verifier is independently spawned.
-        # Deliberately reuse the same wall-clock second: ID allocation must
-        # still produce a distinct executor and verifier attempt.
+        # Round 2: disable the first executor and let a different authorized
+        # CLI take over.  This is the actual multi-agent handoff, not merely a
+        # second attempt in the same adapter/session.
+        assert registry.set_enabled("exec-real", False)
+        runner.replace_registry(registry)
         second_tick = run_daemon_tick(root, conn, registry, now=NOW)
         second = second_tick["attempts_started"][0]
+        assert second["executor_id"] == "exec-repair"
         assert runner.start_attempt(
             NOW,
             contract_id=second["contract_id"],
