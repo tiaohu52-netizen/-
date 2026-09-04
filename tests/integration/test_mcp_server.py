@@ -519,6 +519,23 @@ class TestMCPErrors:
         finally:
             _stop_mcp(proc)
 
+    def test_non_boolean_include_payload_returns_invalid_params(self, data_dir: Path) -> None:
+        """字符串 false 不能意外打开通知 payload，避免上下文泄露。"""
+        proc = _spawn_mcp(data_dir)
+        try:
+            resp = _roundtrip(
+                proc,
+                "tools/call",
+                {
+                    "name": "lhgp_notifications",
+                    "arguments": {"include_payload": "false"},
+                },
+            )
+            assert resp["error"]["code"] == -32602
+            assert "include_payload must be a boolean" in resp["error"]["message"]
+        finally:
+            _stop_mcp(proc)
+
     def test_non_string_notification_filters_return_invalid_params(self, data_dir: Path) -> None:
         proc = _spawn_mcp(data_dir)
         try:
