@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import sqlite3
 from datetime import datetime
@@ -31,6 +32,7 @@ from longtask.contracts.state_machine import (
 from longtask.persistence.attempts import list_contract_attempts
 from longtask.persistence.decisions import list_decisions
 from longtask.persistence.events import EventType
+from longtask.persistence.events_query import get_events
 from longtask.persistence.store import (
     STORE_SCHEMA_VERSION,
     IdempotencyMismatchError,
@@ -218,6 +220,33 @@ def handle_contract_get(
         }
         for attempt in list_contract_attempts(conn, contract_id=contract_id, limit=attempt_limit)
     ]
+    verification_events = {
+        EventType.VERIFICATION_REQUESTED,
+        EventType.VERIFICATION_CONSUMED,
+        EventType.VERIFICATION_STARTED,
+    }
+    verification_history: list[dict[str, Any]] = []
+    for event in reversed(get_events(conn, contract_id=contract_id)):
+        if event.event_type not in verification_events:
+            continue
+        try:
+            payload = json.loads(event.payload_json or "{}")
+        except (TypeError, ValueError):
+            payload = {}
+        verification_history.append(
+            {
+                "event_id": event.event_id,
+                "event_type": event.event_type,
+                "attempt_id": event.attempt_id,
+                "contract_revision": event.contract_revision,
+                "actor": event.actor,
+                "created_at": event.created_at.isoformat(),
+                "payload": payload,
+            }
+        )
+        if len(verification_history) >= 20:
+            break
+    result["verification_history"] = verification_history
     return {"ok": True, "result": result}
 
 
