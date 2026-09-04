@@ -201,6 +201,19 @@ def handle_contract_get(
         contract_id=contract_id,
         limit=decision_limit,
     )
+    # Deadline 风险是合同级模型可见性的一部分；不要要求调用方再读取
+    # 全量事件流才能知道当前快照。只暴露本合同最新的协议生成快照。
+    result["deadline_snapshot"] = None
+    for event in reversed(get_recent_events(conn, contract_id=contract_id, limit=200)):
+        if event.event_type != EventType.FORECAST_UPDATED:
+            continue
+        try:
+            snapshot = json.loads(event.payload_json or "{}")
+        except (TypeError, ValueError):
+            snapshot = None
+        if isinstance(snapshot, dict):
+            result["deadline_snapshot"] = snapshot
+        break
     result["attempt_history"] = [
         {
             "attempt_id": attempt.attempt_id,

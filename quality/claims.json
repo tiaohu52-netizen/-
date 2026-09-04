@@ -566,6 +566,23 @@
       ]
     },
     {
+      "id": "contract-deadline-snapshot-visibility",
+      "statement": "contract/get 直接返回本合同最新 deadline 风险快照，使模型无需重放全量事件即可获得可解释的 p50/p90、slack、risk 与 next-decision 事实。",
+      "lifecycle": "verified",
+      "scope_paths": [
+        "src/longtask/rpc/handlers/contract.py",
+        "tests/integration/test_rpc_lifecycle.py"
+      ],
+      "evidence": [
+        {
+          "kind": "integration_real_store",
+          "path": "tests/integration/test_rpc_lifecycle.py",
+          "recorded_at": "2026-09-05",
+          "summary": "contract/get 在真实 SQLite 合同事件流中返回最新 forecast/updated 快照，且按合同隔离。"
+        }
+      ]
+    },
+    {
       "id": "real-multi-executor-handoff",
       "statement": "合同授权池内的不同 executor 可以跨 attempt 串行接力：首个真实 subprocess 执行器失败后被停用，下一轮由另一个授权 executor 修复，独立 verifier 验收后合同完成。",
       "lifecycle": "verified",
