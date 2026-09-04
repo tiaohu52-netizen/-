@@ -82,6 +82,15 @@ def test_canonical_namespace_exposes_contract_read_and_list() -> None:
         assert schema.get("description"), f"{canonical} 缺描述"
 
 
+def test_contract_read_schema_exposes_decision_history_limit() -> None:
+    """模型工具描述必须保留风险历史查询的可控上限。"""
+    _handler, schema = TOOLS["lhgp_get_contract"]
+    properties = schema["inputSchema"]["properties"]
+    assert properties["decision_limit"]["type"] == "integer"
+    assert properties["decision_limit"]["minimum"] == 1
+    assert properties["decision_limit"]["maximum"] == 200
+
+
 def test_canonical_aliases_reuse_the_same_handlers() -> None:
     """规范别名必须复用旧处理链，避免两套语义分叉。"""
     for canonical, legacy in CONTRACT_READ_CAPABILITIES.items():
