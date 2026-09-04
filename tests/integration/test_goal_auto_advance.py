@@ -103,8 +103,34 @@ def _insert_goal(conn: sqlite3.Connection, goal_id: str, stages: list[dict]) -> 
 
 
 def _prepare_bound_contract(
-    conn: sqlite3.Connection, goal_id: str, stage_id: str, contract_id: str
+    conn: sqlite3.Connection,
+    goal_id: str,
+    stage_id: str,
+    contract_id: str,
+    *,
+    check: str = "result.txt 存在",
+    executor_id: str | None = None,
 ) -> None:
+    draft = {
+        "title": f"阶段 {stage_id} 合同",
+        "objective": "完成该阶段",
+        "deadline_at": (NOW + timedelta(hours=2)).isoformat(),
+        "hard_constraints": {"file_effects": {"mode": "workspace-write"}},
+        "acceptance": {"standard": "通过", "checks": [check], "verifier": "cross_check"},
+        "workload_estimate": {"initial_hours": 1.0},
+        "budget": {
+            "max_dispatches": 5,
+            "max_escalations": 1,
+            "max_concurrent_attempts": 1,
+            "max_attempt_minutes": 30,
+            "max_output_bytes": 1048576,
+        },
+    }
+    if executor_id:
+        draft["authority"] = {
+            "executor_policy": "explicit_allow",
+            "executors": [{"executor_id": executor_id, "models": ["*"], "roles": ["executor"]}],
+        }
     envelope = RequestEnvelope(
         method=Method.GOAL_PREPARE,
         request_id=f"req-{contract_id}",
@@ -114,25 +140,7 @@ def _prepare_bound_contract(
             "contract_id": contract_id,
             "goal_id": goal_id,
             "stage_id": stage_id,
-            "draft": {
-                "title": f"阶段 {stage_id} 合同",
-                "objective": "完成该阶段",
-                "deadline_at": (NOW + timedelta(hours=2)).isoformat(),
-                "hard_constraints": {"file_effects": {"mode": "workspace-write"}},
-                "acceptance": {
-                    "standard": "通过",
-                    "checks": ["result.txt 存在"],
-                    "verifier": "cross_check",
-                },
-                "workload_estimate": {"initial_hours": 1.0},
-                "budget": {
-                    "max_dispatches": 5,
-                    "max_escalations": 1,
-                    "max_concurrent_attempts": 1,
-                    "max_attempt_minutes": 30,
-                    "max_output_bytes": 1048576,
-                },
-            },
+            "draft": draft,
         },
     )
     handle_goal_prepare(envelope, conn=conn, now=NOW)
@@ -260,4 +268,34 @@ def test_advance_writes_auditable_goal_event(tmp_path: Path) -> None:
     assert amendments, "阶段推进应产生可审计的 goal 修订事件"
     advance_events = [e for e in amendments if e.actor == "verifier"]
     assert advance_events, "推进事件应标记 actor=verifier（由证据推导，非执行者声明）"
+    conn.close()
+
+
+def test_goal_continuity_reopens_and_switches_executor(tmp_path: Path) -> None:
+    """阶段 1 完成后模拟会话/daemon 重启，阶段 2 可绑定另一 executor。"""
+    root, conn, reg = _setup(tmp_path)
+    _insert_goal(conn, "goal-continuity", STAGES)
+    _prepare_bound_contract(conn, "goal-continuity", "stage-1", "contract-a")
+    _activate(conn, "contract-a")
+    _record_verifier(conn, "contract-a", "succeeded")
+    run_daemon_tick(root, conn, reg, now=NOW)
+    assert _progress(conn, "goal-continuity")["current"] == "stage-2"
+    conn.close()  # 原会话与 daemon 进程退出
+
+    # 新会话重新打开权威 SQLite，并让不同 executor 接力阶段 2。
+    conn = connect(StoreConfig(db_path=root / "state.db"))
+    ensure_schema(conn)
+    _prepare_bound_contract(
+        conn,
+        "goal-continuity",
+        "stage-2",
+        "contract-b",
+        check="report.txt 存在",
+        executor_id="exec-b",
+    )
+    view = get_contract(conn, "contract-b")
+    assert view is not None
+    assert view.goal_id == "goal-continuity"
+    assert view.draft.authority.executors[0].executor_id == "exec-b"
+    assert get_goal(conn, "goal-continuity")["plan"]["stages"][1]["contract_id"] == "contract-b"
     conn.close()
