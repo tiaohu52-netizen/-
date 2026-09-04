@@ -12,6 +12,8 @@ from pathlib import Path
 import pytest
 from jsonschema import Draft202012Validator
 
+from longtask.contracts.authority import from_dict as authority_from_dict
+from longtask.contracts.continuity import from_dict as continuity_from_dict
 from longtask.contracts.schema import (
     FROZEN_FIELDS,
     Acceptance,
@@ -140,3 +142,13 @@ class TestContractSerialization:
         assert v_dict["revision"] == 1
         assert v_dict["title"] == "示例合同"
         assert v_dict["schema_version"] == 2
+
+
+def test_authority_allow_parallel_rejects_non_boolean() -> None:
+    with pytest.raises(TypeError, match="allow_parallel must be a boolean"):
+        authority_from_dict({"allow_parallel": "false"})
+
+
+def test_continuity_checkpoint_flag_rejects_non_boolean() -> None:
+    with pytest.raises(TypeError, match="checkpoint_on_material_change must be a boolean"):
+        continuity_from_dict({"checkpoint_on_material_change": "false"})
