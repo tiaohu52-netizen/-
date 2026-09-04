@@ -313,7 +313,7 @@
     },
     {
       "id": "rpc-contract-lifecycle",
-      "statement": "JSON-RPC 合同生命周期方法与 DESIGN §5/§11 一致：非法迁移 STATE_FORBIDDEN、冻结区字段拦截 VALIDATION_FAILED、预算与工作量数值拒绝布尔/非有限值、patch CAS 冲突 REVISION_CONFLICT、request_id 重放返回原结果不产生第二个事件、list/events cursor 分页续读",
+      "statement": "JSON-RPC 合同生命周期方法与 DESIGN §5/§11 一致：非法迁移 STATE_FORBIDDEN、冻结区字段拦截 VALIDATION_FAILED、预算与工作量数值拒绝布尔/非有限值、控制面 limit/cursor/revision 拒绝布尔伪整数、patch CAS 冲突 REVISION_CONFLICT、request_id 重放返回原结果不产生第二个事件、list/events cursor 分页续读",
       "lifecycle": "verified",
       "scope_paths": [
         "src/longtask/rpc/",
@@ -328,7 +328,7 @@
           "kind": "integration_real_store",
           "path": "tests/integration/test_rpc_lifecycle.py",
           "recorded_at": "2026-09-01",
-          "summary": "真实 SQLite 集成测试：prepare→approve→patch→pause→resume→cancel 正向流、非法迁移/终态拦截、冻结字段拒改、RPC 草稿预算布尔值拒接、revision 冲突、分页续读、request_id 重放、UNKNOWN_CONTRACT。"
+          "summary": "真实 SQLite 集成测试：prepare→approve→patch→pause→resume→cancel 正向流、非法迁移/终态拦截、冻结字段拒改、RPC 草稿预算布尔值拒接、分页 limit 布尔伪整数拒接、revision 冲突、分页续读、request_id 重放、UNKNOWN_CONTRACT。"
         },
         {
           "kind": "focused_test",
