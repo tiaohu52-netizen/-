@@ -531,6 +531,29 @@
       ]
     },
     {
+      "id": "real-subprocess-repair-loop",
+      "statement": "真实 SubprocessAdapter 进程级闭环：executor 首次产出失败后由独立 verifier 判失败，repair 再派新的 executor 与 verifier，最终仅在验收证据通过时将合同置为 complete；verifier 成功不会递归派生 verifier。",
+      "lifecycle": "verified",
+      "scope_paths": [
+        "src/longtask/cli/runner.py",
+        "tests/integration/test_real_subprocess_repair_loop.py"
+      ],
+      "evidence": [
+        {
+          "kind": "integration_real_store",
+          "path": "tests/integration/test_real_subprocess_repair_loop.py",
+          "recorded_at": "2026-09-05",
+          "summary": "真实 sys.executable 子进程执行器首次写入 bad、verifier 真实判失败；第二轮执行器写入 good、独立 verifier 判通过，合同最终 complete 且 verifier attempt 恰为两条。"
+        },
+        {
+          "kind": "source_static",
+          "path": "src/longtask/cli/runner.py",
+          "recorded_at": "2026-09-05",
+          "summary": "_finish_attempt 仅在 role=executor 且 succeeded 时派生 verifier；verifier 成功不再递归派生。verifier ID 同秒冲突时按 attempts 表补序号。"
+        }
+      ]
+    },
+    {
       "id": "local-rpc-transport",
       "statement": "daemon 与 rpc-call 之间使用本机认证传输：Unix domain socket 优先；Windows 无 AF_UNIX 时仅回环 TCP，并保留 daemon.token 握手认证。活动 endpoint 不得被第二个 daemon 覆盖。",
       "lifecycle": "verified",
