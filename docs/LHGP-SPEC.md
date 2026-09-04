@@ -724,6 +724,10 @@ verifier 报告验收结果的通道有两条，按 harness 能力选择：
 状态、版本、时间、返回码、错误类别与恢复策略；不得用 Goal 级历史替代合同级归属。
 调用方可用 `attempt_limit` 限制返回条数（参考实现默认 20，最大 100）。
 
+唤醒层降级事件（`wakeup/degraded`）按状态边沿记录：同一层持续不可用时
+MUST NOT 按 daemon tick 重复写入；该层恢复后再次失效时 SHOULD 重新记录，
+以保留可审计的故障转变而不制造事件空转。
+
 ### 13.2 事件族
 
 事件名采用 `lower_snake_case` 载荷和 `domain/action` 类型，例如：
