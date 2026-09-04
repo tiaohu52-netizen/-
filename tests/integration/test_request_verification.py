@@ -261,3 +261,28 @@ def test_daemon_request_idempotence_uses_bound_goal_identity(tmp_path: Path) -> 
         assert count == 1
     finally:
         conn.close()
+
+
+def test_daemon_can_consume_new_request_after_terminal_verifier(tmp_path: Path) -> None:
+    """历史 verifier 终态后，新的用户验收请求仍可派生 verifier。"""
+    root, conn, cid, reg = _setup(tmp_path, state=ContractState.BLOCKED)
+    try:
+        conn.execute(
+            "INSERT INTO attempts (attempt_id, goal_id, contract_revision, role,"
+            " executor_id, model_id, state, lease_generation, admitted_at, terminal_at, updated_at)"
+            " VALUES ('ver-old', ?, 1, 'verifier', 'exec-b', '*', 'failed', 1, ?, ?, ?)",
+            (cid, NOW.isoformat(), NOW.isoformat(), NOW.isoformat()),
+        )
+        conn.commit()
+        _request(conn, cid, request_id="req-ver-new")
+
+        runner = AttemptRunner(root, conn, reg)
+        _consume_verification_requests(root, conn, runner, NOW + timedelta(seconds=1))
+
+        count = conn.execute(
+            "SELECT COUNT(*) FROM attempts WHERE goal_id=? AND role='verifier'",
+            (cid,),
+        ).fetchone()[0]
+        assert count == 2
+    finally:
+        conn.close()
