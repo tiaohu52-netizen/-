@@ -139,9 +139,27 @@ def get_events(
     return [_row_to_stored_event(row) for row in conn.execute(query, params).fetchall()]
 
 
+def get_recent_events(
+    conn: sqlite3.Connection,
+    *,
+    contract_id: str,
+    limit: int = 20,
+) -> list[StoredEvent]:
+    """Return newest contract events using a database-side limit."""
+    if not isinstance(limit, int) or isinstance(limit, bool) or limit < 1:
+        raise ValueError("limit must be a positive integer")
+    query = (
+        "SELECT "
+        + _SELECT_LIST
+        + " FROM events WHERE contract_id = ? ORDER BY event_id DESC LIMIT ?"
+    )  # noqa: S608 — _SELECT_LIST is a fixed internal column list
+    rows = conn.execute(query, (contract_id, limit)).fetchall()
+    return [_row_to_stored_event(row) for row in reversed(rows)]
+
+
 def get_events_by_request_id(conn: sqlite3.Connection, request_id: str) -> list[StoredEvent]:
     query = "SELECT " + _SELECT_LIST + " FROM events WHERE request_id = ? ORDER BY event_id ASC"  # noqa: S608
     return [_row_to_stored_event(row) for row in conn.execute(query, (request_id,)).fetchall()]
 
 
-__all__ = ["append_event", "get_events", "get_events_by_request_id"]
+__all__ = ["append_event", "get_events", "get_events_by_request_id", "get_recent_events"]
