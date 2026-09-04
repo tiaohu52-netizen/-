@@ -309,7 +309,7 @@ def _reattach(
     emit: Callable[[str], None] | None,
 ) -> ReconcileOutcome:
     """分支 1：确认同一外部 run 仍活着 → 重新绑定并续租（§11.3）。"""
-    cid = attempt.contract_id or attempt.goal_id
+    cid = _resolve_contract_id(conn, attempt) or attempt.goal_id
     set_attempt_state(
         conn,
         attempt_id=attempt.attempt_id,
@@ -391,7 +391,7 @@ def _collect(
     exit_code_known=False + collect_note：pid 确认消失但无法 collect 的
     收尸后窗口（reattach 已拒绝）——如实结算 failed，不猜退出码。
     """
-    cid = attempt.contract_id or attempt.goal_id
+    cid = _resolve_contract_id(conn, attempt) or attempt.goal_id
     payload: dict[str, Any] = {
         "external_run_id": handle.external_run_id,
         "session_locator": handle.session_locator,
@@ -484,7 +484,7 @@ def _orphan(
     detail: str,
 ) -> ReconcileOutcome:
     """分支 3：状态未知 → 标记 orphaned，宽限期内代持租约阻止重复 spawn。"""
-    cid = attempt.goal_id
+    cid = _resolve_contract_id(conn, attempt) or attempt.goal_id
     first_time = attempt.state != AttemptState.ORPHANED.value
     mark_attempt_orphaned(conn, attempt_id=attempt.attempt_id, now=now)
     # 代持：租约活着时 decide() 封顶 remind，分发路径不会另起会话（§7）
@@ -545,7 +545,7 @@ def _sweep_orphan(
     emit: Callable[[str], None] | None,
 ) -> ReconcileOutcome:
     """宽限维护：未到期继续代持；到期则 fence 并让位给重新派发（分支 4）。"""
-    cid = attempt.goal_id
+    cid = _resolve_contract_id(conn, attempt) or attempt.goal_id
     if not holds_lease or lease is None:
         # 租约已被回收或转给新 holder：旧的这一条已经 fence 过了
         return ReconcileOutcome(
