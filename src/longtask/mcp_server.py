@@ -132,7 +132,10 @@ def tool_prepare_contract(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str
             "standard": args["acceptance_standard"],
             "checks": list(args["acceptance_checks"]),
         },
-        "workload_estimate": {"initial_hours": float(args.get("workload_initial_hours", 1.0))},
+        # Preserve the model value for the single runtime validator; coercing
+        # here would turn true/false into 1.0/0.0 and bypass fail-closed input
+        # checks.
+        "workload_estimate": {"initial_hours": args.get("workload_initial_hours", 1.0)},
         "budget": args.get(
             "budget",
             {
