@@ -28,6 +28,7 @@ from longtask.contracts.state_machine import (
     is_terminal_state,
     is_valid_transition,
 )
+from longtask.persistence.attempts import list_contract_attempts
 from longtask.persistence.decisions import list_decisions
 from longtask.persistence.events import EventType
 from longtask.persistence.store import (
@@ -184,6 +185,25 @@ def handle_contract_get(
         contract_id=contract_id,
         limit=decision_limit,
     )
+    result["attempt_history"] = [
+        {
+            "attempt_id": attempt.attempt_id,
+            "contract_id": attempt.contract_id,
+            "contract_revision": attempt.contract_revision,
+            "role": attempt.role,
+            "executor_id": attempt.executor_id,
+            "model_id": attempt.model_id,
+            "state": attempt.state,
+            "admitted_at": attempt.admitted_at.isoformat(),
+            "started_at": attempt.started_at.isoformat() if attempt.started_at else None,
+            "terminal_at": attempt.terminal_at.isoformat() if attempt.terminal_at else None,
+            "return_code": attempt.return_code,
+            "error_class": attempt.error_class,
+            "external_run_id": attempt.external_run_id,
+            "recovery_strategy": attempt.recovery_strategy,
+        }
+        for attempt in list_contract_attempts(conn, contract_id=contract_id)
+    ]
     return {"ok": True, "result": result}
 
 
