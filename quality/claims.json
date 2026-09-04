@@ -263,6 +263,7 @@
       "lifecycle": "verified",
       "scope_paths": [
         "src/longtask/adapters/",
+        "src/lhgp/contracts/contract_draft.py",
         "tests/conformance/"
       ],
       "evidence": [
@@ -277,6 +278,12 @@
           "path": "tests/conformance/test_refusal_scenarios.py",
           "recorded_at": "2026-09-01",
           "summary": "端到端一致性场景：沙箱不支持拒接并记录 dispatch/refused 事件、预算耗尽就地转入 blocked(need-user)、写事务崩溃 WAL 恢复、租约回收后旧写回 LEASE_FENCED 不污染新 attempt。"
+        },
+        {
+          "kind": "focused_test",
+          "path": "tests/unit/test_contract_schema.py",
+          "recorded_at": "2026-09-05",
+          "summary": "合同反序列化拒绝布尔预算值，避免 true/false 被转换为 1/0 并错误授予资源额度。"
         },
         {
           "kind": "integration_real_store",
