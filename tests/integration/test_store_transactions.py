@@ -28,6 +28,7 @@ from longtask.contracts.schema import (
 from longtask.persistence.events import EventType
 from longtask.persistence.store import (
     EventInput,
+    IdempotencyMismatchError,
     LeaseCASError,
     LeaseFencedError,
     RevisionConflictError,
@@ -418,6 +419,18 @@ class TestIdempotency:
 
             events_2 = get_events(conn, contract_id=contract_id)
             assert len(events_2) == 1  # 依然只有一条事件
+
+            # 同 request_id 但草案漂移必须拒绝，避免重试时静默吞掉参数变更。
+            with pytest.raises(IdempotencyMismatchError):
+                save_contract(
+                    conn,
+                    make_draft(title="漂移后的合同"),
+                    contract_id=contract_id,
+                    now=NOW + timedelta(seconds=10),
+                    request_id=req_id,
+                )
+
+            assert len(get_events(conn, contract_id=contract_id)) == 1
         finally:
             conn.close()
 

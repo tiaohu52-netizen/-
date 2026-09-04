@@ -601,6 +601,10 @@ def save_contract(
                 )
                 existing_contract = get_contract(conn, replay_contract_id)
                 if existing_contract is not None:
+                    if existing_contract.draft.to_dict() != draft.to_dict():
+                        raise IdempotencyMismatchError(
+                            "request_id already belongs to a different contract draft"
+                        )
                     return existing_contract
 
         resolved_goal_id = goal_id or contract_id

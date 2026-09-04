@@ -605,7 +605,7 @@
     },
     {
       "id": "mcp-idempotency-key-discoverability",
-      "statement": "所有有副作用的 MCP 工具 schema 显式暴露 request_id，并指导模型在网络/进程重试时复用同一 ID，以保留 RPC 层 request_id 幂等语义。",
+      "statement": "所有有副作用的 MCP 工具 schema 显式暴露 request_id，并指导模型在网络/进程重试时复用同一 ID，以保留 RPC 层 request_id 幂等语义；同一 request_id 携带不同合同草案时明确拒绝，避免静默接受参数漂移。",
       "lifecycle": "verified",
       "scope_paths": [
         "src/longtask/mcp_server.py",
@@ -618,7 +618,7 @@
           "kind": "integration_real_store",
           "path": "tests/integration/test_mcp_server.py",
           "recorded_at": "2026-09-05",
-          "summary": "MCP 工具发现/元数据测试覆盖双命名空间；有副作用工具 schema 提供 request_id，默认稳定键穿过 save_contract 幂等重放，重复 prepare 不创建重复合同，skill 明确重试复用规则。"
+          "summary": "MCP 工具发现/元数据测试覆盖双命名空间；有副作用工具 schema 提供 request_id，默认稳定键穿过 save_contract 幂等重放，重复 prepare 不创建重复合同；存储层对同键不同草案抛 IdempotencyMismatchError 且不追加事件，skill 明确重试复用规则。"
         }
       ]
     },
