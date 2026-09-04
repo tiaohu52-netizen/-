@@ -41,6 +41,8 @@ follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
   the full 7-gate suite remains green with 557 tests at 81.50% coverage.
 - Unavailable L1 wakeup channels now emit one deduplicated `wakeup/degraded`
   event per daemon lifecycle instead of writing noise on every tick.
+- Failed wakeup task disarms remain tracked and are retried on the next daemon
+  tick, preventing stale OS scheduler entries after transient errors.
 
 ## [0.1.0a0] - 2026-09-01
 
