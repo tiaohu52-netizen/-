@@ -1,0 +1,232 @@
+"""SPEC §12.4 用户触发验收（contract/request-verification）集成测试。
+
+dogfood v5 发现 2 的修复验证：执行预算耗尽但交付物已就绪时，用户能
+直接请求验收——handler 校验+落事件，daemon tick 消费事件派生独立
+verifier（RPC handler 无进程表，与 control/interrupt 相同分工）。
+"""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from longtask.adapters.fake_executor import FAKE_MANIFEST
+from longtask.adapters.registry import (
+    CostHint,
+    ExecutorRegistry,
+    LaunchSpec,
+    RegistryEntry,
+)
+from longtask.cli.daemon_loop import _consume_verification_requests
+from longtask.cli.runner import AttemptRunner
+from longtask.contracts.schema import (
+    Acceptance,
+    BlockReason,
+    Budget,
+    ContractDraft,
+    ContractState,
+)
+from longtask.persistence.events import EventType
+from longtask.persistence.events_query import get_events
+from longtask.persistence.store import (
+    StoreConfig,
+    connect,
+    ensure_schema,
+    get_contract,
+    save_contract,
+    update_contract_state,
+)
+from longtask.rpc.errors import ErrorCode, RpcError
+from longtask.rpc.handlers.contract import handle_contract_request_verification
+from longtask.rpc.server import RequestEnvelope
+
+pytestmark = pytest.mark.integration
+
+NOW = datetime(2026, 9, 4, 12, 0, 0, tzinfo=UTC)
+
+
+def _setup(
+    tmp_path: Path, *, reserved: int = 3, state: ContractState | None = None
+) -> tuple[Path, Any, str, ExecutorRegistry]:
+    root = tmp_path / "data"
+    ws = root / "ws"
+    ws.mkdir(parents=True)
+    (ws / "result.txt").write_text("deliverable\n", encoding="utf-8")
+    cid = "lt-reqver1"
+    conn = connect(StoreConfig(db_path=root / "state.db"))
+    ensure_schema(conn)
+    save_contract(
+        conn,
+        ContractDraft(
+            title="request verification 测试",
+            objective="验证用户触发验收",
+            deadline_at=NOW + timedelta(hours=1),
+            hard_constraints={
+                "file_effects": {"mode": "workspace-write", "workspace_root": str(ws)}
+            },
+            acceptance=Acceptance(
+                standard="全部通过",
+                checks=({"kind": "file-exists", "target": "result.txt"},),
+            ),
+            workload_initial_hours=1.5,
+            budget=Budget(
+                max_dispatches=5,
+                max_escalations=1,
+                max_concurrent_attempts=1,
+                max_attempt_minutes=30,
+                max_output_bytes=1048576,
+                verification_attempts_reserved=reserved,
+            ),
+        ),
+        contract_id=cid,
+        now=NOW,
+    )
+    if state is not None:
+        update_contract_state(
+            conn,
+            contract_id=cid,
+            new_state=state,
+            now=NOW,
+            blocked_reason=BlockReason.NEED_USER if state == ContractState.BLOCKED else None,
+        )
+    reg = ExecutorRegistry()
+    for exec_id in ("exec-a", "exec-b"):
+        reg.register(
+            RegistryEntry(
+                id=exec_id,
+                kind="fake",
+                launch=LaunchSpec(),
+                capabilities=FAKE_MANIFEST.capabilities,
+                limits={"max_concurrent_attempts": 2},
+                cost_hint=CostHint.LOW,
+                enabled=True,
+            )
+        )
+    reg.save_to_file(root / "registry.json")
+    return root, conn, cid, reg
+
+
+def _request(conn: Any, cid: str, request_id: str = "req-ver-1") -> dict:
+    from longtask.rpc.methods import Method
+
+    envelope = RequestEnvelope(
+        method=Method.CONTRACT_REQUEST_VERIFICATION,
+        request_id=request_id,
+        client_id="mcp",
+        protocol_version=2,
+        params={"contract_id": cid},
+    )
+    return handle_contract_request_verification(envelope, conn=conn, now=NOW)
+
+
+def test_request_on_blocked_contract_resumes_and_records(tmp_path: Path) -> None:
+    """dogfood v5 场景：blocked(need-user) + 交付物在 → 请求验收 →
+    合同回 active + verification/requested 事件落库。"""
+    _root, conn, cid, _reg = _setup(tmp_path, state=ContractState.BLOCKED)
+    try:
+        result = _request(conn, cid)
+        assert result["ok"] is True
+        contract = get_contract(conn, cid)
+        assert contract.state == ContractState.ACTIVE  # blocked → active
+        types = [e.event_type for e in get_events(conn, contract_id=cid)]
+        assert EventType.VERIFICATION_REQUESTED.value in types
+        assert EventType.CONTRACT_RESUMED.value in types
+    finally:
+        conn.close()
+
+
+def test_request_on_active_contract_records_without_resume(tmp_path: Path) -> None:
+    _root, conn, cid, _reg = _setup(tmp_path, state=ContractState.ACTIVE)
+    try:
+        result = _request(conn, cid)
+        assert result["ok"] is True
+        # active 态不再产生多余的 resume 事件
+        types = [e.event_type for e in get_events(conn, contract_id=cid)]
+        assert EventType.CONTRACT_RESUMED.value not in types
+    finally:
+        conn.close()
+
+
+def test_request_on_terminal_contract_refused(tmp_path: Path) -> None:
+    _root, conn, cid, _reg = _setup(tmp_path, state=ContractState.COMPLETE)
+    try:
+        with pytest.raises(RpcError) as excinfo:
+            _request(conn, cid)
+        assert excinfo.value.code == ErrorCode.STATE_FORBIDDEN
+    finally:
+        conn.close()
+
+
+def test_request_with_running_verifier_refused(tmp_path: Path) -> None:
+    _root, conn, cid, _reg = _setup(tmp_path, state=ContractState.ACTIVE)
+    try:
+        # 已有进行中的 verifier attempt
+        conn.execute(
+            "INSERT INTO attempts (attempt_id, goal_id, contract_revision, role,"
+            " executor_id, model_id, state, lease_generation, admitted_at, updated_at)"
+            " VALUES ('ver-running', ?, 1, 'verifier', 'exec-b', '*', 'running', 1, ?, ?)",
+            (cid, NOW.isoformat(), NOW.isoformat()),
+        )
+        conn.commit()
+        with pytest.raises(RpcError) as excinfo:
+            _request(conn, cid)
+        assert excinfo.value.code == ErrorCode.STATE_FORBIDDEN
+        assert "already in progress" in str(excinfo.value)
+    finally:
+        conn.close()
+
+
+def test_request_with_exhausted_verification_budget_refused(tmp_path: Path) -> None:
+    """验证预算耗尽 → 如实拒绝并说明升级路径（调 reserved 需修订合同）。"""
+    _root, conn, cid, _reg = _setup(tmp_path, reserved=1, state=ContractState.ACTIVE)
+    try:
+        conn.execute(
+            "INSERT INTO attempts (attempt_id, goal_id, contract_revision, role,"
+            " executor_id, model_id, state, lease_generation, admitted_at, updated_at)"
+            " VALUES ('ver-old', ?, 1, 'verifier', 'exec-b', '*', 'failed', 1, ?, ?)",
+            (cid, NOW.isoformat(), NOW.isoformat()),
+        )
+        conn.commit()
+        with pytest.raises(RpcError) as excinfo:
+            _request(conn, cid)
+        assert excinfo.value.code == ErrorCode.STATE_FORBIDDEN
+        assert "verification budget exhausted: 1/1" in str(excinfo.value)
+    finally:
+        conn.close()
+
+
+def test_daemon_consumes_request_and_dispatches_verifier(tmp_path: Path) -> None:
+    """完整链：用户请求事件 → daemon 消费 → 独立 verifier 派生 →
+    verification/started 事件；重复消费幂等（不再派第二个）。"""
+    root, conn, cid, reg = _setup(tmp_path, state=ContractState.BLOCKED)
+    try:
+        # 模拟有过 executor attempt（verifier 排除它）
+        conn.execute(
+            "INSERT INTO attempts (attempt_id, goal_id, contract_revision, role,"
+            " executor_id, model_id, state, lease_generation, admitted_at, updated_at)"
+            " VALUES ('att-1', ?, 1, 'executor', 'exec-a', '*', 'failed', 1, ?, ?)",
+            (cid, NOW.isoformat(), NOW.isoformat()),
+        )
+        conn.commit()
+        _request(conn, cid)
+
+        runner = AttemptRunner(root, conn, reg)
+        _consume_verification_requests(root, conn, runner, NOW + timedelta(seconds=1))
+
+        verifiers = conn.execute(
+            "SELECT attempt_id, executor_id FROM attempts WHERE role='verifier'"
+        ).fetchall()
+        assert len(verifiers) == 1
+        assert verifiers[0][1] == "exec-b"  # ≠ 执行者 exec-a
+        types = [e.event_type for e in get_events(conn, contract_id=cid)]
+        assert EventType.VERIFICATION_STARTED.value in types
+
+        # 幂等：再次消费不再派生
+        _consume_verification_requests(root, conn, runner, NOW + timedelta(seconds=2))
+        verifiers2 = conn.execute("SELECT COUNT(*) FROM attempts WHERE role='verifier'").fetchone()
+        assert verifiers2[0] == 1
+    finally:
+        conn.close()

@@ -15,6 +15,7 @@ class Method(StrEnum):
     CONTRACT_RESUME = "contract/resume"
     CONTRACT_CANCEL = "contract/cancel"
     CONTRACT_ARBITRATE = "contract/arbitrate"
+    CONTRACT_REQUEST_VERIFICATION = "contract/request-verification"
     ATTEMPT_STATUS = "attempt/status"
     ATTEMPT_LOGS = "attempt/logs"
     ATTEMPT_WRITE_BACK = "attempt/write-back"
@@ -50,6 +51,7 @@ IDEMPOTENT_METHODS = frozenset(
         Method.CONTRACT_RESUME,
         Method.CONTRACT_CANCEL,
         Method.CONTRACT_ARBITRATE,
+        Method.CONTRACT_REQUEST_VERIFICATION,
         Method.GOAL_PREPARE,
         Method.GOAL_ADMISSION_CHECK,
         Method.CONTEXT_PROMOTE,

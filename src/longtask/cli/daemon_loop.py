@@ -25,12 +25,14 @@ from longtask.cli.daemon_proc import (
 )
 from longtask.cli.runner import AttemptRunner
 from longtask.cli.tick import run_daemon_tick
+from longtask.contracts.schema import ContractState
 from longtask.persistence.decisions import earliest_next_decision_at
 from longtask.persistence.events import EventType
 from longtask.persistence.notifications import drain_notifications
 from longtask.persistence.projections import rebuild_projection
 from longtask.persistence.store import (
     StoreConfig,
+    append_event,
     connect,
     ensure_schema,
     get_events,
@@ -149,6 +151,8 @@ def run_daemon_loop(
             runner.poll_attempts(now_val)
             # 消费 control/interrupt 请求（用户通过 RPC 打断执行中的 attempt）
             _consume_interrupt_requests(root, conn, runner, now_val)
+            # 消费 verification/requested 请求（用户直接请求验收，§12.4）
+            _consume_verification_requests(root, conn, runner, now_val)
             res = run_daemon_tick(root, conn, registry, now=now_val, emit_fn=emit_fn)
             if emit_fn is not None:
                 drain_notifications(
@@ -229,6 +233,62 @@ def run_daemon_loop(
         "spawned": runner.spawned_count,
         "finished": runner.finished_count,
     }
+
+
+def _consume_verification_requests(
+    root: Path,
+    conn: sqlite3.Connection,
+    runner: AttemptRunner,
+    now: datetime,
+) -> None:
+    """消费 verification/requested 事件（SPEC §12.4 用户触发验收）。
+
+    RPC handler（contract/request-verification）只做校验与事件落库；
+    daemon 每轮 tick 顶部扫描请求事件，用持有进程表的 AttemptRunner
+    派生独立 verifier（spawn 必须由 daemon 做——RPC handler 没有进程表，
+    与 control/interrupt 相同的「写事件-消费」分工）。
+
+    幂等：attempts 表一旦出现 role=verifier 行（含 terminal——
+    §12.3 历史 verifier 的存在本就不阻止新派生，新的请求走新事件），
+    同一请求事件不再重复兑现。
+    """
+    for contract in list_contracts(conn, limit=1000):
+        if contract.state != ContractState.ACTIVE:
+            continue
+        requested = [
+            event
+            for event in get_events(conn, contract_id=contract.contract_id)
+            if event.event_type == EventType.VERIFICATION_REQUESTED
+        ]
+        if not requested:
+            continue
+        already = conn.execute(
+            "SELECT attempt_id FROM attempts WHERE goal_id = ? AND role = 'verifier' LIMIT 1",
+            (contract.contract_id,),
+        ).fetchone()
+        if already is not None:
+            continue
+        last_executor = conn.execute(
+            "SELECT executor_id FROM attempts "
+            "WHERE goal_id = ? AND role = 'executor' "
+            "ORDER BY admitted_at DESC LIMIT 1",
+            (contract.contract_id,),
+        ).fetchone()
+        executor_id = str(last_executor[0]) if last_executor else ""
+        ok = runner._dispatch_verifier(
+            now, contract_id=contract.contract_id, executor_id=executor_id
+        )
+        if ok:
+            append_event(
+                conn,
+                contract_id=contract.contract_id,
+                goal_id=contract.goal_id,
+                event_type=EventType.VERIFICATION_STARTED,
+                payload={"requested_by": "user", "executor_of_record": executor_id},
+                now=now,
+                actor="daemon",
+            )
+            rebuild_projection(root, contract.contract_id, conn)
 
 
 def _consume_interrupt_requests(

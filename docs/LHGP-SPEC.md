@@ -677,6 +677,18 @@ verifier 报告验收结果的通道有两条，按 harness 能力选择：
   「无法判定」。
 - 双方均无显式结果 → `undetermined`，走人工仲裁（§12.3）。
 
+**用户触发验收（`contract/request-verification`）**：Principal MAY 在
+任意非终态合同上直接请求验收——典型场景是执行预算耗尽但交付物疑似
+已就绪（`blocked(need-user)`）。运行时 MUST：
+
+1. 校验合同非终态且无进行中的 verifier attempt；
+2. 验证预算允许（§12.4 独立记账；预算耗尽时如实拒绝并说明升级路径）；
+3. 把合同恢复为可验证状态（blocked → active，保留升级历史）后派生
+   verifier attempt，`requested_by=user` 落事件供审计。
+
+该通道只派 verifier、不派 executor——它表达「先看看现状算不算完成」，
+不是「再干一轮」。
+
 ---
 
 ## 13. 权威存储与事件模型
