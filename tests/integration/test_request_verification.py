@@ -162,6 +162,19 @@ def test_request_on_active_contract_records_without_resume(tmp_path: Path) -> No
         conn.close()
 
 
+def test_duplicate_pending_request_is_refused(tmp_path: Path) -> None:
+    """daemon 尚未消费时，第二次请求不得重复排队。"""
+    _root, conn, cid, _reg = _setup(tmp_path, state=ContractState.ACTIVE)
+    try:
+        _request(conn, cid, request_id="req-ver-first")
+        with pytest.raises(RpcError) as excinfo:
+            _request(conn, cid, request_id="req-ver-second")
+        assert excinfo.value.code == ErrorCode.STATE_FORBIDDEN
+        assert "already pending" in str(excinfo.value)
+    finally:
+        conn.close()
+
+
 def test_request_on_terminal_contract_refused(tmp_path: Path) -> None:
     _root, conn, cid, _reg = _setup(tmp_path, state=ContractState.COMPLETE)
     try:
