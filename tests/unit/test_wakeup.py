@@ -391,6 +391,12 @@ class TestRtcAlarm:
         assert "--params-b64" in xml
         assert '{\\"task_id\\"' not in xml
 
+    def test_windows_schedule_rounds_down_to_avoid_late_wakeup(self) -> None:
+        target = NOW + timedelta(hours=8, seconds=59)
+        hour, day = WindowsTaskSchedulerPort._schedule_time(target)
+        expected = target.astimezone().replace(second=0, microsecond=0)
+        assert (hour, day) == (expected.strftime("%H:%M"), expected.strftime("%Y/%m/%d"))
+
     def test_windows_task_scheduler_disarm_reports_access_failure(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
