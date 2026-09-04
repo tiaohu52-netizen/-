@@ -25,6 +25,21 @@ import pytest
 pytestmark = pytest.mark.integration
 
 
+def test_mcp_request_id_is_stable_when_omitted() -> None:
+    from longtask.mcp_server import _mcp_request_id
+    from longtask.rpc.methods import Method
+
+    args = {"contract_id": "lt-idempotent", "revision": 1}
+    first = _mcp_request_id(Method.CONTRACT_APPROVE, args)
+    second = _mcp_request_id(Method.CONTRACT_APPROVE, dict(args))
+    assert first == second
+    assert first.startswith("mcp:contract/approve:")
+    assert _mcp_request_id(Method.CONTRACT_PATCH, args) != first
+    assert (
+        _mcp_request_id(Method.CONTRACT_APPROVE, {**args, "request_id": "user-key"}) == "user-key"
+    )
+
+
 def _spawn_mcp(data_dir: Path) -> subprocess.Popen[bytes]:
     """启动 longtask-mcp 子进程，stdio 用 bytes 收发。"""
     return subprocess.Popen(  # noqa: S603

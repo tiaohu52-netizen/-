@@ -22,6 +22,7 @@ transport）。零新增三方依赖：标准库 json + asyncio（readline 阻�
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 from collections.abc import Callable
@@ -48,6 +49,22 @@ def _now() -> datetime:
     from datetime import UTC
 
     return datetime.now(UTC)
+
+
+def _mcp_request_id(method: Method, args: dict[str, Any]) -> str:
+    """Return an explicit or stable derived request key for MCP retries.
+
+    MCP tool calls do not expose the transport request id to the wrapped RPC
+    handler.  A canonical digest keeps an omitted-id retry idempotent while an
+    explicit key still lets callers intentionally distinguish identical calls.
+    """
+    explicit = args.get("request_id")
+    if isinstance(explicit, str) and explicit.strip():
+        return explicit
+    payload = {key: value for key, value in args.items() if key != "request_id"}
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    digest = hashlib.sha256(encoded.encode("utf-8")).hexdigest()[:32]
+    return f"mcp:{method.value}:{digest}"
 
 
 # ─── MCP 工具：每个工具对应一个 JSON-RPC method + 入参映射 ─────────────
@@ -135,7 +152,7 @@ def tool_prepare_contract(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str
     envelope = parse_envelope(
         {
             "method": Method.CONTRACT_PREPARE.value,
-            "request_id": args.get("request_id", _now().isoformat()),
+            "request_id": _mcp_request_id(Method.CONTRACT_PREPARE, args),
             "client_id": args.get("client_id", "mcp"),
             "protocol_version": PROTOCOL_VERSION,
             "params": params,
@@ -148,7 +165,7 @@ def tool_approve_contract(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str
     envelope = parse_envelope(
         {
             "method": Method.CONTRACT_APPROVE.value,
-            "request_id": args.get("request_id", _now().isoformat()),
+            "request_id": _mcp_request_id(Method.CONTRACT_APPROVE, args),
             "client_id": "mcp",
             "protocol_version": PROTOCOL_VERSION,
             "params": {
@@ -165,7 +182,7 @@ def tool_request_verification(args: dict[str, Any], ctx: dict[str, Any]) -> dict
     envelope = parse_envelope(
         {
             "method": Method.CONTRACT_REQUEST_VERIFICATION.value,
-            "request_id": args.get("request_id", _now().isoformat()),
+            "request_id": _mcp_request_id(Method.CONTRACT_REQUEST_VERIFICATION, args),
             "client_id": "mcp",
             "protocol_version": PROTOCOL_VERSION,
             "params": {"contract_id": args["contract_id"]},
@@ -178,7 +195,7 @@ def tool_get_contract(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, An
     envelope = parse_envelope(
         {
             "method": Method.CONTRACT_GET.value,
-            "request_id": args.get("request_id", _now().isoformat()),
+            "request_id": _mcp_request_id(Method.CONTRACT_GET, args),
             "client_id": "mcp",
             "protocol_version": PROTOCOL_VERSION,
             "params": {
@@ -195,7 +212,7 @@ def tool_list_contracts(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, 
     envelope = parse_envelope(
         {
             "method": Method.CONTRACT_LIST.value,
-            "request_id": args.get("request_id", _now().isoformat()),
+            "request_id": _mcp_request_id(Method.CONTRACT_LIST, args),
             "client_id": "mcp",
             "protocol_version": PROTOCOL_VERSION,
             "params": {
@@ -243,7 +260,7 @@ def _mcp_route(method: Method, args: dict[str, Any], ctx: dict[str, Any]) -> dic
         parse_envelope(
             {
                 "method": method.value,
-                "request_id": args.get("request_id", _now().isoformat()),
+                "request_id": _mcp_request_id(method, args),
                 "client_id": "mcp",
                 "protocol_version": PROTOCOL_VERSION,
                 "params": dict(args),
@@ -330,7 +347,7 @@ def tool_attach_to_executor(args: dict[str, Any], ctx: dict[str, Any]) -> dict[s
     status_envelope = parse_envelope(
         {
             "method": Method.ATTEMPT_STATUS.value,
-            "request_id": args.get("request_id", _now().isoformat()),
+            "request_id": _mcp_request_id(Method.ATTEMPT_STATUS, args),
             "client_id": "mcp",
             "protocol_version": PROTOCOL_VERSION,
             "params": {"contract_id": contract_id, "attempt_id": attempt_id},
@@ -357,7 +374,7 @@ def tool_attach_to_executor(args: dict[str, Any], ctx: dict[str, Any]) -> dict[s
             wb_envelope = parse_envelope(
                 {
                     "method": Method.ATTEMPT_WRITE_BACK.value,
-                    "request_id": args.get("request_id", _now().isoformat()),
+                    "request_id": _mcp_request_id(Method.ATTEMPT_WRITE_BACK, args),
                     "client_id": "mcp",
                     "protocol_version": PROTOCOL_VERSION,
                     "params": {
@@ -382,7 +399,7 @@ def tool_attach_to_executor(args: dict[str, Any], ctx: dict[str, Any]) -> dict[s
             wb_envelope = parse_envelope(
                 {
                     "method": Method.ATTEMPT_WRITE_BACK.value,
-                    "request_id": args.get("request_id", _now().isoformat()),
+                    "request_id": _mcp_request_id(Method.ATTEMPT_WRITE_BACK, args),
                     "client_id": "mcp",
                     "protocol_version": PROTOCOL_VERSION,
                     "params": {
