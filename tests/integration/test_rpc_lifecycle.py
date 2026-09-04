@@ -1050,6 +1050,7 @@ def test_contract_get_exposes_isolated_decision_history(tmp_path: Path) -> None:
         ("attempt_limit", 101),
         ("decision_limit", 0),
         ("attempt_limit", True),
+        ("attempt_limit", 1.5),
     ],
 )
 def test_contract_get_rejects_history_limit_out_of_range(
