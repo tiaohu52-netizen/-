@@ -312,6 +312,23 @@ class TestMCPHealth:
         finally:
             _stop_mcp(proc)
 
+    def test_list_executors_rejects_non_boolean_filter(self, data_dir: Path) -> None:
+        """Schema 声明 boolean 时，运行时不能把字符串真值化。"""
+        proc = _spawn_mcp(data_dir)
+        try:
+            response = _roundtrip(
+                proc,
+                "tools/call",
+                {
+                    "name": "lhgp_list_executors",
+                    "arguments": {"enabled_only": "false"},
+                },
+            )
+            assert response["error"]["code"] == -32602
+            assert "enabled_only must be a boolean" in response["error"]["message"]
+        finally:
+            _stop_mcp(proc)
+
 
 class TestMCPLifecycle:
     """AI 工具链完整走一遍：立合同 → 批准 → 拉起执行者（认领 attempt）。"""

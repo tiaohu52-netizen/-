@@ -98,7 +98,10 @@ def tool_doctor(_args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
 def tool_list_executors(_args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
     """可用的执行器池（用户框定后）：模型先看这个再选执行器。"""
     reg = ctx["registry"]
-    enabled_only = bool(_args.get("enabled_only", False))
+    raw_enabled_only = _args.get("enabled_only", False)
+    if not isinstance(raw_enabled_only, bool):
+        raise ValueError("enabled_only must be a boolean")
+    enabled_only = raw_enabled_only
     entries = reg.list_entries(enabled_only=enabled_only)
     return {
         "executors": [
