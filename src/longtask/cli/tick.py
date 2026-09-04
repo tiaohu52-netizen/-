@@ -790,7 +790,8 @@ def _compute_next_decision_at(
         recheck_minutes = _TIER_RECHECK_MINUTES.get(decision_tier, 15.0)
         candidates.append(now + timedelta(minutes=recheck_minutes))
     if deadline > now:
-        candidates.append(deadline - _DEADLINE_HARD_CAP)
+        # 当距离截止不足安全边际时，立即唤醒；不能把过去时刻写入调度簿。
+        candidates.append(max(now, deadline - _DEADLINE_HARD_CAP))
 
     if not candidates:
         return None
