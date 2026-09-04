@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import sqlite3
 from datetime import UTC, datetime, timedelta
 
@@ -53,9 +54,20 @@ class TestForecastRoundTrip:
 
     def test_from_dict_handles_garbage_values(self) -> None:
         # 非法值不能炸；当作 None
-        f = Forecast.from_dict({"queue_minutes": "not-a-number", "p_finish": [1]})
+        f = Forecast.from_dict(
+            {
+                "queue_minutes": "not-a-number",
+                "p_finish": [1],
+                "remaining_minutes": True,
+                "forecast_p90_minutes": math.nan,
+                "safety_margin_minutes": math.inf,
+            }
+        )
         assert f.queue_minutes is None
         assert f.p_finish is None
+        assert f.remaining_minutes is None
+        assert f.forecast_p90_minutes is None
+        assert f.safety_margin_minutes is None
 
 
 class TestRiskTier:
