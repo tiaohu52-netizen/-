@@ -43,6 +43,8 @@ follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
   event per daemon lifecycle instead of writing noise on every tick.
 - Failed wakeup task disarms remain tracked and are retried on the next daemon
   tick, preventing stale OS scheduler entries after transient errors.
+- dogfood v5 now preflights `request-verification` for blocked deliveries and
+  falls back to a revision contract only after an explicit protocol refusal.
 
 ## [0.1.0a0] - 2026-09-01
 
