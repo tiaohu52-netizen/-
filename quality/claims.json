@@ -395,15 +395,19 @@
     },
     {
       "id": "ephemeral-context-and-verifier",
-      "statement": "临时上下文（DESIGN §4.1）+ 交叉核对 verifier（DESIGN §5.2）：active.md 快照 + scratch.md 骨架由契约 context 字段驱动，容量合同 fail-closed 拒绝启动（context/capacity-refused）；task_prompt 自动注入交接摘要（修复再派 attempt 缺验收失败上下文的缺口）。执行者 succeeded 后由 AttemptRunner._dispatch_verifier 派生独立 verifier attempt（role=VERIFIER，候选必须 ≠ 执行者）；daemon tick 末钩子 _judge_verifier_outcomes 按 verifier 终态事件裁决：succeeded→合同 complete（actor=verifier），failed→退回 active。无独立候选如实记 ESCALATION_HANDED_TO_USER，不静默。",
+      "statement": "临时上下文（DESIGN §4.1）+ 交叉核对 verifier（DESIGN §5.2）：active.md 快照 + scratch.md 骨架由契约 context 字段驱动，容量合同 fail-closed 拒绝启动（context/capacity-refused）；task_prompt 自动注入交接摘要（修复再派 attempt 缺验收失败上下文的缺口）。执行者 succeeded 后由 AttemptRunner._dispatch_verifier 派生独立 verifier attempt（role=VERIFIER，候选必须 ≠ 执行者）；daemon tick 末钩子 _judge_verifier_outcomes 按 verifier 终态事件裁决：succeeded→合同 complete（actor=verifier），failed→退回 active。无独立候选如实记 ESCALATION_HANDED_TO_USER，不静默。验收证据双通道（SPEC §12.4）：会话型 harness 走 attempt/write-back RPC；一次性 CLI harness 在 stdout 末尾写 lhgp-verdict 判定块，收尾时与协议确定性评估合成——确定性 pass/fail 优先不被模型覆盖（防橡皮图章，冲突记 model_outcome 供审计），协议 undetermined 由模型显式 pass/fail 填补，无证据 fail-closed 不猜。",
       "lifecycle": "verified",
       "scope_paths": [
         "src/longtask/persistence/context.py",
         "src/longtask/cli/runner.py",
+        "src/lhgp/acceptance/verdict.py",
         "src/longtask/cli/daemon.py",
         "tests/unit/test_context.py",
+        "tests/unit/test_verdict.py",
         "tests/integration/test_verifier.py",
-        "examples/agent-cli-model-provider-run-v2/"
+        "tests/integration/test_verifier_verdict.py",
+        "examples/agent-cli-model-provider-run-v2/",
+        "examples/agent-cli-dogfood-v5/"
       ],
       "evidence": [
         {
@@ -423,6 +427,24 @@
           "path": "examples/agent-cli-model-provider-run-v2/",
           "recorded_at": "2026-09-01",
           "summary": "真实 agent-cli --profile headless 第三方归档（人工审阅态：examples/agent-cli-model-provider-run-v2/)；（model-provider-cn / model-provider-M2.7-highspeed）走通：执行者 attempt 收到 active.md 快照（context/snapshot-built 落库），heartbeat 续约 lease/renewed 90 次；succeeded 后 runner 派生独立 verifier（exec-b vs exec-a），verifier succeeded → contract/completed 合同 complete。事件链完整可审计。已知缺口：headless harness 的子进程生命未与 Popen 句柄对齐——已如实记录于 examples/agent-cli-model-provider-run-v2/README.md。"
+        },
+        {
+          "kind": "focused_test",
+          "path": "tests/unit/test_verdict.py",
+          "recorded_at": "2026-09-04",
+          "summary": "14 个 unit 场景钉住判定块解析与裁决合成：合法块解析（verdict/checks/outcome 校验）、缺失/空 stdout/非法 JSON/非法 verdict 值 → None（fail-closed 不猜）、非法 outcome 条目跳过、空 checks 拒收、多块取最后（verifier 最终结论在末尾）；合成规则：确定性 pass/fail 优先（模型反向结论不覆盖，双向各一场景，冲突记 model_outcome）、协议 undetermined 由模型 pass 填补（dogfood v5 真实场景：裸 PATH 无 python，模型激活 venv 实跑）、双方均无 → undetermined、模型对其他 check 的结论不填补本 check。"
+        },
+        {
+          "kind": "integration_real_store",
+          "path": "tests/integration/test_verifier_verdict.py",
+          "recorded_at": "2026-09-04",
+          "summary": "4 个集成场景走通端到端裁决链（fake verifier stdout 带判定块 → runner 收尾合成 → tick 裁决）：模型 pass 填补 undetermined 命令 check → verifier succeeded → 合同 complete；模型 fail → verifier failed → 合同退回 active（repair）；无判定块 → 确定性 file check 仍评估（pass）但 model_verdict=None；协议确定性 fail（文件不存在）→ 模型 pass 不覆盖 → 合同退回 active，冲突证据可审计。"
+        },
+        {
+          "kind": "manual_review",
+          "path": "examples/agent-cli-dogfood-v5/README.md",
+          "recorded_at": "2026-09-04",
+          "summary": "dogfood v5 stage-1（真实 daemon + 真实断裂）发现该缺口的原始记录：deepseek verifier 实际核验通过（激活 venv 跑测试、stdout 结论 succeeded），协议因裸 PATH 无 python 判 undetermined → verifier failed → 验证预算耗尽。发现 4 的原始动机与本修复的验收场景来源。"
         }
       ]
     },
