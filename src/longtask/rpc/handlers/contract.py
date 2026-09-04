@@ -279,8 +279,11 @@ def handle_contract_list(
 
     after_contract_id: str | None = params.get("cursor", params.get("after_contract_id"))
     limit = _coerce_int(params.get("limit", 20), "limit")
-    if limit is None or limit <= 0:
-        raise RpcError(code=ErrorCode.VALIDATION_FAILED, message="limit must be positive")
+    if limit is None or not 1 <= limit <= 200:
+        raise RpcError(
+            code=ErrorCode.VALIDATION_FAILED,
+            message="limit must be between 1 and 200",
+        )
 
     try:
         contracts = list_contracts(

@@ -602,7 +602,13 @@ TOOLS: dict[
                 "type": "object",
                 "properties": {
                     "state": {"type": "string"},
-                    "limit": {"type": "integer", "default": 20},
+                    "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 200,
+                        "default": 20,
+                        "description": "最多返回 200 份合同，避免一次读取过大上下文",
+                    },
                 },
             },
         },
