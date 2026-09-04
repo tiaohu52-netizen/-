@@ -45,6 +45,8 @@ def test_connect_and_ensure_schema(tmp_path: Path) -> None:
             "actor",
             "schema_version",
         } <= cols
+        decision_cols = {r[1] for r in conn.execute("PRAGMA table_info(decisions)")}
+        assert {"goal_id", "contract_id", "contract_revision", "decision_type"} <= decision_cols
     finally:
         conn.close()
 

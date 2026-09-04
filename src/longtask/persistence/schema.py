@@ -263,6 +263,7 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS decisions (
             decision_id INTEGER PRIMARY KEY AUTOINCREMENT,
             goal_id TEXT NOT NULL,
+            contract_id TEXT,  -- 当前决策所属合同（旧库兼容为空）
             contract_revision INTEGER NOT NULL,
             tier TEXT,  -- urgency tier；None 表示 deadline-arbiter
             decision_type TEXT NOT NULL,  -- see DESIGN §6
@@ -330,6 +331,12 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
         ON attempts(contract_id, admitted_at)
         """
     )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_decisions_contract_time
+        ON decisions(contract_id, recorded_at)
+        """
+    )
 
     _add_goal_columns(conn)
 
@@ -391,6 +398,7 @@ def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
     # P3：attempts 表外部句柄列（SPEC §11.3）——v2 早期 attempts 表无这些列
     _add_column_if_missing("attempts", "external_run_id TEXT")
     _add_column_if_missing("attempts", "contract_id TEXT")
+    _add_column_if_missing("decisions", "contract_id TEXT")
     _add_column_if_missing("attempts", "model_id TEXT")
     _add_column_if_missing("attempts", "session_locator TEXT")
     _add_column_if_missing("attempts", "recovery_strategy TEXT")

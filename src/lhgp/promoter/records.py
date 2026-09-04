@@ -68,6 +68,7 @@ def _record_decision(
     conn: sqlite3.Connection,
     *,
     goal_id: str,
+    contract_id: str | None = None,
     contract_revision: int,
     tier: UrgencyTier | None,
     decision_type: str,
@@ -79,11 +80,12 @@ def _record_decision(
 ) -> None:
     conn.execute(
         """INSERT INTO decisions (
-        goal_id, contract_revision, tier, decision_type, reason,
+        goal_id, contract_id, contract_revision, tier, decision_type, reason,
         budget_dispatches_left, budget_escalations_left, payload_json, recorded_at, actor
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, '{}', ?, ?)""",
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?)""",
         (
             goal_id,
+            contract_id,
             contract_revision,
             int(tier) if tier is not None else None,
             decision_type,
