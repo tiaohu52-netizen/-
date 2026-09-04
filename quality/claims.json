@@ -344,7 +344,7 @@
           "kind": "integration_real_store",
           "path": "tests/integration/test_executor_rpc.py",
           "recorded_at": "2026-09-01",
-          "summary": "RPC 控制面集成测试：executor/list 查询及 enabled_only 过滤、executor/enable 与 executor/disable 用户框定控制、executor/health 健康与能力、UNKNOWN_EXECUTOR 错误码。"
+          "summary": "RPC 控制面集成测试：executor/list 查询及 enabled_only 过滤（错误类型 fail-closed）、executor/enable 与 executor/disable 用户框定控制、executor/health 健康与能力、UNKNOWN_EXECUTOR 错误码。"
         }
       ]
     },

@@ -19,7 +19,13 @@ def handle_executor_list(
 ) -> dict[str, Any]:
     """查询执行器注册表列表。"""
     reg = registry or ExecutorRegistry()
-    enabled_only = bool(envelope.params.get("enabled_only", False))
+    raw_enabled_only = envelope.params.get("enabled_only", False)
+    if not isinstance(raw_enabled_only, bool):
+        raise RpcError(
+            code=ErrorCode.VALIDATION_FAILED,
+            message="enabled_only must be a boolean",
+        )
+    enabled_only = raw_enabled_only
     entries = reg.list_entries(enabled_only=enabled_only)
     return {
         "ok": True,

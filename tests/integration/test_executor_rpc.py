@@ -109,6 +109,13 @@ class TestExecutorRpc:
         assert resp_enabled["result"]["total"] == 1
         assert resp_enabled["result"]["executors"][0]["id"] == "dsh-bridge"
 
+        # JSON 字符串不能被宽松地真值化，否则 "false" 会错误过滤掉执行器。
+        env_invalid = make_envelope(Method.EXECUTOR_LIST, params={"enabled_only": "false"})
+        with pytest.raises(RpcError) as exc_info:
+            route(env_invalid, registry=reg, now=NOW)
+        assert exc_info.value.code == ErrorCode.VALIDATION_FAILED
+        assert str(exc_info.value.message) == "enabled_only must be a boolean"
+
     def test_executor_enable_and_disable(self) -> None:
         reg = make_test_registry()
         assert not reg.get("codex-cli").enabled  # type: ignore[union-attr]
