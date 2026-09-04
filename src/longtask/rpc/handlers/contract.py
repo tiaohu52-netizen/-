@@ -204,7 +204,9 @@ def handle_contract_get(
     # Deadline 风险是合同级模型可见性的一部分；不要要求调用方再读取
     # 全量事件流才能知道当前快照。只暴露本合同最新的协议生成快照。
     result["deadline_snapshot"] = None
-    for event in reversed(get_recent_events(conn, contract_id=contract_id, limit=200)):
+    # 不用固定窗口：长寿命合同可能有数百次调度/验收事件，最新快照
+    # 不能因为历史日志变长而从模型视图中消失。
+    for event in reversed(get_events(conn, contract_id=contract_id)):
         if event.event_type != EventType.FORECAST_UPDATED:
             continue
         try:
