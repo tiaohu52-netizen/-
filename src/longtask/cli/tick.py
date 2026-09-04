@@ -298,6 +298,7 @@ def run_daemon_tick(
             due_at=c.draft.deadline_at,
             next_decision_at=next_at,
             sample_count=len(historical_minutes),
+            sample_durations_minutes=historical_minutes,
         )
         snapshot_payload = snapshot.to_dict()
         previous_snapshot: dict[str, Any] | None = None
