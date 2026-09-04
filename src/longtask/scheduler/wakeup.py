@@ -104,7 +104,9 @@ class WindowsTaskSchedulerPort:
         if local.second or local.microsecond:
             local += timedelta(minutes=1)
         local = local.replace(second=0, microsecond=0)
-        return local.strftime("%H:%M"), local.strftime("%m/%d/%Y")
+        # Windows 11 的 schtasks 解析器要求 yyyy/mm/dd，即使系统区域设置
+        # 使用其他日期显示格式；固定该格式避免本地化导致 arm 失败。
+        return local.strftime("%H:%M"), local.strftime("%Y/%m/%d")
 
     def _wake_command(self, task_id: str) -> str:
         params = json.dumps({"task_id": task_id}, separators=(",", ":"))
