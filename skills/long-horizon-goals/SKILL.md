@@ -31,7 +31,9 @@ description: 将需要跨会话、跨 Agent 推进的用户目标转成 LHGP 合
 2. `list_executors` — 查可用执行器池（Codex / Claude Code / agent-cli / 任何 CLI 适配器）
 3. `prepare_contract` — 起草合同：objective / acceptance / deadline / budget / authority
 4. `approve_contract` — 用户确认后批准（drafted → active）
-5. `get_contract` — 看运行状态、当前 attempt、leasing
+5. `get_contract` — 看运行状态、当前 attempt、leasing，以及该合同隔离的
+   `decision_history`（风险档、升级原因、预算余量和下一步依据）；可传
+   `decision_limit` 控制历史条数
 6. （等待 daemon 派 attempt；轮询 get_contract 或订阅 events）
 7. `list_contracts` — 复盘历史 + 审计事件链
 
