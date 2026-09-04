@@ -344,7 +344,7 @@
           "kind": "focused_test",
           "path": "tests/unit/test_registry.py",
           "recorded_at": "2026-09-01",
-          "summary": "单元测试覆盖：CostHint 排序优先级、LaunchSpec 序列化、默认 disabled 开关、注册表 enabled/能力布尔字段的严格类型校验（错误值 fail-closed）、能力门槛匹配（required_capabilities/context/沙箱模式/网络/进程）、并发额度与成本优先级分发决策。"
+          "summary": "单元测试覆盖：CostHint 排序优先级、LaunchSpec 序列化、默认 disabled 开关、注册表 enabled/能力布尔字段的严格类型校验（错误值 fail-closed）、admission snapshot 保留真实 enabled 状态、能力门槛匹配（required_capabilities/context/沙箱模式/网络/进程）、并发额度与成本优先级分发决策。"
         },
         {
           "kind": "integration_real_store",
