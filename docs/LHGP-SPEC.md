@@ -733,6 +733,10 @@ MUST NOT 按 daemon tick 重复写入；该层恢复后再次失效时 SHOULD �
 以保留可审计的故障转变而不制造事件空转。
 注销已登记的唤醒任务若失败，运行时 MUST 保留登记并在后续 tick 重试；只有
 注销成功后才可移除本地登记，防止操作系统中的计划任务残留。
+对 active 合同，L1 一次性唤醒的目标时刻 MUST 取
+`min(next_wakeup_at, next_decision_at, due_at - safety_margin)`（忽略缺失值）。
+较晚的 Deadline 安全边距不得遮蔽更早的决策点；否则实现不能声称对
+`next_decision_at` 提供唤醒对齐。
 
 ### 13.2 事件族
 

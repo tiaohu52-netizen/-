@@ -38,7 +38,7 @@ follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
   including missing external-handle capability columns, before daemon scans.
 - Doctor output and README quickstart commands now use the canonical LHGP name.
 - Claims evidence is re-anchored to the latest verified implementation commit;
-  the full 7-gate suite remains green with 566 tests at 81.49% coverage.
+  the full 7-gate suite remains green with 567 tests at 81.49% coverage.
 - Unavailable L1 wakeup channels now emit one deduplicated `wakeup/degraded`
   event per daemon lifecycle instead of writing noise on every tick.
 - Failed wakeup task disarms remain tracked and are retried on the next daemon
@@ -53,6 +53,12 @@ follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
   reports actionable missing-CLI diagnostics before dispatch.
 - MCP now exposes read-only `lhgp_doctor` / `longtask_doctor` aliases so models
   can run the same preflight diagnostics before selecting an executor.
+- L1 RTC wakeup targets now use the earliest available decision, wakeup, or
+  deadline-safety point; a later safety margin can no longer postpone an
+  earlier `next_decision_at`.
+- L1 RTC wakeup targets now use the earliest available decision, wakeup, or
+  deadline-safety point; a later safety margin can no longer postpone an
+  earlier `next_decision_at`.
 
 ## [0.1.0a0] - 2026-09-01
 
