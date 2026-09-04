@@ -65,6 +65,7 @@ def _build_handlers() -> dict[Method, Callable[..., dict[str, Any]]]:
         Method.CONTRACT_RESUME: contract.handle_contract_resume,
         Method.CONTRACT_CANCEL: contract.handle_contract_cancel,
         Method.CONTRACT_ARBITRATE: contract.handle_contract_arbitrate,
+        Method.CONTRACT_REQUEST_VERIFICATION: contract.handle_contract_request_verification,
         Method.GOAL_PREPARE: goal.handle_goal_prepare,
         Method.GOAL_ADMISSION_CHECK: goal.handle_goal_admission_check,
         Method.GOAL_GET: goal.handle_goal_get,

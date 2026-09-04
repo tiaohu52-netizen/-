@@ -145,6 +145,20 @@ def tool_approve_contract(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str
     return route(envelope, conn=ctx["conn"], now=_now(), registry=ctx["registry"])
 
 
+def tool_request_verification(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
+    """用户触发验收（§12.4）：只派 verifier，不派执行者。"""
+    envelope = parse_envelope(
+        {
+            "method": Method.CONTRACT_REQUEST_VERIFICATION.value,
+            "request_id": args.get("request_id", _now().isoformat()),
+            "client_id": "mcp",
+            "protocol_version": PROTOCOL_VERSION,
+            "params": {"contract_id": args["contract_id"]},
+        }
+    )
+    return route(envelope, conn=ctx["conn"], now=_now(), registry=ctx["registry"])
+
+
 def tool_get_contract(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
     envelope = parse_envelope(
         {
@@ -501,6 +515,22 @@ TOOLS: dict[
             },
         },
     ),
+    "longtask_request_verification": (
+        tool_request_verification,
+        {
+            "description": (
+                "用户直接请求验收（§12.4）：不派执行者，只派独立 verifier 核对"
+                "现有交付物。典型场景：执行预算耗尽（blocked）但交付物疑似已"
+                "就绪——先看看现状算不算完成。验证预算耗尽或已有 verifier 在"
+                "跑时如实拒绝。"
+            ),
+            "inputSchema": {
+                "type": "object",
+                "required": ["contract_id"],
+                "properties": {"contract_id": {"type": "string"}},
+            },
+        },
+    ),
     "longtask_get_contract": (
         tool_get_contract,
         {
@@ -649,6 +679,7 @@ _RENAMED_TOOLS = {
     # 工具的 AI 无法查看自己立下的合同，补齐以免规范工具集存在死角。
     "lhgp_get_contract": "longtask_get_contract",
     "lhgp_list_contracts": "longtask_list_contracts",
+    "lhgp_request_verification": "longtask_request_verification",
 }
 for _new_name, _legacy_name in _RENAMED_TOOLS.items():
     _handler, _metadata = TOOLS[_legacy_name]

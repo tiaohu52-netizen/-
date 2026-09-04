@@ -51,6 +51,8 @@ class EventType(StrEnum):
     ESCALATION_SPAWNED = "escalation/spawned"
     ESCALATION_PARALLELIZED = "escalation/parallelized"
     ESCALATION_HANDED_TO_USER = "escalation/handed-to-user"
+    VERIFICATION_REQUESTED = "verification/requested"
+    VERIFICATION_STARTED = "verification/started"
     DISPATCH_REFUSED = "dispatch/refused"
     DISPATCH_DEFERRED = "dispatch/deferred"
     HANDLE_REGISTERED = "handle/registered"

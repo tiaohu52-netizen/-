@@ -34,6 +34,7 @@ from longtask.persistence.store import (
     RevisionConflictError,
     StoreError,
     StoreTamperedError,
+    append_event,
     get_contract,
     list_contracts,
     patch_contract,
@@ -315,6 +316,101 @@ def handle_contract_patch(
     return {"ok": True, "result": updated.to_dict()}
 
 
+def handle_contract_request_verification(
+    envelope: RequestEnvelope,
+    *,
+    conn: sqlite3.Connection,
+    now: datetime,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """用户直接请求验收（SPEC §12.4）：不派 executor，只请求 verifier。
+
+    典型场景：执行预算耗尽（blocked need-user）但交付物疑似已就绪。
+    handler 只做校验与事件落库；daemon tick 消费 verification/requested
+    事件派生 verifier（RPC handler 没有进程表，spawn 必须由 daemon 的
+    AttemptRunner 做——与 control/interrupt 相同的「写事件-消费」分工）。
+    """
+    params = envelope.params
+    contract_id = require_contract_id(params)
+    if (replay := idempotent_replay(conn, envelope, contract_id)) is not None:
+        return replay
+
+    current = get_contract(conn, contract_id)
+    if current is None:
+        raise RpcError(
+            code=ErrorCode.UNKNOWN_CONTRACT,
+            message=f"contract {contract_id} not found",
+        )
+    if is_terminal_state(current.state):
+        raise RpcError(
+            code=ErrorCode.STATE_FORBIDDEN,
+            message=f"contract {contract_id} is terminal ({current.state.value})",
+        )
+    # 进行中的 verifier attempt：重复请求无意义
+    running_verifier = conn.execute(
+        "SELECT attempt_id FROM attempts "
+        "WHERE goal_id = ? AND role = 'verifier' "
+        "AND state NOT IN ('succeeded', 'failed', 'cancelled', 'stale', 'orphaned') "
+        "LIMIT 1",
+        (contract_id,),
+    ).fetchone()
+    if running_verifier is not None:
+        raise RpcError(
+            code=ErrorCode.STATE_FORBIDDEN,
+            message=(
+                f"verifier attempt {running_verifier[0]} already in progress; "
+                "wait for its verdict before requesting another"
+            ),
+        )
+    # 验证预算（§12.4 独立记账）：耗尽时如实拒绝并说明升级路径
+    from longtask.promoter.records import _count_verifier_attempts
+
+    reserved = current.draft.budget.verification_attempts_reserved
+    used = _count_verifier_attempts(conn, contract_id)
+    if used >= reserved:
+        raise RpcError(
+            code=ErrorCode.STATE_FORBIDDEN,
+            message=(
+                f"verification budget exhausted: {used}/{reserved} verifier "
+                "attempts used (§12.4); raise verification_attempts_reserved "
+                "via a contract revision"
+            ),
+        )
+
+    actor = resolve_actor(envelope, params)
+    # blocked → active：verifier 派生要求 ACTIVE 态；升级历史保留在事件流
+    if current.state == ContractState.BLOCKED:
+        try:
+            update_contract_state(
+                conn,
+                contract_id=contract_id,
+                new_state=ContractState.ACTIVE,
+                now=now,
+                event_type=EventType.CONTRACT_RESUMED,
+                event_payload={"reason": "user requested verification (§12.4)"},
+                actor=actor,
+            )
+        except StoreError as exc:
+            raise RpcError(code=ErrorCode.INTERNAL, message=str(exc)) from exc
+    append_event(
+        conn,
+        contract_id=contract_id,
+        goal_id=current.goal_id,
+        event_type=EventType.VERIFICATION_REQUESTED,
+        payload={"requested_by": actor, "budget_used": used, "budget_reserved": reserved},
+        now=now,
+        actor=actor,
+    )
+    return {
+        "ok": True,
+        "result": {
+            "contract_id": contract_id,
+            "verification_requested": True,
+            "note": "daemon will dispatch an independent verifier on its next tick",
+        },
+    }
+
+
 def handle_contract_pause(
     envelope: RequestEnvelope,
     *,
@@ -584,5 +680,6 @@ __all__ = [
     "handle_contract_patch",
     "handle_contract_pause",
     "handle_contract_prepare",
+    "handle_contract_request_verification",
     "handle_contract_resume",
 ]
