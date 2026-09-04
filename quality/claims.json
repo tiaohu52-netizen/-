@@ -462,7 +462,7 @@
           "kind": "integration_real_store",
           "path": "tests/integration/test_mcp_server.py",
           "recorded_at": "2026-09-01",
-          "summary": "stdio 集成场景覆盖 discover（initialize + tools.list）、health、立合同→批准→查询→执行者认领四步走通、未知工具/缺必填回 JSON-RPC error；health.tool_count 与 tools/list 实际条目数严格一致，enabled_only/include_payload 等布尔参数对错误类型 fail-closed。真实 spawn longtask-mcp 子进程 + 真实 SQLite + 真实 stdio JSON-RPC。"
+          "summary": "stdio 集成场景覆盖 discover（initialize + tools.list）、health、立合同→批准→查询→执行者认领四步走通、未知工具/缺必填回 JSON-RPC error；health.tool_count 与 tools/list 实际条目数严格一致，enabled_only/include_payload/workload_initial_hours 等参数对错误类型 fail-closed。真实 spawn longtask-mcp 子进程 + 真实 SQLite + 真实 stdio JSON-RPC。"
         },
         {
           "kind": "integration_real_store",
