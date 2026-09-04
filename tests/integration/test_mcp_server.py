@@ -90,6 +90,31 @@ def test_mcp_prepare_rejects_boolean_workload(tmp_path: Path) -> None:
         conn.close()
 
 
+def test_mcp_prepare_rejects_string_acceptance_checks(tmp_path: Path) -> None:
+    from longtask.adapters.registry import ExecutorRegistry
+    from longtask.mcp_server import tool_prepare_contract
+    from longtask.persistence.store import StoreConfig, connect, ensure_schema
+    from longtask.rpc.errors import ErrorCode, RpcError
+
+    conn = connect(StoreConfig(db_path=tmp_path / "state.db"))
+    ensure_schema(conn)
+    args = {
+        "title": "invalid checks",
+        "objective": "checks must be a list",
+        "deadline_at": (datetime.now(UTC) + timedelta(hours=2)).isoformat(),
+        "acceptance_standard": "contract exists",
+        "acceptance_checks": "contract exists",
+    }
+    try:
+        with pytest.raises(RpcError) as exc_info:
+            tool_prepare_contract(
+                args, {"conn": conn, "registry": ExecutorRegistry(), "root": tmp_path}
+            )
+        assert exc_info.value.code is ErrorCode.VALIDATION_FAILED
+    finally:
+        conn.close()
+
+
 def _spawn_mcp(data_dir: Path) -> subprocess.Popen[bytes]:
     """启动 longtask-mcp 子进程，stdio 用 bytes 收发。"""
     return subprocess.Popen(  # noqa: S603
