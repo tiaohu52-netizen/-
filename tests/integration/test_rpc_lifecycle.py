@@ -990,6 +990,13 @@ def test_contract_get_exposes_isolated_decision_history(tmp_path: Path) -> None:
             "SELECT goal_id FROM contracts WHERE contract_id = ?", (cid,)
         ).fetchone()[0]
         conn.execute(
+            """INSERT INTO attempts (
+                attempt_id, goal_id, contract_id, contract_revision, role,
+                state, admitted_at, updated_at
+            ) VALUES (?, ?, ?, 1, 'verifier', 'failed', ?, ?)""",
+            ("ver-decision-history", goal_id, cid, NOW.isoformat(), NOW.isoformat()),
+        )
+        conn.execute(
             """INSERT INTO decisions (
                 goal_id, contract_id, contract_revision, tier, decision_type,
                 reason, budget_dispatches_left, budget_escalations_left,
@@ -1009,5 +1016,8 @@ def test_contract_get_exposes_isolated_decision_history(tmp_path: Path) -> None:
         assert history[0]["contract_id"] == cid
         assert history[0]["decision_type"] == "hand-to-user"
         assert history[0]["tier"] == 3
+        attempts = result["result"]["attempt_history"]
+        assert attempts[0]["attempt_id"] == "ver-decision-history"
+        assert attempts[0]["role"] == "verifier"
     finally:
         conn.close()

@@ -720,6 +720,8 @@ verifier 报告验收结果的通道有两条，按 harness 能力选择：
 并保留 `decision_id`、`contract_revision`、`tier`、`decision_type`、`reason`、预算余量、
 `payload`、`recorded_at` 与 `actor`。旧库中无法证明合同归属的历史行 MUST 不得被猜测拼入，
 以免跨合同污染模型上下文；调用方可用 `decision_limit` 限制返回条数。
+同一响应 SHOULD 提供 `attempt_history`：仅列出该合同的 attempt，包含角色、执行器/模型、
+状态、版本、时间、返回码、错误类别与恢复策略；不得用 Goal 级历史替代合同级归属。
 
 ### 13.2 事件族
 

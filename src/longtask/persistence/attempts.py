@@ -148,6 +148,20 @@ def get_attempt(conn: sqlite3.Connection, attempt_id: str) -> StoredAttempt | No
     return _row_to_attempt(rows[0])
 
 
+def list_contract_attempts(
+    conn: sqlite3.Connection, *, contract_id: str, limit: int = 20
+) -> list[StoredAttempt]:
+    """列出单合同 attempt，按最近 admission 倒序。"""
+    bounded_limit = max(1, min(int(limit), 100))
+    rows = _fetch_all(
+        conn,
+        "SELECT " + _COLS_SQL + " FROM attempts WHERE contract_id = ? "
+        "ORDER BY admitted_at DESC, attempt_id DESC LIMIT ?",
+        (contract_id, bounded_limit),
+    )
+    return [_row_to_attempt(row) for row in rows]
+
+
 def list_reconcilable_attempts(conn: sqlite3.Connection) -> list[StoredAttempt]:
     """列出所有非终态 attempt（reconcile 的扫描集，§9 步骤 2 / §11.3）。
 
@@ -273,6 +287,7 @@ __all__ = [
     "RECONCILABLE_STATES",
     "StoredAttempt",
     "get_attempt",
+    "list_contract_attempts",
     "list_reconcilable_attempts",
     "mark_attempt_orphaned",
     "register_attempt_handle",
