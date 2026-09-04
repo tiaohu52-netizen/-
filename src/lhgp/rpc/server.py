@@ -30,8 +30,12 @@ class RequestEnvelope:
 def parse_envelope(raw: dict[str, Any]) -> RequestEnvelope:
     try:
         method = Method(str(raw["method"]))
-        request_id = str(raw["request_id"])
-        client_id = str(raw["client_id"])
+        raw_request_id = raw["request_id"]
+        raw_client_id = raw["client_id"]
+        if not isinstance(raw_request_id, str) or not isinstance(raw_client_id, str):
+            raise TypeError("request_id and client_id must be strings")
+        request_id = raw_request_id
+        client_id = raw_client_id
         raw_protocol_version = raw["protocol_version"]
         if isinstance(raw_protocol_version, bool):
             raise ValueError("protocol_version must be an integer")
