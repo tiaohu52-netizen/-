@@ -196,6 +196,7 @@ class RtcAlarm:
         self._safety_margin = safety_margin
         self._armed: dict[str, datetime] = {}
         self._degraded_reported = False
+        self._degraded_contracts: set[str] = set()
 
     def refresh(
         self,
@@ -248,6 +249,7 @@ class RtcAlarm:
                 try:
                     self._schedule.arm(task_id, at)
                     self._armed[cid] = at
+                    self._degraded_contracts.discard(cid)
                     append_event(
                         conn,
                         contract_id=cid,
@@ -257,14 +259,16 @@ class RtcAlarm:
                         actor="daemon",
                     )
                 except OSError as exc:
-                    append_event(
-                        conn,
-                        contract_id=cid,
-                        event_type=EventType.WAKEUP_DEGRADED,
-                        payload={"layer": "L1", "reason": str(exc)},
-                        now=now,
-                        actor="daemon",
-                    )
+                    if cid not in self._degraded_contracts:
+                        append_event(
+                            conn,
+                            contract_id=cid,
+                            event_type=EventType.WAKEUP_DEGRADED,
+                            payload={"layer": "L1", "reason": str(exc)},
+                            now=now,
+                            actor="daemon",
+                        )
+                        self._degraded_contracts.add(cid)
 
         # 终态/消失的合同：注销
         for cid in list(self._armed):

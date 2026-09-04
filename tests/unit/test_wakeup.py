@@ -275,6 +275,19 @@ class TestRtcAlarm:
         assert count == 1
         conn.close()
 
+    def test_contract_arm_failure_degraded_event_is_deduplicated(self, tmp_path: Path) -> None:
+        conn = make_store(tmp_path)
+        save_active_contract(conn, "lt-w14", deadline=NOW + timedelta(hours=10))
+        alarm = RtcAlarm(FakeSchedulePort(fail_arm=True))
+        alarm.refresh(conn, now=NOW)
+        alarm.refresh(conn, now=NOW + timedelta(minutes=1))
+        count = conn.execute(
+            "SELECT COUNT(*) FROM events WHERE event_type = ? AND contract_id = ?",
+            ("wakeup/degraded", "lt-w14"),
+        ).fetchone()[0]
+        assert count == 1
+        conn.close()
+
     def test_null_schedule_port_is_unavailable(self) -> None:
         port = NullSchedulePort()
         assert port.is_available() is False
