@@ -20,16 +20,22 @@
 
 from __future__ import annotations
 
+import base64
+import getpass
 import json
+import os
 import re
 import shutil
 import sqlite3
 import subprocess
 import sys
+import tempfile
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Protocol
+from xml.sax.saxutils import escape as xml_escape
 
 from longtask.persistence.events import EventType
 from longtask.persistence.store import append_event, get_lease, list_contracts
@@ -109,8 +115,12 @@ class WindowsTaskSchedulerPort:
         return local.strftime("%H:%M"), local.strftime("%Y/%m/%d")
 
     def _wake_command(self, task_id: str) -> str:
+        return subprocess.list2cmdline(self._wake_argv(task_id))
+
+    def _wake_argv(self, task_id: str) -> list[str]:
         params = json.dumps({"task_id": task_id}, separators=(",", ":"))
-        argv = [
+        params_b64 = base64.urlsafe_b64encode(params.encode("utf-8")).decode("ascii").rstrip("=")
+        return [
             sys.executable,
             "-m",
             "longtask.cli.main",
@@ -120,10 +130,47 @@ class WindowsTaskSchedulerPort:
             "daemon/wake",
             "--client-id",
             "daemon-wakeup",
-            "--params",
-            params,
+            "--params-b64",
+            params_b64,
         ]
-        return subprocess.list2cmdline(argv)
+
+    def _task_xml(self, task_id: str, at: datetime) -> str:
+        """生成允许唤醒/电池运行的 Task Scheduler XML。"""
+        local = at.astimezone()
+        if local.second or local.microsecond:
+            local += timedelta(minutes=1)
+        local = local.replace(second=0, microsecond=0, tzinfo=None)
+        argv = self._wake_argv(task_id)
+        command = xml_escape(argv[0])
+        arguments = xml_escape(subprocess.list2cmdline(argv[1:]))
+        working_directory = xml_escape(str(self._root))
+        author = xml_escape(getpass.getuser())
+        boundary = local.isoformat(timespec="seconds")
+        return f"""<?xml version="1.0" encoding="UTF-16"?>
+<Task xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task" version="1.4">
+  <RegistrationInfo>
+    <Author>{author}</Author><Description>LHGP local deadline wakeup</Description>
+  </RegistrationInfo>
+  <Triggers><TimeTrigger><StartBoundary>{boundary}</StartBoundary><Enabled>true</Enabled></TimeTrigger></Triggers>
+  <Principals>
+    <Principal id="Author">
+      <LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <WakeToRun>true</WakeToRun>
+    <ExecutionTimeLimit>PT1H</ExecutionTimeLimit>
+    <Enabled>true</Enabled>
+  </Settings>
+  <Actions Context="Author">
+    <Exec><Command>{command}</Command><Arguments>{arguments}</Arguments><WorkingDirectory>{working_directory}</WorkingDirectory></Exec>
+  </Actions>
+</Task>
+"""
 
     @staticmethod
     def _run(args: list[str]) -> None:
@@ -143,24 +190,25 @@ class WindowsTaskSchedulerPort:
 
     def arm(self, task_id: str, at: datetime) -> None:
         task_name = self._task_name(task_id)
-        start_time, start_date = self._schedule_time(at)
-        self._run(
-            [
-                "schtasks.exe",
-                "/Create",
-                "/TN",
-                task_name,
-                "/TR",
-                self._wake_command(task_id),
-                "/SC",
-                "ONCE",
-                "/ST",
-                start_time,
-                "/SD",
-                start_date,
-                "/F",
-            ]
-        )
+        fd, raw_path = tempfile.mkstemp(prefix="lhgp-task-", suffix=".xml")
+        os.close(fd)
+        xml_path = Path(raw_path)
+        try:
+            xml_path.write_text(self._task_xml(task_id, at), encoding="utf-16")
+            self._run(
+                [
+                    "schtasks.exe",
+                    "/Create",
+                    "/TN",
+                    task_name,
+                    "/XML",
+                    str(xml_path),
+                    "/F",
+                ]
+            )
+        finally:
+            with suppress(FileNotFoundError):
+                xml_path.unlink()
 
     def disarm(self, task_id: str) -> None:
         task_name = self._task_name(task_id)

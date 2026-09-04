@@ -357,6 +357,7 @@ class TestRtcAlarm:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         calls: list[list[str]] = []
+        xml_documents: list[str] = []
 
         class Completed:
             returncode = 0
@@ -367,7 +368,9 @@ class TestRtcAlarm:
         monkeypatch.setattr("longtask.scheduler.wakeup.shutil.which", lambda _: "schtasks.exe")
         monkeypatch.setattr(
             "longtask.scheduler.wakeup.subprocess.run",
-            lambda args, **kwargs: calls.append(list(args)) or Completed(),
+            lambda args, **kwargs: calls.append(list(args))
+            or xml_documents.append(Path(args[args.index("/XML") + 1]).read_text(encoding="utf-16"))
+            or Completed(),
         )
 
         port = WindowsTaskSchedulerPort(tmp_path)
@@ -377,12 +380,16 @@ class TestRtcAlarm:
         assert calls
         command = calls[0]
         assert command[:2] == ["schtasks.exe", "/Create"]
-        assert "/SC" in command and command[command.index("/SC") + 1] == "ONCE"
-        # schtasks 精度为分钟；带秒的目标必须向上取整，不能提前唤醒。
-        expected_local = (NOW + timedelta(hours=8, seconds=1)).astimezone() + timedelta(minutes=1)
-        assert command[command.index("/ST") + 1] == expected_local.strftime("%H:%M")
-        assert command[command.index("/SD") + 1] == expected_local.strftime("%Y/%m/%d")
-        assert "daemon/wake" in command[command.index("/TR") + 1]
+        assert "/XML" in command
+        assert xml_documents
+        xml = xml_documents[0]
+        assert "<WakeToRun>true</WakeToRun>" in xml
+        assert "<StartWhenAvailable>true</StartWhenAvailable>" in xml
+        assert "<DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>" in xml
+        assert "<StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>" in xml
+        assert "daemon/wake" in xml
+        assert "--params-b64" in xml
+        assert '{\\"task_id\\"' not in xml
 
     def test_windows_task_scheduler_disarm_reports_access_failure(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
