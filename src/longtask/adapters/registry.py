@@ -18,6 +18,19 @@ from longtask.contracts.authority import to_dict as authority_to_dict
 from longtask.contracts.schema import ContractDraft, Enforcement
 
 
+def _strict_bool(data: dict[str, Any], key: str, default: bool) -> bool:
+    """Parse a registry boolean without truthiness coercion.
+
+    Registry files are user-controlled configuration.  Values such as the
+    string ``"false"`` must not silently enable an executor or capability;
+    reject malformed values so the default-deny boundary remains intact.
+    """
+    value = data.get(key, default)
+    if not isinstance(value, bool):
+        raise TypeError(f"{key} must be a boolean")
+    return value
+
+
 class CostHint(StrEnum):
     """执行器成本提示（DESIGN §8.1、§8.3）。
 
@@ -141,16 +154,16 @@ def capabilities_from_dict(data: dict[str, Any]) -> Capabilities:
     """从字典解析 Capabilities（DESIGN §12.4）。"""
     raw_sandbox = data.get("sandbox", {})
     return Capabilities(
-        spawn=bool(data.get("spawn", True)),
-        observe=bool(data.get("observe", True)),
-        cancel=bool(data.get("cancel", True)),
-        notify=bool(data.get("notify", False)),
-        followup=bool(data.get("followup", False)),
-        steer=bool(data.get("steer", False)),
-        interrupt=bool(data.get("interrupt", False)),
+        spawn=_strict_bool(data, "spawn", True),
+        observe=_strict_bool(data, "observe", True),
+        cancel=_strict_bool(data, "cancel", True),
+        notify=_strict_bool(data, "notify", False),
+        followup=_strict_bool(data, "followup", False),
+        steer=_strict_bool(data, "steer", False),
+        interrupt=_strict_bool(data, "interrupt", False),
         context=str(data.get("context", "optional")),
         sandbox=sandbox_capability_from_dict(raw_sandbox),
-        acceptance_evidence=bool(data.get("acceptance_evidence", False)),
+        acceptance_evidence=_strict_bool(data, "acceptance_evidence", False),
     )
 
 
@@ -212,7 +225,7 @@ class RegistryEntry:
         cost_hint = (
             CostHint(raw_cost) if raw_cost in CostHint._value2member_map_ else CostHint.MEDIUM
         )
-        enabled = bool(data.get("enabled", False))
+        enabled = _strict_bool(data, "enabled", False)
         raw_models = data.get("models", ("*",))
         models = tuple(str(model).strip() for model in raw_models if str(model).strip())
         if not models:

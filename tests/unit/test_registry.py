@@ -147,12 +147,22 @@ class TestRegistryEntry:
         with pytest.raises(ValueError, match="non-empty 'id'"):
             RegistryEntry.from_dict({"id": ""})
 
+    def test_from_dict_rejects_non_boolean_enabled(self) -> None:
+        with pytest.raises(TypeError, match="enabled must be a boolean"):
+            RegistryEntry.from_dict({"id": "agent-1", "enabled": "false"})
+
     def test_to_manifest(self) -> None:
         entry = make_entry("agent-bridge", kind="bridge")
         manifest = entry.to_manifest(adapter_version="0.2.0")
         assert manifest.executor_id == "agent-bridge"
         assert manifest.adapter_version == "0.2.0"
         assert manifest.transport == "bridge"
+
+
+class TestCapabilitiesParsing:
+    def test_rejects_non_boolean_capability(self) -> None:
+        with pytest.raises(TypeError, match="spawn must be a boolean"):
+            RegistryEntry.from_dict({"id": "agent-1", "capabilities": {"spawn": "false"}})
 
 
 class TestCapabilityMatch:
