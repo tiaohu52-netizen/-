@@ -140,6 +140,14 @@ class TestCompileSnapshot:
             now=NOW,
             actor="daemon",
         )
+        append_event(
+            conn,
+            contract_id=cid,
+            event_type=EventType.FORECAST_UPDATED,
+            payload={"risk": "orange", "next_decision_at": NOW.isoformat()},
+            now=NOW,
+            actor="promoter",
+        )
 
         contract = get_contract(conn, cid)
         active, _ = compile_context_snapshot(root, conn, contract, "att-2", NOW)
@@ -148,6 +156,9 @@ class TestCompileSnapshot:
         assert "按 FIX-NOTES 修正断言" in body
         assert "修复 tests.py 断言" in body
         assert "att-0" in body  # 失败摘要进快照
+        assert "Deadline 风险快照" in body
+        assert '"risk": "orange"' in body
+        assert "不是按时完成保证" in body
         conn.close()
 
     def test_includes_recent_progress_checkpoint_as_untrusted_data(self, tmp_path: Path) -> None:

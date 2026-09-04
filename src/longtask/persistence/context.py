@@ -30,6 +30,7 @@ from typing import Any
 
 from longtask.contracts.schema import ContractDraft, ContractView
 from longtask.persistence.events import EventType
+from longtask.persistence.events_query import get_latest_forecast_snapshot
 from longtask.persistence.store import append_event, get_events
 
 CONTEXT_DIR = "context"
@@ -161,6 +162,7 @@ def compile_context_snapshot(
     draft = contract.draft
     handover = _handover_data(root, contract.contract_id)
     digest = _recent_attempt_digest(conn, contract.contract_id)
+    deadline_snapshot = get_latest_forecast_snapshot(conn, contract_id=contract.contract_id)
 
     sections: list[str] = [
         f"# Active Context: {contract.contract_id} / {attempt_id}",
@@ -177,6 +179,15 @@ def compile_context_snapshot(
         f"- acceptance.checks: {list(draft.acceptance.checks)}",
         "",
     ]
+    if deadline_snapshot is not None:
+        sections += [
+            "## Deadline 风险快照（协议生成，只读）",
+            "以下数据用于风险判断，不是按时完成保证：",
+            "```json",
+            json.dumps(deadline_snapshot, ensure_ascii=False, sort_keys=True),
+            "```",
+            "",
+        ]
     if handover:
         sections += [
             "## 交接（上一 attempt 留下的现场）",
