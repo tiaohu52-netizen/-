@@ -296,7 +296,10 @@ def tool_notifications(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, A
     limit = raw_limit
     if not 1 <= limit <= 200:
         raise ValueError("limit must be between 1 and 200")
-    include_payload = bool(args.get("include_payload", False))
+    raw_include_payload = args.get("include_payload", False)
+    if not isinstance(raw_include_payload, bool):
+        raise ValueError("include_payload must be a boolean")
+    include_payload = raw_include_payload
     rows = list_notifications(
         ctx["conn"],
         status=status or None,
