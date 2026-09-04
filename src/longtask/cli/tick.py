@@ -404,6 +404,7 @@ def run_daemon_tick(
                 _record_decision(
                     conn,
                     goal_id=c.goal_id,
+                    contract_id=cid,
                     contract_revision=c.revision,
                     tier=u_tier,
                     decision_type="hand-to-user",
