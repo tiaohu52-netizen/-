@@ -857,6 +857,19 @@ class TestHandlerValidationBranches:
                 )
             assert exc.value.code is ErrorCode.VALIDATION_FAILED
 
+            # JSON boolean 不是协议整数；拒绝 Python 的 bool-as-int 子类行为。
+            for request_id, params in (
+                ("r-bool-cursor", {"cursor": True}),
+                ("r-bool-limit", {"limit": False}),
+            ):
+                with pytest.raises(RpcError) as exc:
+                    route(
+                        make_env(Method.PROTOCOL_EVENTS, request_id, params),
+                        conn=conn,
+                        now=NOW,
+                    )
+                assert exc.value.code is ErrorCode.VALIDATION_FAILED
+
             # 非正 limit
             with pytest.raises(RpcError) as exc:
                 route(
