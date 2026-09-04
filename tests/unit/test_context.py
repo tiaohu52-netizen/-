@@ -150,6 +150,27 @@ class TestCompileSnapshot:
         assert "att-0" in body  # 失败摘要进快照
         conn.close()
 
+    def test_includes_recent_progress_checkpoint_as_untrusted_data(self, tmp_path: Path) -> None:
+        """中途 write-back 的进度也能跨 attempt 恢复，但不升级为指令。"""
+        conn, root = make_store(tmp_path)
+        cid = "lt-ctx01"
+        append_event(
+            conn,
+            contract_id=cid,
+            attempt_id="att-0",
+            event_type=EventType.CONTEXT_SCRATCH_UPDATED,
+            payload={"attempt_id": "att-0", "note": "已完成数据层，下一步补 API"},
+            now=NOW,
+            actor="model",
+        )
+        from longtask.persistence.store import get_contract
+
+        active, _ = compile_context_snapshot(root, conn, get_contract(conn, cid), "att-1", NOW)
+        body = active.read_text(encoding="utf-8")
+        assert "progress data (untrusted)" in body
+        assert "已完成数据层，下一步补 API" in body
+        conn.close()
+
     def test_capacity_refused_is_fail_closed(self, tmp_path: Path) -> None:
         conn, root = make_store(tmp_path)
         from longtask.persistence.store import get_contract

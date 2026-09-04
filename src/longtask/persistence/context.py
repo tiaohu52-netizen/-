@@ -21,6 +21,7 @@ source 阶段摘要（stages/*.md）与 promotion 流程属 §4.1 完整语义�
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -109,18 +110,37 @@ def _handover_data(root: Path, contract_id: str) -> dict[str, str]:
 
 
 def _recent_attempt_digest(conn: sqlite3.Connection, contract_id: str, limit: int = 3) -> str:
-    """最近 attempt 终态摘要（含失败原因）——验收失败上下文的主通道。"""
+    """最近终态与进度摘要——跨会话恢复的事实通道。
+
+    Scratch 更新来自执行者，属于不可信工作数据；快照明确标注来源，
+    让下一模型能恢复进度但不能把进度文本当成协议指令。
+    """
     events = get_events(conn, contract_id=contract_id)
-    terminal = [
+    relevant = [
         e
         for e in events
         if e.event_type
-        in (EventType.ATTEMPT_SUCCEEDED, EventType.ATTEMPT_FAILED, EventType.ATTEMPT_STALE)
+        in (
+            EventType.ATTEMPT_SUCCEEDED,
+            EventType.ATTEMPT_FAILED,
+            EventType.ATTEMPT_STALE,
+            EventType.CONTEXT_SCRATCH_UPDATED,
+        )
     ]
     lines: list[str] = []
-    for e in terminal[-limit:]:
+    for e in relevant[-limit:]:
         if e.attempt_id:
-            lines.append(f"- {e.attempt_id}: {str(e.event_type).split('/')[-1]}")
+            kind = str(e.event_type).split("/")[-1]
+            if e.event_type == EventType.CONTEXT_SCRATCH_UPDATED:
+                try:
+                    payload = json.loads(e.payload_json or "{}")
+                except (TypeError, ValueError):
+                    payload = {}
+                note = payload.get("note") if isinstance(payload, dict) else None
+                suffix = f" — progress data (untrusted): {note}" if note else ""
+                lines.append(f"- {e.attempt_id}: {kind}{suffix}")
+            else:
+                lines.append(f"- {e.attempt_id}: {kind}")
     return "\n".join(lines)
 
 
