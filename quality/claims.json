@@ -531,6 +531,24 @@
       ]
     },
     {
+      "id": "daemon-process-restart-reattach",
+      "statement": "真实 daemon 进程 stop/start 边界保持外部 subprocess 连续性：第二个 daemon 通过持久句柄 reattach 原 attempt，租约仍由原 attempt 持有，且不会重复派发 executor。",
+      "lifecycle": "verified",
+      "scope_paths": [
+        "src/longtask/cli/daemon_loop.py",
+        "src/longtask/promoter/reconcile.py",
+        "tests/integration/test_daemon_process_restart.py"
+      ],
+      "evidence": [
+        {
+          "kind": "integration_real_store",
+          "path": "tests/integration/test_daemon_process_restart.py",
+          "recorded_at": "2026-09-05",
+          "summary": "真实 start/stop CLI 启动两个独立 daemon；外部 subprocess 在 daemon 停止后继续运行，第二个 daemon 产生 reconcile/reattached，executor attempt 数保持 1，租约 holder 未变。"
+        }
+      ]
+    },
+    {
       "id": "real-subprocess-repair-loop",
       "statement": "真实 SubprocessAdapter 进程级闭环：executor 首次产出失败后由独立 verifier 判失败，repair 再派新的 executor 与 verifier，最终仅在验收证据通过时将合同置为 complete；verifier 成功不会递归派生 verifier。",
       "lifecycle": "verified",
