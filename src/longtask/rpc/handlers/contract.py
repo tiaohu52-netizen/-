@@ -429,6 +429,37 @@ def handle_contract_request_verification(
             code=ErrorCode.STATE_FORBIDDEN,
             message=f"contract {contract_id} is terminal ({current.state.value})",
         )
+    # A request that is durably queued but not yet consumed already represents
+    # the user's intent.  Reject a second request before it can spend another
+    # verification reservation; a fresh request is allowed after consumption.
+    verification_events = get_events(conn, contract_id=contract_id)
+    consumed_request_ids: set[int] = set()
+    for event in verification_events:
+        if event.event_type != EventType.VERIFICATION_CONSUMED:
+            continue
+        try:
+            consumed_request_ids.add(
+                int(json.loads(event.payload_json or "{}")["request_event_id"])
+            )
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+            continue
+    pending_request = next(
+        (
+            event
+            for event in verification_events
+            if event.event_type == EventType.VERIFICATION_REQUESTED
+            and event.event_id not in consumed_request_ids
+        ),
+        None,
+    )
+    if pending_request is not None:
+        raise RpcError(
+            code=ErrorCode.STATE_FORBIDDEN,
+            message=(
+                f"verification request {pending_request.event_id} already pending; "
+                "wait for daemon consumption before requesting another"
+            ),
+        )
     # 进行中的 verifier attempt：重复请求无意义
     running_verifier = conn.execute(
         "SELECT attempt_id FROM attempts "
