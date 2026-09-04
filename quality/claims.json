@@ -401,7 +401,7 @@
           "summary": "覆盖 L0 判定与失败降级、Windows Task Scheduler argv/分钟取整/权限失败、L1 取最早决策点、过去时刻立即唤醒、一次性 fired 重新登记、终态注销、端口不可用降级，以及 daemon/wake RPC 的认证、合同校验与 wakeup/rtc-fired 审计。"
         },
         {
-          "kind": "manual_smoke",
+          "kind": "manual_review",
           "path": "docs/evidence/windows-l1-scheduler-smoke-2026-09-04.md",
           "recorded_at": "2026-09-04",
           "summary": "本机真实 schtasks.exe 创建任务返回 0、查询状态 Ready，随后删除并确认再次查询返回 1；同时验证 Windows 要求 yyyy/mm/dd 日期格式。"
