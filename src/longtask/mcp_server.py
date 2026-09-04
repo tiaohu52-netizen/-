@@ -163,7 +163,9 @@ def tool_prepare_contract(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str
         {
             "method": Method.CONTRACT_PREPARE.value,
             "request_id": _mcp_request_id(Method.CONTRACT_PREPARE, args),
-            "client_id": args.get("client_id", "mcp"),
+            # MCP is a model-controlled boundary; never let tool arguments
+            # override the trusted client identity used for actor derivation.
+            "client_id": "mcp",
             "protocol_version": PROTOCOL_VERSION,
             "params": params,
         }
