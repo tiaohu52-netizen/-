@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -27,6 +28,19 @@ def _strict_int(value: Any, field: str) -> int:
         return int(value)
     except (TypeError, ValueError) as exc:
         raise TypeError(f"budget.{field} must be an integer") from exc
+
+
+def _strict_float(value: Any, field: str) -> float:
+    """Parse a finite workload estimate without bool coercion."""
+    if isinstance(value, bool):
+        raise TypeError(f"{field} must be a finite number")
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError) as exc:
+        raise TypeError(f"{field} must be a finite number") from exc
+    if not math.isfinite(parsed):
+        raise TypeError(f"{field} must be a finite number")
+    return parsed
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,9 +133,9 @@ def from_dict(data: dict[str, Any]) -> ContractDraft:
     )
     workload_raw = data.get("workload_estimate") or {}
     if "initial_hours" in workload_raw:
-        workload = float(workload_raw["initial_hours"])
+        workload = _strict_float(workload_raw["initial_hours"], "workload_estimate.initial_hours")
     elif "workload_initial_hours" in data:
-        workload = float(data["workload_initial_hours"])
+        workload = _strict_float(data["workload_initial_hours"], "workload_estimate.initial_hours")
     else:
         raise KeyError("workload_estimate.initial_hours")
     budget_raw = data["budget"]

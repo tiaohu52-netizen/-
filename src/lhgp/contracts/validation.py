@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from datetime import datetime
 from typing import Any
 
@@ -47,7 +48,12 @@ def validate_raw(data: object) -> list[str]:
     init_hours = workload.get("initial_hours") if isinstance(workload, dict) else None
     if init_hours is None:
         init_hours = data.get("workload_initial_hours")
-    if not isinstance(init_hours, (int, float)) or init_hours <= 0:
+    if (
+        isinstance(init_hours, bool)
+        or not isinstance(init_hours, (int, float))
+        or not math.isfinite(float(init_hours))
+        or init_hours <= 0
+    ):
         errors.append("workload_estimate.initial_hours must be a positive number")
     budget = data.get("budget")
     if not isinstance(budget, dict):

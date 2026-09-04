@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import math
 import sqlite3
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
@@ -57,6 +58,15 @@ def _budget_int(value: Any, field: str) -> int:
     return int(value)
 
 
+def _workload_float(value: Any) -> float:
+    if isinstance(value, bool):
+        raise TypeError("workload_estimate.initial_hours must be a finite number")
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        raise TypeError("workload_estimate.initial_hours must be a finite number")
+    return parsed
+
+
 def resolve_actor(envelope: RequestEnvelope, params: dict[str, Any]) -> str:
     """从 envelope 派生服务端可信 actor（C4 修复）。
 
@@ -94,9 +104,9 @@ def parse_contract_draft(params: dict[str, Any]) -> ContractDraft:
 
         workload_estimate = draft_data.get("workload_estimate")
         if workload_estimate is not None and isinstance(workload_estimate, dict):
-            workload_initial_hours = float(workload_estimate["initial_hours"])
+            workload_initial_hours = _workload_float(workload_estimate["initial_hours"])
         elif "workload_initial_hours" in draft_data:
-            workload_initial_hours = float(draft_data["workload_initial_hours"])
+            workload_initial_hours = _workload_float(draft_data["workload_initial_hours"])
         else:
             raise KeyError("workload_estimate.initial_hours")
 
