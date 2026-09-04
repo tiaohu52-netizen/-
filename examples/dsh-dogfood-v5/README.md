@@ -72,13 +72,13 @@ contract blocked(need-user)                 ← 如实升级，不假装
 ## 复现
 
 ```bash
-python .dogfood/dogfood_v5.py setup    # 建 Goal + 3 阶段 + 绑定合同
-python .dogfood/dogfood_v5.py stage1   # 真实 daemon + 断裂①注入 + 恢复观察
-python .dogfood/dogfood_v5.py stage1-verify  # 验收 stage-1 并记录修复/重验结果
-python .dogfood/dogfood_v5.py build-registry  # 仅重建本地执行器注册表
-python .dogfood/dogfood_v5.py stage2   # kimi CLI 接力 + 独立 verifier
-python .dogfood/dogfood_v5.py stage3   # 重启 daemon 后继续 stage-3
-python .dogfood/dogfood_v5.py status   # 状态检查
+python examples/dsh-dogfood-v5/dogfood_v5.py setup    # 建 Goal + 3 阶段 + 绑定合同
+python examples/dsh-dogfood-v5/dogfood_v5.py stage1   # 真实 daemon + 断裂①注入 + 恢复观察
+python examples/dsh-dogfood-v5/dogfood_v5.py stage1-verify  # 验收 stage-1 并记录修复/重验结果
+python examples/dsh-dogfood-v5/dogfood_v5.py build-registry  # 仅重建本地执行器注册表
+python examples/dsh-dogfood-v5/dogfood_v5.py stage2   # kimi CLI 接力 + 独立 verifier
+python examples/dsh-dogfood-v5/dogfood_v5.py stage3   # 重启 daemon 后继续 stage-3
+python examples/dsh-dogfood-v5/dogfood_v5.py status   # 状态检查
 # 前置：.dogfood/dsh-home（minimax key）+ .dogfood/dsh-home-verifier
 #（deepseek key，复制后删 profiles/node_modules 让 dsh 重建 symlink）
 ```

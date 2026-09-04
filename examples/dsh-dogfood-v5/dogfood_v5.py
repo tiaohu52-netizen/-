@@ -17,13 +17,13 @@
   stage-3 验证整合（daemon 重启发生在本阶段开始前）
 
 用法：
-  python .dogfood/dogfood_v5.py setup          # 建 Goal + 阶段计划 + 绑定合同
-  python .dogfood/dogfood_v5.py build-registry # 重建本地执行器注册表
-  python .dogfood/dogfood_v5.py stage1         # 真实 daemon + 断裂①注入
-  python .dogfood/dogfood_v5.py stage1-verify  # 验收 stage-1
-  python .dogfood/dogfood_v5.py stage2         # kimi CLI 接力 + 独立 verifier
-  python .dogfood/dogfood_v5.py stage3         # 重启 daemon 后继续 stage-3
-  python .dogfood/dogfood_v5.py status         # 查看当前状态
+  python examples/dsh-dogfood-v5/dogfood_v5.py setup          # 建 Goal + 阶段计划 + 绑定合同
+  python examples/dsh-dogfood-v5/dogfood_v5.py build-registry # 重建本地执行器注册表
+  python examples/dsh-dogfood-v5/dogfood_v5.py stage1         # 真实 daemon + 断裂①注入
+  python examples/dsh-dogfood-v5/dogfood_v5.py stage1-verify  # 验收 stage-1
+  python examples/dsh-dogfood-v5/dogfood_v5.py stage2         # kimi CLI 接力 + 独立 verifier
+  python examples/dsh-dogfood-v5/dogfood_v5.py stage3         # 重启 daemon 后继续 stage-3
+  python examples/dsh-dogfood-v5/dogfood_v5.py status         # 查看当前状态
 """
 
 from __future__ import annotations
@@ -36,7 +36,9 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-REPO = Path(__file__).resolve().parent.parent
+# dogfood_v5.py 位于 <repo>/examples/dsh-dogfood-v5/；所有状态与包装器
+# 路径必须锚定仓库根，而不是 examples/（否则会打开错误的 state.db）。
+REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "src"))
 
 from longtask.cli.daemon import get_daemon_status, halt_daemon, spawn_daemon  # noqa: E402
@@ -601,6 +603,7 @@ def run_stage2() -> None:
     finally:
         conn.close()
 
+
     daemon = get_daemon_status(ROOT)
     if not daemon.get("running"):
         started = spawn_daemon(ROOT, interval_seconds=2.0)
@@ -625,6 +628,33 @@ def run_stage2() -> None:
     finally:
         conn.close()
 
+
+def plan_stage2() -> None:
+    """不启动外部 CLI，只预演 stage-2 的 authority 选择。"""
+    from longtask.adapters.registry import ExecutorRegistry
+    from longtask.rpc.handlers._common import parse_contract_draft
+
+    registry_path = ROOT / "registry.json"
+    if not registry_path.is_file():
+        raise RuntimeError("registry missing; run build-registry first")
+    registry = ExecutorRegistry.load_from_file(registry_path)
+    draft = parse_contract_draft(
+        _stage_draft(
+            STAGES[1], executor_id="kimi-code", executor_model="kimi-k3",
+            verifier_id="dsh-verifier", verifier_model="deepseek-v4-pro",
+        )
+    )
+    executor_ids = [entry.id for entry in registry.match_candidates(draft, requested_role="executor")]
+    verifier_ids = [entry.id for entry in registry.match_candidates(draft, requested_role="verifier")]
+    print(json.dumps({
+        "stage": "stage-2",
+        "external_process_started": False,
+        "executor_candidates": executor_ids,
+        "verifier_candidates": verifier_ids,
+        "expected": {"executor": "kimi-code", "verifier": "dsh-verifier"},
+    }, ensure_ascii=False, indent=2))
+    if executor_ids != ["kimi-code"] or verifier_ids != ["dsh-verifier"]:
+        raise RuntimeError("stage-2 authority preflight failed: default-deny mismatch")
 
 def run_stage3() -> None:
     """阶段 3：重启 daemon 后再立约，验证 Goal/事件/阶段状态无损。"""
@@ -679,6 +709,8 @@ if __name__ == "__main__":
         run_stage1_verify()
     elif cmd == "stage2":
         run_stage2()
+    elif cmd == "stage2-plan":
+        plan_stage2()
     elif cmd == "stage3":
         run_stage3()
     elif cmd == "build-registry":
