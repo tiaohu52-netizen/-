@@ -133,6 +133,39 @@ def seed_attempt(
         conn.close()
 
 
+def test_legacy_attempt_with_ambiguous_goal_is_skipped_fail_safe(tmp_path: Path) -> None:
+    """旧 attempt 无 contract_id 且 Goal 多合同，不得猜测恢复目标。"""
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    make_contract(data_dir, "contract-a")
+    make_contract(data_dir, "contract-b")
+    conn = connect(StoreConfig(db_path=data_dir / "state.db"))
+    try:
+        conn.execute(
+            "UPDATE contracts SET goal_id='goal-shared' "
+            "WHERE contract_id IN ('contract-a', 'contract-b')"
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    seed_attempt(data_dir, cid="goal-shared", attempt_id="legacy-ambiguous", state="running")
+    conn = connect(StoreConfig(db_path=data_dir / "state.db"))
+    try:
+        messages: list[str] = []
+        outcomes = reconcile_attempts(
+            data_dir,
+            conn,
+            now=NOW + timedelta(minutes=1),
+            resolve_adapter=lambda _eid: None,
+            emit=messages.append,
+        )
+        assert outcomes[0].branch == ReconcileBranch.SKIPPED
+        assert get_attempt(conn, "legacy-ambiguous").state == "running"
+        assert any("ambiguous-contract" in message for message in messages)
+    finally:
+        conn.close()
+
+
 def _dumps(data: dict[str, str]) -> str:
     import json
 
