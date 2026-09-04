@@ -7,10 +7,10 @@ import socket
 import threading
 import time
 
+from lhgp.rpc.transport import _serve_loopback_tcp
 from longtask import PROTOCOL_VERSION
 from longtask.rpc.client import call_unix_socket
 from longtask.rpc.errors import ErrorCode
-from lhgp.rpc.transport import _serve_loopback_tcp
 from longtask.rpc.transport import process_lines, serve_unix_socket
 
 
