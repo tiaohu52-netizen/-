@@ -41,7 +41,7 @@ from longtask.persistence.store import (
 )
 from longtask.promoter.reconcile import reconcile_attempts
 from longtask.rpc.methods import Method
-from longtask.rpc.server import RequestEnvelope, parse_envelope, route
+from longtask.rpc.server import parse_envelope, route
 from longtask.rpc.transport import serve_unix_socket
 from longtask.scheduler.wakeup import (
     NullSchedulePort,
@@ -112,13 +112,9 @@ def run_daemon_loop(
         if token:
 
             def dispatch_rpc(raw: dict[str, Any]) -> dict[str, Any]:
-                envelope = RequestEnvelope(
-                    method=parse_envelope(raw).method,
-                    request_id=str(raw["request_id"]),
-                    client_id=str(raw["client_id"]),
-                    protocol_version=int(raw["protocol_version"]),
-                    params=dict(raw.get("params", {})),
-                )
+                # Use the single canonical parser; re-coercing fields here would
+                # silently reintroduce bool/string ambiguity at the daemon edge.
+                envelope = parse_envelope(raw)
                 rpc_conn = connect(StoreConfig(db_path=root / "state.db"))
                 try:
                     ensure_schema(rpc_conn)
