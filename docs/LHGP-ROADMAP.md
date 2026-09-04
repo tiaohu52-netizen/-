@@ -239,6 +239,11 @@ relay、L2/L3 外部唤醒、严格墙钟交付保证，以及完整 Python 模�
 - Python 内部模块路径最后迁移（`src/longtask` → `src/lhgp`），并同步 `scripts/arch_check.py` 的架构约束。
 - fresh-machine 安装测试与三个非玩具 dogfood 目标。
 
+当前新增可复现证据：`docs/evidence/dogfood-v5-stage2-preflight-2026-09-04.md`
+记录了 stage-2 的 default-deny 授权预演（仅选出 `kimi-code` executor 与
+`dsh-verifier` verifier，未启动外部进程）。这只证明授权预检，不替代真实
+CLI 接力与验收闭环证据。
+
 **验收**：conformance 场景 #14；官方插件 validator 通过；全新用户 quickstart ≤ 10 分钟；发布标签只能是 Alpha / Developer Preview。
 
 ---
