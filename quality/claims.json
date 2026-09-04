@@ -531,6 +531,71 @@
       ]
     },
     {
+      "id": "local-rpc-transport",
+      "statement": "daemon 与 rpc-call 之间使用本机认证传输：Unix domain socket 优先；Windows 无 AF_UNIX 时仅回环 TCP，并保留 daemon.token 握手认证。活动 endpoint 不得被第二个 daemon 覆盖。",
+      "lifecycle": "verified",
+      "scope_paths": [
+        "src/lhgp/rpc/transport.py",
+        "src/lhgp/rpc/client.py",
+        "tests/unit/test_rpc_transport.py"
+      ],
+      "evidence": [
+        {
+          "kind": "focused_test",
+          "path": "tests/unit/test_rpc_transport.py",
+          "recorded_at": "2026-09-04",
+          "summary": "认证握手、Unix round-trip（平台支持时）、Windows loopback fallback round-trip（平台支持时）以及活动 endpoint 不被第二个 listener 覆盖的回归场景。"
+        },
+        {
+          "kind": "source_static",
+          "path": "src/lhgp/rpc/transport.py",
+          "recorded_at": "2026-09-04",
+          "summary": "fallback 固定绑定 127.0.0.1，metadata 原子写入；启动前探测活动端口，避免覆盖存活 daemon。"
+        }
+      ]
+    },
+    {
+      "id": "notification-outbox",
+      "statement": "通知 outbox 持久化并具备幂等去重、租约领取、失败重试、安静时间与发送状态审计。",
+      "lifecycle": "verified",
+      "scope_paths": [
+        "src/longtask/persistence/notifications.py",
+        "tests/unit/test_notifications.py"
+      ],
+      "evidence": [
+        {
+          "kind": "focused_test",
+          "path": "tests/unit/test_notifications.py",
+          "recorded_at": "2026-09-04",
+          "summary": "覆盖重复入队幂等、claim/lease、发送成功、失败退避重试、安静时间和状态转移路由。"
+        }
+      ]
+    },
+    {
+      "id": "notification-routing",
+      "statement": "合同状态与风险事件按 attention 配置路由到 need_user、satisfied、missed、risk_red 等通知类型，并通过 outbox 进入可审计投递队列。",
+      "lifecycle": "verified",
+      "scope_paths": [
+        "src/longtask/persistence/notifications.py",
+        "tests/unit/test_notifications.py",
+        "tests/integration/test_mcp_server.py"
+      ],
+      "evidence": [
+        {
+          "kind": "focused_test",
+          "path": "tests/unit/test_notifications.py",
+          "recorded_at": "2026-09-04",
+          "summary": "验证状态转移根据 attention 产生通知事件，且通知查询支持 goal/status 过滤与默认敏感 payload 脱敏。"
+        },
+        {
+          "kind": "integration_real_store",
+          "path": "tests/integration/test_mcp_server.py",
+          "recorded_at": "2026-09-04",
+          "summary": "MCP notifications 工具暴露、参数校验与过滤行为通过真实存储集成测试。"
+        }
+      ]
+    },
+    {
       "id": "daemon-lifecycle-and-attempt-runner",
       "statement": "longtaskd 常驻闭环（DESIGN §3.3/§3.4/§5.1/§15.2）：start/stop 真实分离进程与优雅退出；AttemptRunner 拉起真实子进程、存活续约、终态回收（attempt/succeeded|failed + 租约释放）、换代记 stale；死租约 redispatch 走回收路径；预算按 attempt/started 事件计数触顶转 blocked(need-user)",
       "lifecycle": "verified",
