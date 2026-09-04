@@ -14,6 +14,7 @@ from jsonschema import Draft202012Validator
 
 from longtask.contracts.authority import from_dict as authority_from_dict
 from longtask.contracts.continuity import from_dict as continuity_from_dict
+from longtask.contracts.contract_draft import from_dict as draft_from_dict
 from longtask.contracts.schema import (
     FROZEN_FIELDS,
     Acceptance,
@@ -108,6 +109,12 @@ class TestFrozenFields:
 
 
 class TestContractSerialization:
+    def test_budget_boolean_is_rejected_during_deserialization(self) -> None:
+        payload = make_draft().to_dict()
+        payload["budget"]["max_dispatches"] = True
+        with pytest.raises(TypeError, match=r"budget\.max_dispatches must be an integer"):
+            draft_from_dict(payload)
+
     def test_draft_and_view_to_dict(self) -> None:
         draft = make_draft()
         d_dict = draft.to_dict()
