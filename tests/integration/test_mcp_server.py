@@ -89,6 +89,7 @@ class TestMCPDiscovery:
             names = {t["name"] for t in tools["result"]["tools"]}
             expected = {
                 "longtask_health",
+                "longtask_doctor",
                 "longtask_list_executors",
                 "longtask_prepare_contract",
                 "longtask_approve_contract",
@@ -117,7 +118,8 @@ class TestMCPDiscovery:
                 "longtask_request_verification",
                 "lhgp_request_verification",
             }.issubset(names)
-            assert len(names) == 32
+            assert {"longtask_doctor", "lhgp_doctor"}.issubset(names)
+            assert len(names) == 34
             by_name = {item["name"]: item for item in tools["result"]["tools"]}
             assert by_name["lhgp_notifications"]["annotations"] == {
                 "readOnlyHint": True,
@@ -180,6 +182,10 @@ class TestMCPHealth:
             assert result["status"] == "ok"
             assert "protocol_version" in result
             assert "longtask_prepare_contract" in result["tools"]
+            doctor = _result_text(
+                _roundtrip(proc, "tools/call", {"name": "lhgp_doctor", "arguments": {}}, _id=2)
+            )
+            assert doctor["all_ok"] is True
         finally:
             _stop_mcp(proc)
 
