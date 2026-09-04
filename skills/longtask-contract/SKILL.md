@@ -96,7 +96,7 @@ longtask arbitrate lt-20260903-001 --decision hand_to_user --note "需要确认 
 “验收现状”。该命令只派 verifier，不会再派 executor：
 
 ```bash
-longtask contract/request-verification lt-20260903-001 \
+longtask request-verification lt-20260903-001 \
   --reason "执行预算已耗尽，请核对当前工作区是否满足验收"
 ```
 
