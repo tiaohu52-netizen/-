@@ -61,6 +61,21 @@ if TYPE_CHECKING:
     from longtask.rpc.server import RequestEnvelope
 
 
+def _strict_candidate_bool(candidate: dict[str, Any], key: str, default: bool) -> bool:
+    """Parse admission facts without truthiness coercion.
+
+    Registry snapshots are an integration boundary; a string such as
+    ``"false"`` must not become a passing eligibility fact.
+    """
+    value = candidate.get(key, default)
+    if not isinstance(value, bool):
+        raise RpcError(
+            code=ErrorCode.VALIDATION_FAILED,
+            message=f"admission candidate field '{key}' must be a boolean",
+        )
+    return value
+
+
 def _build_admission_offer(
     *,
     draft_dict: dict[str, Any],
@@ -78,12 +93,16 @@ def _build_admission_offer(
     for cand in registry_view or []:
         facts = CandidateFacts(
             executor_id=str(cand.get("executor_id") or ""),
-            executor_enabled_globally=bool(cand.get("enabled", False)),
-            executor_concurrency_available=bool(cand.get("concurrency_available", True)),
-            capability_satisfied=bool(cand.get("capability_satisfied", True)),
-            constraint_enforcement_proven=bool(cand.get("constraint_enforcement_proven", True)),
-            budget_available=bool(cand.get("budget_available", True)),
-            verifier_independent=bool(cand.get("verifier_independent", True)),
+            executor_enabled_globally=_strict_candidate_bool(cand, "enabled", False),
+            executor_concurrency_available=_strict_candidate_bool(
+                cand, "concurrency_available", True
+            ),
+            capability_satisfied=_strict_candidate_bool(cand, "capability_satisfied", True),
+            constraint_enforcement_proven=_strict_candidate_bool(
+                cand, "constraint_enforcement_proven", True
+            ),
+            budget_available=_strict_candidate_bool(cand, "budget_available", True),
+            verifier_independent=_strict_candidate_bool(cand, "verifier_independent", True),
         )
         requested_role = str(cand.get("requested_role", "executor"))
         raw_models = cand.get("models") or [cand.get("requested_model", "*")]

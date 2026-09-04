@@ -336,8 +336,10 @@
       "scope_paths": [
         "src/longtask/adapters/registry.py",
         "src/lhgp/rpc/handlers/executor.py",
+        "src/longtask/rpc/handlers/goal.py",
         "src/longtask/rpc/handlers.py",
         "tests/unit/test_registry.py",
+        "tests/conformance/test_admission_offer.py",
         "tests/integration/test_executor_rpc.py"
       ],
       "evidence": [
@@ -352,6 +354,12 @@
           "path": "tests/integration/test_executor_rpc.py",
           "recorded_at": "2026-09-01",
           "summary": "RPC 控制面集成测试：executor/list 查询及 enabled_only 过滤（错误类型 fail-closed）、executor/enable 与 executor/disable 用户框定控制、executor/health 真实适配器探活与能力（无适配器 fail-closed）、UNKNOWN_EXECUTOR 错误码。"
+        },
+        {
+          "kind": "focused_test",
+          "path": "tests/conformance/test_admission_offer.py",
+          "recorded_at": "2026-09-05",
+          "summary": "admission 候选事实的非布尔 enabled 值被 VALIDATION_FAILED 拒接，防止外部快照通过 truthiness 转换伪造 eligibility。"
         }
       ]
     },
