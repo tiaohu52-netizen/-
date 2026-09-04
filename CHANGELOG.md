@@ -38,7 +38,7 @@ follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
   including missing external-handle capability columns, before daemon scans.
 - Doctor output and README quickstart commands now use the canonical LHGP name.
 - Claims evidence is re-anchored to the latest verified implementation commit;
-  the full 7-gate suite remains green with 564 tests at 81.51% coverage.
+  the full 7-gate suite remains green with 564 tests at 81.50% coverage.
 - Unavailable L1 wakeup channels now emit one deduplicated `wakeup/degraded`
   event per daemon lifecycle instead of writing noise on every tick.
 - Failed wakeup task disarms remain tracked and are retried on the next daemon
