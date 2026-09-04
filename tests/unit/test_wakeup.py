@@ -3,7 +3,7 @@
 端口全部注入 fake：零系统副作用、无真实墙钟。覆盖：
 - L0 guard_needed 判定（active 租约存活 / u >= 1.0 / 越 Deadline / 无需守卫）；
 - SleepGuard 持有/释放状态转换即事件，失败降级记 wakeup/degraded；
-- RtcAlarm 对齐 active 合同（注册目标时刻 max(next_wakeup, deadline-margin)）、
+- RtcAlarm 对齐 active 合同（注册目标时刻取最早的决策/唤醒/安全边距时刻）、
   终态合同注销、端口不可用降级；
 - 事件词汇表 wakeup/* 与 ADR-0002 一致。
 """
@@ -214,7 +214,7 @@ class TestSleepGuard:
 
 
 class TestRtcAlarm:
-    def test_arms_active_contract_at_max_of_wakeup_and_deadline_margin(
+    def test_arms_active_contract_at_earliest_decision_or_deadline_margin(
         self, tmp_path: Path
     ) -> None:
         conn = make_store(tmp_path)
@@ -227,10 +227,22 @@ class TestRtcAlarm:
         armed = alarm.refresh(conn, now=NOW)
 
         assert armed == ("lt-w10",)
-        # deadline - margin = +9.5h > wakeup +20min -> 注册时刻取前者
-        expected = deadline - DEFAULT_SAFETY_MARGIN
+        # next_wakeup 是更早的真实决策点，不能被 deadline 安全边距遮蔽。
+        expected = wakeup
         assert port.armed["longtask-wakeup-lt-w10"] == expected
         assert EventType.WAKEUP_RTC_ARMED.value in event_types(conn, "lt-w10")
+        conn.close()
+
+    def test_arms_at_deadline_margin_when_no_earlier_decision_exists(self, tmp_path: Path) -> None:
+        conn = make_store(tmp_path)
+        deadline = NOW + timedelta(hours=10)
+        wakeup = NOW + timedelta(hours=12)
+        save_active_contract(conn, "lt-w10b", deadline=deadline, next_wakeup=wakeup)
+
+        port = FakeSchedulePort()
+        RtcAlarm(port).refresh(conn, now=NOW)
+
+        assert port.armed["longtask-wakeup-lt-w10b"] == deadline - DEFAULT_SAFETY_MARGIN
         conn.close()
 
     def test_disarms_terminal_contract(self, tmp_path: Path) -> None:

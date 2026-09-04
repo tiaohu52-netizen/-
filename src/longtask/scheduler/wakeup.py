@@ -8,7 +8,7 @@
 - L0 SleepGuard：active 租约存活或 u ≥ 1.0 时持有系统电源请求
   （Windows SetThreadExecutionState），事件 wakeup/sleep-guard；
 - L1 RtcAlarm：为 active 合同注册带 wake 标志的计划任务
-  （max(next_wakeup_at, deadline_at - safety_margin)），事件
+  （取 next_wakeup_at、next_decision_at 与 deadline 安全边距中的最早时刻），事件
   wakeup/rtc-armed / wakeup/rtc-fired；
 - 任一层失效：记 wakeup/degraded 事件并降级声明（§11.4），绝不静默。
   L2（云侧准时通知）与 L3（常在线中继）依赖外部基础设施，
@@ -185,10 +185,9 @@ class RtcAlarm:
     """L1 计划任务唤醒：为 active 合同注册带 wake 位的一次性任务。
 
     每个 active 合同一个 task_id（longtask-wakeup-<cid>）；目标时刻取
-    max(next_wakeup_at, next_decision_at, deadline_at - safety_margin)。
-    P4：next_decision_at 是调度层算出的下一决策点，纳入目标让 RTC
-    唤醒对齐真实决策节奏。注册/注销失败记 wakeup/degraded(layer=L1)，
-    绝不静默假装已注册。
+    next_wakeup_at、next_decision_at 与 deadline_at - safety_margin 中的最早值。
+    任一时刻到达都必须唤醒 daemon，不能让较晚的 deadline 安全边距遮蔽更早的
+    决策点。注册/注销失败记 wakeup/degraded(layer=L1)，绝不静默假装已注册。
     """
 
     def __init__(self, schedule: SchedulePort, safety_margin: timedelta = DEFAULT_SAFETY_MARGIN):
@@ -232,7 +231,8 @@ class RtcAlarm:
             cid = contract.contract_id
             wakeup = contract.next_wakeup_at
             deadline_minus_margin = contract.draft.deadline_at - self._safety_margin
-            # P4：next_decision_at（下一决策点）也纳入目标
+            # 每个候选点都代表一次必须重新审视的最早时刻；取 min，
+            # 否则较晚的 deadline 安全边距会推迟更早的决策/唤醒。
             candidates = [
                 t
                 for t in (wakeup, contract.next_decision_at, deadline_minus_margin)
@@ -240,7 +240,7 @@ class RtcAlarm:
             ]
             if not candidates:
                 continue
-            targets[cid] = max(candidates)
+            targets[cid] = min(candidates)
 
         # 目标时刻已变或新出现的合同：重新注册
         for cid, at in targets.items():
