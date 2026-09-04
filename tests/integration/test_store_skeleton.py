@@ -78,6 +78,7 @@ def test_schema_reconciles_partial_v2_columns(tmp_path: Path) -> None:
         columns = {row[1] for row in conn.execute("PRAGMA table_info(attempts)")}
         assert {
             "model_id",
+            "contract_id",
             "external_run_id",
             "session_locator",
             "capability_snapshot_json",
