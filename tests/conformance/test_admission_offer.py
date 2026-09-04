@@ -136,6 +136,16 @@ def test_goal_prepare_preserves_stable_goal_identity(tmp_path) -> None:
     conn.close()
 
 
+def test_goal_list_rejects_boolean_limit(tmp_path) -> None:
+    conn = _conn(tmp_path)
+    try:
+        with pytest.raises(RpcError) as exc_info:
+            handle_goal_list(_envelope("req-list-bool", {"limit": True}), conn=conn)
+        assert exc_info.value.code == ErrorCode.VALIDATION_FAILED
+    finally:
+        conn.close()
+
+
 def test_bound_stage_cannot_advance_before_contract_acceptance(tmp_path) -> None:
     conn = _conn(tmp_path)
     response = handle_goal_prepare(
