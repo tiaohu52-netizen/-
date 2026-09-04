@@ -245,6 +245,22 @@ class TestRtcAlarm:
         assert port.armed["longtask-wakeup-lt-w10b"] == deadline - DEFAULT_SAFETY_MARGIN
         conn.close()
 
+    def test_clamps_past_decision_point_to_now(self, tmp_path: Path) -> None:
+        conn = make_store(tmp_path)
+        deadline = NOW + timedelta(hours=10)
+        save_active_contract(
+            conn,
+            "lt-w10c",
+            deadline=deadline,
+            next_wakeup=NOW - timedelta(minutes=1),
+        )
+
+        port = FakeSchedulePort()
+        RtcAlarm(port).refresh(conn, now=NOW)
+
+        assert port.armed["longtask-wakeup-lt-w10c"] == NOW
+        conn.close()
+
     def test_disarms_terminal_contract(self, tmp_path: Path) -> None:
         conn = make_store(tmp_path)
         save_active_contract(conn, "lt-w11", deadline=NOW + timedelta(hours=10))

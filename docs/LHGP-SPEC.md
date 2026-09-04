@@ -736,7 +736,8 @@ MUST NOT 按 daemon tick 重复写入；该层恢复后再次失效时 SHOULD �
 对 active 合同，L1 一次性唤醒的目标时刻 MUST 取
 `min(next_wakeup_at, next_decision_at, due_at - safety_margin)`（忽略缺失值）。
 较晚的 Deadline 安全边距不得遮蔽更早的决策点；否则实现不能声称对
-`next_decision_at` 提供唤醒对齐。
+`next_decision_at` 提供唤醒对齐。若该最早时刻已在过去，目标 MUST 钳制为
+当前时刻，表示立即重算，不得把过去时间直接交给平台调度器。
 
 ### 13.2 事件族
 
