@@ -49,6 +49,10 @@ class TestParseEnvelope:
         with pytest.raises(RpcError, match="protocol_version 99 unsupported"):
             parse_envelope(make_raw(protocol_version=99))
 
+    def test_boolean_version_rejected(self) -> None:
+        with pytest.raises(RpcError, match="protocol_version must be an integer"):
+            parse_envelope(make_raw(protocol_version=True))
+
     def test_empty_identifiers_rejected(self) -> None:
         with pytest.raises(RpcError, match="non-empty"):
             parse_envelope(make_raw(request_id=""))

@@ -32,7 +32,10 @@ def parse_envelope(raw: dict[str, Any]) -> RequestEnvelope:
         method = Method(str(raw["method"]))
         request_id = str(raw["request_id"])
         client_id = str(raw["client_id"])
-        protocol_version = int(raw["protocol_version"])
+        raw_protocol_version = raw["protocol_version"]
+        if isinstance(raw_protocol_version, bool):
+            raise ValueError("protocol_version must be an integer")
+        protocol_version = int(raw_protocol_version)
     except (KeyError, TypeError, ValueError) as exc:
         raise RpcError(ErrorCode.VALIDATION_FAILED, f"malformed request envelope: {exc}") from exc
     if protocol_version != PROTOCOL_VERSION:
