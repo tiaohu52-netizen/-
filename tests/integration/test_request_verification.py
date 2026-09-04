@@ -139,6 +139,13 @@ def test_request_on_blocked_contract_resumes_and_records(tmp_path: Path) -> None
         types = [e.event_type for e in get_events(conn, contract_id=cid)]
         assert EventType.VERIFICATION_REQUESTED.value in types
         assert EventType.CONTRACT_RESUMED.value in types
+        requested = [
+            e
+            for e in get_events(conn, contract_id=cid)
+            if e.event_type == EventType.VERIFICATION_REQUESTED
+        ]
+        assert requested[-1].contract_revision == contract.revision
+        assert requested[-1].role == "user"
     finally:
         conn.close()
 
