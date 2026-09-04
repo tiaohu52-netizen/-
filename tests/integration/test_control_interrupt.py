@@ -17,7 +17,7 @@ import pytest
 
 from longtask import PROTOCOL_VERSION
 from longtask.adapters.fake_executor import FakeExecutor
-from longtask.cli.daemon import _consume_interrupt_requests
+from longtask.cli.daemon import _cancel_terminal_contract_attempts, _consume_interrupt_requests
 from longtask.cli.runner import AttemptRunner
 from longtask.contracts.schema import Acceptance, Budget, ContractDraft, ContractState
 from longtask.persistence.events import EventType
@@ -119,6 +119,52 @@ class TestInterruptHandler:
 
 
 class TestInterruptConsume:
+    def test_terminal_contract_cancels_running_attempt(self, tmp_path: Path) -> None:
+        """contract/cancel 后 daemon 必须终止本进程 attempt 并释放租约。"""
+        conn = _make_conn(tmp_path)
+        try:
+            runner = AttemptRunner(
+                tmp_path,
+                conn,
+                __import__(
+                    "longtask.adapters.registry", fromlist=["ExecutorRegistry"]
+                ).ExecutorRegistry(),
+            )
+            acquire_lease(
+                conn,
+                contract_id=CID,
+                holder_attempt_id="att-terminal",
+                expected_generation=0,
+                heartbeat_at=NOW,
+                timeout=timedelta(minutes=30),
+            )
+            runner._running["att-terminal"] = {
+                "contract_id": CID,
+                "executor_id": "missing",
+                "session_ref": "subprocess:att-terminal",
+                "generation": 1,
+            }
+            update_contract_state(
+                conn,
+                contract_id=CID,
+                new_state=ContractState.CANCELLED,
+                now=NOW + timedelta(seconds=1),
+            )
+
+            _cancel_terminal_contract_attempts(conn, runner, NOW + timedelta(seconds=2))
+
+            assert runner.is_idle()
+            assert get_lease(conn, CID) is None
+            cancelled = [
+                event
+                for event in get_events(conn, contract_id=CID)
+                if event.event_type == EventType.ATTEMPT_CANCELLED
+            ]
+            assert len(cancelled) == 1
+            assert cancelled[0].actor == "daemon"
+        finally:
+            conn.close()
+
     def test_daemon_consume_cancels_running_attempt(self, tmp_path: Path) -> None:
         """interrupt 事件 → _consume_interrupt_requests → runner.cancel_attempt
         → attempt/cancelled + 租约释放 + 停追。"""

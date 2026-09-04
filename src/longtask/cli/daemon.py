@@ -13,7 +13,11 @@
 
 from __future__ import annotations
 
-from longtask.cli.daemon_loop import _consume_interrupt_requests, run_daemon_loop
+from longtask.cli.daemon_loop import (
+    _cancel_terminal_contract_attempts,
+    _consume_interrupt_requests,
+    run_daemon_loop,
+)
 from longtask.cli.daemon_proc import (
     DAEMON_LOG_FILE,
     DAEMON_STOP_FILE,
@@ -41,6 +45,7 @@ __all__ = [
     "RPC_SOCKET_FILE",
     "STOP_GRACE_SECONDS",
     "TOKEN_FILE",
+    "_cancel_terminal_contract_attempts",
     "_consume_interrupt_requests",
     "get_daemon_status",
     "halt_daemon",

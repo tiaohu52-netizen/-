@@ -157,6 +157,10 @@ def run_daemon_loop(
                 locally_tracked=runner.is_tracking,
                 emit=emit_fn,
             )
+            # 合同进入 cancelled/expired 后，控制面已不再允许继续推进；
+            # 在 poll 前终止本进程持有的外部 attempt，避免已终止承诺
+            # 继续消耗资源或产生迟到写回。
+            _cancel_terminal_contract_attempts(conn, runner, now_val)
             # 先回收上一轮的收尾者并给存活者续心跳，再调度，最后拉起新 attempt
             runner.poll_attempts(now_val)
             # 消费 control/interrupt 请求（用户通过 RPC 打断执行中的 attempt）
@@ -355,6 +359,29 @@ def _consume_verification_requests(
                 actor="daemon",
             )
             rebuild_projection(root, contract.contract_id, conn)
+
+
+def _cancel_terminal_contract_attempts(
+    conn: sqlite3.Connection,
+    runner: AttemptRunner,
+    now: datetime,
+) -> None:
+    """终止已取消/已过期合同的本进程 attempt（幂等、只处理本进程）。"""
+    terminal_contracts = {
+        contract.contract_id
+        for contract in list_contracts(conn, limit=1000)
+        if contract.state in (ContractState.CANCELLED, ContractState.EXPIRED)
+    }
+    for contract_id, attempt_id in runner.running_attempts():
+        if contract_id not in terminal_contracts:
+            continue
+        runner.cancel_attempt(
+            now,
+            contract_id=contract_id,
+            attempt_id=attempt_id,
+            reason="contract reached terminal state",
+            actor="daemon",
+        )
 
 
 def _consume_interrupt_requests(
