@@ -1,6 +1,6 @@
 {
   "registry_version": 2,
-  "pinned_sha": "ee014d8ee0476d7cc98cde117048e10b53984fce",
+  "pinned_sha": "83783f18199acd7e477eb75a5c07031724e66c5d",
   "last_revalidated": "2026-09-04",
   "design_claims": [
     {
@@ -410,7 +410,7 @@
     },
     {
       "id": "mcp-server-and-skill",
-      "statement": "MCP server 薄层（DESIGN §11.1、§17）+ §17 longtask-contract skill：任何 MCP 兼容的 agent harness 可通过 stdio JSON-RPC 2.0 发现并调用长任务协议。当前暴露 32 个面向 AI 任务流的工具（18 个 lhgp_ 规范别名 + 14 个 longtask_ 遗留别名，含 lhgp_request_verification 用户触发验收），不暴露 RPC 方法——工具是 AI 任务流语义不是 RPC 隧道。skill 教模型怎么起草合同（objective 写验收不是方法、acceptance.checks 逐条可独立核对、workload_initial_hours 如实填决定紧迫度）。stdio 输出强制 ASCII（ensure_ascii=True）避免 Windows pipe 编码转换破坏非 ASCII 字节；协议错误码透传（StrEnum 值），JSON-RPC 标准错误码用于客户端层。",
+      "statement": "MCP server 薄层（DESIGN §11.1、§17）+ §17 longtask-contract skill：任何 MCP 兼容的 agent harness 可通过 stdio JSON-RPC 2.0 发现并调用长任务协议。当前暴露 34 个面向 AI 任务流的工具（18 个 lhgp_ 规范别名 + 16 个 longtask_ 遗留别名，含 lhgp_request_verification 用户触发验收与 lhgp_doctor 只读预检），不暴露 RPC 方法——工具是 AI 任务流语义不是 RPC 隧道。skill 教模型怎么起草合同（objective 写验收不是方法、acceptance.checks 逐条可独立核对、workload_initial_hours 如实填决定紧迫度）。stdio 输出强制 ASCII（ensure_ascii=True）避免 Windows pipe 编码转换破坏非 ASCII 字节；协议错误码透传（StrEnum 值），JSON-RPC 标准错误码用于客户端层）。",
       "lifecycle": "verified",
       "scope_paths": [
         "src/longtask/mcp_server.py",
