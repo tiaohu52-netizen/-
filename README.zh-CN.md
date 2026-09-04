@@ -193,7 +193,7 @@ cat ~/.lhgp/contracts/lt-20260903-hello/contract.yaml
 ### 如果你的 Agent 是兼容 MCP 的 LLM
 
 包还装了 `longtask-mcp`，一个薄的 [MCP](https://modelcontextprotocol.io)
-server。它给你的模型暴露核心任务流工具，以及 LHGP 命名别名、审计和控制扩展（不是 24 个 RPC 方法的 1:1 隧道 —— 见规范 §11.1）。在你的 MCP 配置里加一行把它指给 harness，模型就能直接发现并使用本协议 —— 模型侧的接入文档在 [`skills/longtask-contract/SKILL.md`](skills/longtask-contract/SKILL.md)。
+server。它给你的模型暴露核心任务流工具，以及 LHGP 命名别名、审计和控制扩展（不是底层 RPC 方法的 1:1 隧道 —— 见规范 §11.1）。在你的 MCP 配置里加一行把它指给 harness，模型就能直接发现并使用本协议 —— 模型侧的接入文档在 [`skills/longtask-contract/SKILL.md`](skills/longtask-contract/SKILL.md)。
 
 ## 明确不做（暂时）
 
