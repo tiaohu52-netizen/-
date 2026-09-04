@@ -739,7 +739,8 @@ MUST NOT 按 daemon tick 重复写入；该层恢复后再次失效时 SHOULD �
 - `attempt/admitted`, `attempt/started`, `attempt/orphaned`, `attempt/succeeded`；
 - `checkpoint/committed`, `capsule/built`, `capsule/rejected`；
 - `dispatch/selected`, `dispatch/refused`；
-- `verification/started`, `verification/failed`, `verification/passed`；
+- `verification/requested`, `verification/consumed`, `verification/started`,
+  `verification/failed`, `verification/passed`；
 - `lease/acquired`, `lease/renewed`, `lease/fenced`；
 - `wakeup/armed`, `wakeup/fired`, `wakeup/degraded`。
 
