@@ -275,16 +275,21 @@ class RtcAlarm:
             if cid not in targets:
                 try:
                     self._schedule.disarm(f"longtask-wakeup-{cid}")
+                    # 只有注销成功才移除内存登记；失败时保留，下一轮重试，
+                    # 避免系统计划任务残留而协议误以为已清理。
+                    del self._armed[cid]
+                    self._degraded_contracts.discard(cid)
                 except OSError as exc:
-                    append_event(
-                        conn,
-                        contract_id=cid,
-                        event_type=EventType.WAKEUP_DEGRADED,
-                        payload={"layer": "L1", "reason": str(exc)},
-                        now=now,
-                        actor="daemon",
-                    )
-                del self._armed[cid]
+                    if cid not in self._degraded_contracts:
+                        append_event(
+                            conn,
+                            contract_id=cid,
+                            event_type=EventType.WAKEUP_DEGRADED,
+                            payload={"layer": "L1", "reason": str(exc)},
+                            now=now,
+                            actor="daemon",
+                        )
+                        self._degraded_contracts.add(cid)
         return tuple(sorted(self._armed))
 
 

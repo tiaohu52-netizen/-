@@ -64,9 +64,12 @@ class FakePowerPort:
 class FakeSchedulePort:
     """可编程计划任务端口：记录 arm/disarm，可注入失败与不可用。"""
 
-    def __init__(self, available: bool = True, fail_arm: bool = False) -> None:
+    def __init__(
+        self, available: bool = True, fail_arm: bool = False, fail_disarm: bool = False
+    ) -> None:
         self._available = available
         self.fail_arm = fail_arm
+        self.fail_disarm = fail_disarm
         self.armed: dict[str, datetime] = {}
         self.disarmed: list[str] = []
 
@@ -79,6 +82,8 @@ class FakeSchedulePort:
         self.armed[task_id] = at
 
     def disarm(self, task_id: str) -> None:
+        if self.fail_disarm:
+            raise OSError(f"disarm failed: {task_id}")
         self.disarmed.append(task_id)
 
 
@@ -286,6 +291,22 @@ class TestRtcAlarm:
             ("wakeup/degraded", "lt-w14"),
         ).fetchone()[0]
         assert count == 1
+        conn.close()
+
+    def test_contract_disarm_failure_is_retried(self, tmp_path: Path) -> None:
+        conn = make_store(tmp_path)
+        save_active_contract(conn, "lt-w15", deadline=NOW + timedelta(hours=10))
+        port = FakeSchedulePort()
+        alarm = RtcAlarm(port)
+        alarm.refresh(conn, now=NOW)
+        conn.execute("UPDATE contracts SET state = 'cancelled' WHERE contract_id = 'lt-w15'")
+        port.fail_disarm = True
+        alarm.refresh(conn, now=NOW + timedelta(minutes=1))
+        assert "lt-w15" in alarm._armed
+        port.fail_disarm = False
+        alarm.refresh(conn, now=NOW + timedelta(minutes=2))
+        assert "lt-w15" not in alarm._armed
+        assert port.disarmed == ["longtask-wakeup-lt-w15"]
         conn.close()
 
     def test_null_schedule_port_is_unavailable(self) -> None:
