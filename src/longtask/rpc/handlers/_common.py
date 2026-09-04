@@ -53,7 +53,7 @@ _TRUSTED_CLIENT_ACTORS: dict[str, str] = {
 
 def _budget_int(value: Any, field: str) -> int:
     """Parse a budget integer while rejecting bool-as-int coercion."""
-    if isinstance(value, bool):
+    if isinstance(value, (bool, float)):
         raise TypeError(f"budget.{field} must be an integer")
     return int(value)
 
