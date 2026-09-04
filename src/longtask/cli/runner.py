@@ -467,8 +467,8 @@ class AttemptRunner:
                     if contract is not None
                     else []
                 )
-                if typed_checks:
-                    workspace = contract_workspace(contract.draft) if contract is not None else ""
+                if typed_checks and contract is not None:
+                    workspace = contract_workspace(contract.draft)
                     if workspace:
                         # SPEC §12.4 裁决合成：确定性评估优先；协议
                         # undetermined 时模型显式 pass/fail 填补；冲突记录
