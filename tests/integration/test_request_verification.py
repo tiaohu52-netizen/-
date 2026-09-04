@@ -49,7 +49,11 @@ NOW = datetime(2026, 9, 4, 12, 0, 0, tzinfo=UTC)
 
 
 def _setup(
-    tmp_path: Path, *, reserved: int = 3, state: ContractState | None = None
+    tmp_path: Path,
+    *,
+    reserved: int = 3,
+    state: ContractState | None = None,
+    goal_id: str | None = None,
 ) -> tuple[Path, Any, str, ExecutorRegistry]:
     root = tmp_path / "data"
     ws = root / "ws"
@@ -83,6 +87,7 @@ def _setup(
         ),
         contract_id=cid,
         now=NOW,
+        goal_id=goal_id,
     )
     if state is not None:
         update_contract_state(
@@ -228,5 +233,31 @@ def test_daemon_consumes_request_and_dispatches_verifier(tmp_path: Path) -> None
         _consume_verification_requests(root, conn, runner, NOW + timedelta(seconds=2))
         verifiers2 = conn.execute("SELECT COUNT(*) FROM attempts WHERE role='verifier'").fetchone()
         assert verifiers2[0] == 1
+    finally:
+        conn.close()
+
+
+def test_daemon_request_idempotence_uses_bound_goal_identity(tmp_path: Path) -> None:
+    """绑定长期 Goal 的合同重复消费请求时仍只派生一个 verifier。"""
+    root, conn, cid, reg = _setup(tmp_path, state=ContractState.BLOCKED, goal_id="goal-long-lived")
+    try:
+        conn.execute(
+            "INSERT INTO attempts (attempt_id, goal_id, contract_revision, role,"
+            " executor_id, model_id, state, lease_generation, admitted_at, updated_at)"
+            " VALUES ('att-bound', ?, 1, 'executor', 'exec-a', '*', 'failed', 1, ?, ?)",
+            ("goal-long-lived", NOW.isoformat(), NOW.isoformat()),
+        )
+        conn.commit()
+        _request(conn, cid)
+
+        runner = AttemptRunner(root, conn, reg)
+        _consume_verification_requests(root, conn, runner, NOW + timedelta(seconds=1))
+        _consume_verification_requests(root, conn, runner, NOW + timedelta(seconds=2))
+
+        count = conn.execute(
+            "SELECT COUNT(*) FROM attempts WHERE goal_id=? AND role='verifier'",
+            ("goal-long-lived",),
+        ).fetchone()[0]
+        assert count == 1
     finally:
         conn.close()

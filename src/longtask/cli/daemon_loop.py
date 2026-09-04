@@ -262,9 +262,13 @@ def _consume_verification_requests(
         ]
         if not requested:
             continue
+        # attempts.goal_id stores the owning Goal identity, not the contract
+        # identity.  A contract may be bound to a long-lived goal, so using
+        # contract_id here would miss an existing verifier and break the
+        # request-consumption idempotence guarantee.
         already = conn.execute(
             "SELECT attempt_id FROM attempts WHERE goal_id = ? AND role = 'verifier' LIMIT 1",
-            (contract.contract_id,),
+            (contract.goal_id,),
         ).fetchone()
         if already is not None:
             continue
@@ -272,7 +276,7 @@ def _consume_verification_requests(
             "SELECT executor_id FROM attempts "
             "WHERE goal_id = ? AND role = 'executor' "
             "ORDER BY admitted_at DESC LIMIT 1",
-            (contract.contract_id,),
+            (contract.goal_id,),
         ).fetchone()
         executor_id = str(last_executor[0]) if last_executor else ""
         ok = runner._dispatch_verifier(
