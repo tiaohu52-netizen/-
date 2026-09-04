@@ -562,7 +562,7 @@
           "kind": "integration_real_store",
           "path": "tests/integration/test_daemon_process_restart.py",
           "recorded_at": "2026-09-05",
-          "summary": "真实 start/stop CLI 启动两个独立 daemon；外部 subprocess 在 daemon 停止后继续运行，第二个 daemon 产生 reconcile/reattached，executor attempt 数保持 1，租约 holder 未变。"
+          "summary": "真实 start/stop CLI 启动两个独立 daemon；外部 subprocess 在 daemon 停止后继续运行，第二个 daemon 产生 reconcile/reattached 并接管 Runner，executor attempt 数保持 1、租约 holder 未变，随后 cancel 合同可终止该重绑进程。"
         }
       ]
     },
