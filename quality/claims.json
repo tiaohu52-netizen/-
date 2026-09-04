@@ -531,6 +531,24 @@
       ]
     },
     {
+      "id": "terminal-contract-cancels-attempts",
+      "statement": "合同进入 cancelled 或 expired 后，daemon 在下一轮主动终止本进程持有的外部 attempt，记录取消事件并释放租约，防止已终止承诺继续消耗资源或迟到写回。",
+      "lifecycle": "verified",
+      "scope_paths": [
+        "src/longtask/cli/daemon_loop.py",
+        "src/longtask/cli/runner.py",
+        "tests/integration/test_control_interrupt.py"
+      ],
+      "evidence": [
+        {
+          "kind": "integration_real_store",
+          "path": "tests/integration/test_control_interrupt.py",
+          "recorded_at": "2026-09-05",
+          "summary": "终态合同消费场景验证 running attempt 被取消、租约释放、单条 daemon 取消事件落库；既有 control/interrupt 幂等场景继续通过。"
+        }
+      ]
+    },
+    {
       "id": "daemon-process-restart-reattach",
       "statement": "真实 daemon 进程 stop/start 边界保持外部 subprocess 连续性：第二个 daemon 通过持久句柄 reattach 原 attempt，租约仍由原 attempt 持有，且不会重复派发 executor。",
       "lifecycle": "verified",
