@@ -623,7 +623,7 @@ class AttemptRunner:
               AND state NOT IN ('succeeded', 'failed', 'cancelled', 'stale', 'orphaned')
             ORDER BY admitted_at DESC LIMIT 1
             """,
-            (contract_id,),
+            (contract.goal_id,),
         ).fetchone()
         if existing_verifier is not None:
             return False
