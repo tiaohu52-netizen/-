@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import pytest
 
+from lhgp.acceptance.evaluator import _command_timeout_seconds
 from longtask.acceptance.checks import (
     CheckKind,
     CheckSpec,
     RepairBrief,
 )
-from lhgp.acceptance.evaluator import _command_timeout_seconds
 from longtask.acceptance.evaluator import evaluate_check
 from longtask.contracts.acceptance import Acceptance
 
