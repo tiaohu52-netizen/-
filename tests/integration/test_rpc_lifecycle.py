@@ -1025,7 +1025,12 @@ def test_contract_get_exposes_isolated_decision_history(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize(
     ("field", "value"),
-    [("decision_limit", 201), ("attempt_limit", 101), ("decision_limit", 0)],
+    [
+        ("decision_limit", 201),
+        ("attempt_limit", 101),
+        ("decision_limit", 0),
+        ("attempt_limit", True),
+    ],
 )
 def test_contract_get_rejects_history_limit_out_of_range(
     tmp_path: Path, field: str, value: int
