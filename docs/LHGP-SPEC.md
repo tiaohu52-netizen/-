@@ -636,6 +636,35 @@ executor candidate
 
 `Goal satisfied` 的唯一合法推导是：当前 contract revision 的所有 mandatory checks 已有未过期 evidence，并由允许的验收路径产生 `acceptance.passed` 事件。
 
+### 12.4 验收证据通道与裁决合成
+
+verifier 报告验收结果的通道有两条，按 harness 能力选择：
+
+1. **RPC `attempt/write-back`**（会话型 harness）：verifier 在会话内调用
+   协议 RPC，终态必须携带 evidence 列表（每条 check_id/outcome/source）。
+2. **stdout 判定块**（一次性 CLI harness）：headless CLI verifier 无法调
+   RPC——task_prompt MUST 指示其在输出末尾写一个机器可读判定块：
+
+   ````
+   ```lhgp-verdict
+   {"verdict": "succeeded", "checks": [{"check_id": "file-exists:x.py", "outcome": "pass", "source": "ws/x.py"}]}
+   ```
+   ````
+
+   运行时解析最后一个 `lhgp-verdict` 块；缺失或非法 JSON 时该通道视为
+   无证据（不猜、不静默兜底）。
+
+**裁决合成规则**（确定性评估 × 模型观察，逐 check）：
+
+- 协议确定性评估产出 `pass`/`fail` 时，**确定性结果优先**——模型观察
+  不得覆盖机器可复现的证据（防 verifier 橡皮图章）；冲突如实记录进
+  evidence 的 `model_outcome` 字段供审计。
+- 协议确定性评估产出 `undetermined`（如命令在守护进程环境不可执行）
+  时，模型观察的显式 `pass`/`fail` **填补**该 check 的裁决——模型
+  verifier 真实执行过核验命令（observable 证据，§12.1），其结论强于
+  「无法判定」。
+- 双方均无显式结果 → `undetermined`，走人工仲裁（§12.3）。
+
 ---
 
 ## 13. 权威存储与事件模型

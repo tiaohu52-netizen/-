@@ -21,6 +21,7 @@ from typing import Any
 
 from longtask.acceptance.checks import CheckSpec
 from longtask.acceptance.evaluator import evaluate_check
+from longtask.acceptance.verdict import merge_evidence, parse_verdict_block
 from longtask.adapters.base import (
     AttemptInput,
     ExecutorAdapter,
@@ -374,10 +375,22 @@ class AttemptRunner:
         try:
             collected = adapter.collect(attempt_id)
             payload["returncode"] = collected.get("returncode")
+            full_stdout = str(collected.get("stdout") or "")
             payload["stdout_tail"] = _tail_text(collected.get("stdout"))
             payload["stderr_tail"] = _tail_text(collected.get("stderr"))
-            # verifier 必须通过结构化 write-back 提供验收结果；仅凭进程
-            # 退出码无法证明 acceptance.checks 已被逐条核验。
+            # SPEC §12.4 通道 2：一次性 CLI verifier 无法调 write-back RPC，
+            # 约定在 stdout 末尾写 lhgp-verdict 判定块；无块/非法 → None
+            # （不猜、不静默兜底）。
+            model_verdict = (
+                parse_verdict_block(full_stdout) if role == AttemptRole.VERIFIER.value else None
+            )
+            payload["model_verdict"] = (
+                {"verdict": model_verdict.verdict, "checks": list(model_verdict.checks)}
+                if model_verdict is not None
+                else None
+            )
+            # verifier 必须通过结构化 write-back 或 stdout 判定块提供验收
+            # 结果；仅凭进程退出码无法证明 acceptance.checks 已被核验。
             verifier_written_back = any(
                 event.attempt_id == attempt_id
                 and event.event_type in (EventType.ATTEMPT_SUCCEEDED, EventType.ATTEMPT_FAILED)
@@ -391,6 +404,7 @@ class AttemptRunner:
                 role == AttemptRole.VERIFIER.value
                 and not collected.get("finished_by_event")
                 and not verifier_written_back
+                and model_verdict is None
             ):
                 payload["state"] = AttemptState.FAILED.value
                 payload["error_class"] = "verification-evidence-missing"
@@ -409,14 +423,20 @@ class AttemptRunner:
                 if typed_checks:
                     workspace = contract_workspace(contract.draft) if contract is not None else ""
                     if workspace:
+                        # SPEC §12.4 裁决合成：确定性评估优先；协议
+                        # undetermined 时模型显式 pass/fail 填补；冲突记录
+                        # model_outcome 供审计。
                         results = [
                             evaluate_check(check, workspace_root=Path(workspace))
                             for check in typed_checks
                         ]
-                        payload["evidence"] = [result.to_evidence() for result in results]
+                        payload["evidence"] = [
+                            merge_evidence(result.to_evidence(), model_verdict)
+                            for result in results
+                        ]
                         mandatory_failed = any(
-                            result.outcome != "pass"
-                            for check, result in zip(typed_checks, results, strict=True)
+                            str(entry["outcome"]) != "pass"
+                            for check, entry in zip(typed_checks, payload["evidence"], strict=True)
                             if check.mandatory
                         )
                         payload["state"] = (
@@ -756,11 +776,28 @@ class AttemptRunner:
         from longtask.persistence.context import handover_prompt_addendum
 
         base = build_attempt_input(self._root, self._conn, contract, attempt_id, now)
-        checks_text = "\n".join(f"- {c}" for c in contract.draft.acceptance.checks)
+        checks_lines = []
+        for c in contract.draft.acceptance.checks:
+            if isinstance(c, CheckSpec):
+                checks_lines.append(f"- {c.kind.value}:{c.target}")
+            else:
+                checks_lines.append(f"- {c}")
+        checks_text = "\n".join(checks_lines)
+        # SPEC §12.4 通道 2：一次性 CLI verifier 无法调 attempt/write-back
+        # RPC，约定在 stdout 末尾写机器可读判定块，运行时解析合成裁决。
         verifier_prompt = (
-            "你是 verifier（DESIGN §5.2）：独立核对以下验收条款，"
-            "逐条核对并在 attempt/write-back 报告每条 pass/fail/undeterminable + 证据指针；"
-            "全部 pass 才声明 succeeded，否则 failed。\n\n"
+            "你是 verifier（DESIGN §5.2）：独立核对以下验收条款。\n"
+            "逐条真实核验（可读工作区文件、可运行验证命令），然后在输出末尾"
+            "写一个判定块（ fenced code block，语言标记 lhgp-verdict），"
+            "格式如下（check_id 用下面列出的原样标识，outcome 取 "
+            "pass/fail/undetermined，source 写你核验依据的文件或命令）：\n"
+            "```lhgp-verdict\n"
+            '{"verdict": "succeeded", "checks": ['
+            '{"check_id": "file-exists:x.py", "outcome": "pass", "source": "ws/x.py"}'
+            "]}\n"
+            "```\n"
+            "全部 mandatory checks 都 pass 时 verdict 才是 succeeded，否则 "
+            "failed。你的核对结论以该判定块为准——没有判定块视为无证据。\n\n"
             f"## acceptance.checks\n{checks_text}\n\n"
             f"## 标准\n{contract.draft.acceptance.standard}"
         )
