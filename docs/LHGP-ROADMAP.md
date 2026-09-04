@@ -66,7 +66,7 @@ daemon + 本机认证 Unix-socket RPC、Goal Capsule/handover、L0/L1 唤醒、
 ### 2.2 发布审计快照（2026-09-05）
 
 当前 Developer Preview 发布基线已完成一次全量复验：质量门 7/7 全部通过，620
-个测试通过，覆盖率 82.00%；claims 43 条（42 条已验证）全部可追溯，完整套件无 ResourceWarning；wheel 与 sdist 的 companion metadata
+个测试通过，覆盖率 82.01%；claims 43 条（42 条已验证）全部可追溯，完整套件无 ResourceWarning；wheel 与 sdist 的 companion metadata
 一致；官方插件 manifest validator 与两个 Skill validator 均通过。最新可复验
 证据见 [`docs/evidence/P6-fresh-machine-smoke-2026-09-05.md`](evidence/P6-fresh-machine-smoke-2026-09-05.md)
 以及 `quality/claims.json` 的 `pinned_sha`。
