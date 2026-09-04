@@ -594,7 +594,10 @@ TOOLS: dict[
     "longtask_list_contracts": (
         tool_list_contracts,
         {
-            "description": "按状态过滤列出合同。",
+            "description": (
+                "按状态过滤列出合同；每项包含最新 deadline_snapshot，模型可先"
+                "据此筛选风险目标，再决定是否读取完整合同历史。"
+            ),
             "inputSchema": {
                 "type": "object",
                 "properties": {
