@@ -57,6 +57,11 @@ class TestParseEnvelope:
         with pytest.raises(RpcError, match="non-empty"):
             parse_envelope(make_raw(request_id=""))
 
+    @pytest.mark.parametrize("params", [None, [], "not-an-object"])
+    def test_non_object_params_rejected(self, params: object) -> None:
+        with pytest.raises(RpcError, match="params must be an object"):
+            parse_envelope(make_raw(params=params))
+
 
 class TestRoute:
     def test_unimplemented_method_reports_state_forbidden(self) -> None:

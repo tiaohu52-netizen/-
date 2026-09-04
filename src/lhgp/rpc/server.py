@@ -46,9 +46,10 @@ def parse_envelope(raw: dict[str, Any]) -> RequestEnvelope:
         )
     if not request_id or not client_id:
         raise RpcError(ErrorCode.VALIDATION_FAILED, "request_id and client_id must be non-empty")
-    return RequestEnvelope(
-        method, request_id, client_id, protocol_version, dict(raw.get("params", {}))
-    )
+    raw_params = raw.get("params", {})
+    if not isinstance(raw_params, dict):
+        raise RpcError(ErrorCode.VALIDATION_FAILED, "params must be an object")
+    return RequestEnvelope(method, request_id, client_id, protocol_version, dict(raw_params))
 
 
 def route(
