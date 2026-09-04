@@ -37,6 +37,14 @@ _LEASE_COLS = (
 _LEASE_COLS_LIST = ", ".join(_LEASE_COLS)
 
 
+def _goal_id_for_contract(conn: sqlite3.Connection, contract_id: str) -> str:
+    """Return the persistent Goal identity used by lease audit events."""
+    row = conn.execute(
+        "SELECT goal_id FROM contracts WHERE contract_id = ?", (contract_id,)
+    ).fetchone()
+    return str(row[0]) if row and row[0] else contract_id
+
+
 def get_lease(
     conn: sqlite3.Connection,
     contract_id: str,
@@ -149,7 +157,7 @@ def acquire_lease(
             request_id=request_id,
             actor=actor,
             schema_version=schema_version,
-            goal_id=contract_id,
+            goal_id=_goal_id_for_contract(conn, contract_id),
             contract_revision=contract_revision,
             role=role or actor,
             payload_schema_version=schema_version,
@@ -255,7 +263,7 @@ def reclaim_lease(
             request_id=request_id,
             actor=actor,
             schema_version=schema_version,
-            goal_id=contract_id,
+            goal_id=_goal_id_for_contract(conn, contract_id),
             contract_revision=contract_revision,
             role=role or actor,
             payload_schema_version=schema_version,
@@ -350,7 +358,7 @@ def renew_lease(
             request_id=request_id,
             actor=actor,
             schema_version=schema_version,
-            goal_id=contract_id,
+            goal_id=_goal_id_for_contract(conn, contract_id),
             contract_revision=contract_revision,
             role=role or actor,
             payload_schema_version=schema_version,
@@ -429,7 +437,7 @@ def release_lease(
             request_id=request_id,
             actor=actor,
             schema_version=schema_version,
-            goal_id=contract_id,
+            goal_id=_goal_id_for_contract(conn, contract_id),
             contract_revision=contract_revision,
             role=role or actor,
             payload_schema_version=schema_version,

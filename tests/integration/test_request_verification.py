@@ -259,6 +259,12 @@ def test_daemon_request_idempotence_uses_bound_goal_identity(tmp_path: Path) -> 
             ("goal-long-lived",),
         ).fetchone()[0]
         assert count == 1
+        lease_events = [
+            event
+            for event in get_events(conn, contract_id=cid)
+            if event.event_type == EventType.LEASE_ACQUIRED
+        ]
+        assert lease_events and all(event.goal_id == "goal-long-lived" for event in lease_events)
     finally:
         conn.close()
 
