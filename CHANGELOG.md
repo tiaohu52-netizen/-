@@ -51,6 +51,8 @@ follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
   making request, consumption, and verifier-start state directly model-readable.
 - `lhgp doctor` now checks launch executables for enabled registry entries and
   reports actionable missing-CLI diagnostics before dispatch.
+- MCP now exposes read-only `lhgp_doctor` / `longtask_doctor` aliases so models
+  can run the same preflight diagnostics before selecting an executor.
 
 ## [0.1.0a0] - 2026-09-01
 

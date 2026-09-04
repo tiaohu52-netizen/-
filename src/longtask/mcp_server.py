@@ -31,6 +31,7 @@ from typing import Any
 
 from longtask import PROTOCOL_VERSION, __version__
 from longtask.adapters.registry import ExecutorRegistry
+from longtask.cli.doctor import run_doctor
 from longtask.cli.paths import default_data_root
 from longtask.persistence.notifications import list_notifications
 from longtask.persistence.store import (
@@ -58,6 +59,20 @@ def tool_health(_args: dict[str, Any], _ctx: dict[str, Any]) -> dict[str, Any]:
         "implementation_version": __version__,
         "status": "ok",
         "tools": TOOL_NAMES,
+    }
+
+
+def tool_doctor(_args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
+    """Run local preflight diagnostics without changing contract state."""
+    report = run_doctor(ctx["root"])
+    return {
+        "all_ok": report.all_ok,
+        "protocol_version": report.protocol_version,
+        "package_version": report.package_version,
+        "checks": [
+            {"name": check.name, "ok": check.ok, "message": check.message, "details": check.details}
+            for check in report.checks
+        ],
     }
 
 
@@ -432,6 +447,13 @@ TOOLS: dict[
             "inputSchema": {"type": "object", "properties": {}},
         },
     ),
+    "longtask_doctor": (
+        tool_doctor,
+        {
+            "description": "运行本机只读诊断，检查数据库、注册表和已启用 CLI 是否可启动。",
+            "inputSchema": {"type": "object", "properties": {}},
+        },
+    ),
     "longtask_list_executors": (
         tool_list_executors,
         {
@@ -690,6 +712,7 @@ TOOLS: dict[
 # lhgp_*，避免升级时破坏已有 Agent 的工具缓存。
 _RENAMED_TOOLS = {
     "lhgp_health": "longtask_health",
+    "lhgp_doctor": "longtask_doctor",
     "lhgp_list_executors": "longtask_list_executors",
     "lhgp_prepare_goal": "longtask_prepare_contract",
     "lhgp_approve_goal": "longtask_approve_contract",
@@ -794,10 +817,12 @@ _DESTRUCTIVE_TOOLS = {
 }
 _READ_ONLY_TOOLS = {
     "longtask_health",
+    "longtask_doctor",
     "longtask_list_executors",
     "longtask_get_contract",
     "longtask_list_contracts",
     "lhgp_health",
+    "lhgp_doctor",
     "lhgp_list_executors",
     "lhgp_get_goal",
     "lhgp_list_goals",
