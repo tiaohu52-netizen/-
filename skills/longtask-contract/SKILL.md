@@ -161,6 +161,11 @@ DESIGN §5.2 强调"自己考自己不算数"——协议会派一个 verifier �
 
 ### 4.3 hard_constraints：声明而非禁止
 
+typed `acceptance.checks[].kind` 使用线协议枚举：`file-exists`、
+`file-content-matches`、`command-exit-zero`、`artifact-present`、
+`structure-valid`、`observable`、`user-assertion`。设计文档中的抽象分类名
+（如 `artifact_exists`、`command`、`schema`）不能直接作为 kind。
+
 `hard_constraints` 是适配器**翻译前的声明**。翻译不了 = 拒接。所以写
 **可被适配器翻译的能力**：
 

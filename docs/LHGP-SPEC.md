@@ -602,15 +602,26 @@ MVP 默认串行接力。只有计划显式给出互斥分区、写入范围、�
 
 ### 12.1 检查类型
 
-验收 check SHOULD 尽量使用可重复验证的类型：
+验收 check SHOULD 尽量使用可重复验证的类型。线协议中的 `kind` 是以下七个
+固定枚举值（概念上的 artifact/schema/command 等分类映射到这些值；模型和
+客户端 MUST 使用线协议值，不得发送下划线别名）：
 
-- `artifact_exists` / `artifact_hash`；
-- `schema` / `structured_query`；
-- `command`，使用结构化 argv 与明确退出码；
-- `diff_policy` / `path_policy`；
-- `model_review`，必须带 rubric 与证据引用；
-- `human_review`；
-- `composite`，表达 all/any/threshold。
+| `kind` | 语义 | 参考实现的自动判定 |
+|---|---|---|
+| `file-exists` | 交付文件存在 | 确定性 pass/fail |
+| `file-content-matches` | 文件包含文本、正则或 SHA-256 | 确定性 pass/fail/undetermined |
+| `command-exit-zero` | 在 workspace 中以结构化 argv 执行命令并要求退出码 0 | pass/fail/undetermined |
+| `artifact-present` | 声明的产物已生成 | 确定性 pass/fail |
+| `structure-valid` | 产物结构可解析（当前参考实现支持 JSON） | pass/fail/undetermined |
+| `observable` | 需要 verifier 观察的外部事实 | 由 verifier/人工仲裁 |
+| `user-assertion` | 需要用户确认的事实 | 由用户仲裁 |
+
+`artifact_exists` / `artifact_hash`、`schema` / `structured_query`、
+`diff_policy` / `path_policy`、`model_review`、`human_review` 和
+`composite` 是设计层概念；它们尚未作为额外 wire `kind` 发布。需要这些
+语义时，合同应使用上表中最接近的 typed check，或使用 `observable` 并由
+verifier 提供结构化证据。组合 all/any/threshold 由合同的多个 checks 与
+mandatory/optional 规则表达，而不是自行发明新的 kind。
 
 自然语言 verifier 判断是可用证据，但置信等级低于确定性 check。合同应明确哪些 check 是 mandatory，哪些允许 undetermined。
 
