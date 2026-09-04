@@ -60,6 +60,15 @@ class TestCheckSpec:
                 }
             )
 
+    @pytest.mark.parametrize("target", [True, "", "   ", None])
+    def test_from_dict_rejects_invalid_target(self, target: object) -> None:
+        with pytest.raises(TypeError, match="target must be a non-empty string"):
+            CheckSpec.from_dict({"kind": "file-exists", "target": target})
+
+    def test_from_dict_rejects_non_object_args(self) -> None:
+        with pytest.raises(TypeError, match="args must be an object"):
+            CheckSpec.from_dict({"kind": "file-exists", "target": "result.txt", "args": []})
+
     def test_acceptance_validates_typed_check(self) -> None:
         acceptance = Acceptance(
             standard="all artifacts",

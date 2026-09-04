@@ -110,7 +110,7 @@
     },
     {
       "id": "lhgp-spec-typed-acceptance",
-      "statement": "验收 checks 分为 7 种 typed checks（SPEC §12.1），每条 check 关联 evidence 实体；mandatory / optional 分类；verifier 必须独立于 executor（不同 attempt / 不同 session / 优先不同 model family）；target 一律相对 workspace_root 解析；command check 在守护进程环境执行（shell=False、cwd=workspace_root、继承 daemon PATH），解释器缺失产出 undetermined 并给可行动指引（区别于 fail）；属 P5 范围。",
+      "statement": "验收 checks 分为 7 种 typed checks（SPEC §12.1），每条 check 关联 evidence 实体；mandatory / optional 分类；typed target 必须是非空字符串且 args 必须为对象；verifier 必须独立于 executor（不同 attempt / 不同 session / 优先不同 model family）；target 一律相对 workspace_root 解析；command check 在守护进程环境执行（shell=False、cwd=workspace_root、继承 daemon PATH），解释器缺失产出 undetermined 并给可行动指引（区别于 fail）；属 P5 范围。",
       "lifecycle": "verified",
       "scope_paths": [
         "docs/LHGP-SPEC.md",
@@ -134,7 +134,7 @@
           "kind": "source_static",
           "path": "tests/unit/test_p5_acceptance.py",
           "recorded_at": "2026-09-05",
-          "summary": "CheckSpec 的 mandatory 字段只接受 JSON boolean；字符串等错误类型明确拒绝，避免 optional check 被隐式升级为 mandatory。"
+          "summary": "CheckSpec 的 mandatory 字段只接受 JSON boolean；target 必须为非空字符串、args 必须为对象；字符串等错误类型明确拒绝，避免 optional check 被隐式升级为 mandatory 或生成不可验证目标。"
         }
       ]
     },
