@@ -45,6 +45,7 @@ _TRUSTED_CLIENT_ACTORS: dict[str, str] = {
     "executor": "executor",
     "verifier": "verifier",
     "daemon": "daemon",
+    "daemon-wakeup": "daemon",
     "system": "system",
 }
 

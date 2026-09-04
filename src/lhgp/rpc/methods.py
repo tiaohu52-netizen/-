@@ -30,6 +30,7 @@ class Method(StrEnum):
     CONTROL_STEER = "control/steer"
     CONTROL_INTERRUPT = "control/interrupt"
     CONTROL_SPAWN = "control/spawn"
+    DAEMON_WAKE = "daemon/wake"
     LEASE_RENEW = "lease/renew"
     LEASE_RELEASE = "lease/release"
     GOAL_PREPARE = "goal/prepare"

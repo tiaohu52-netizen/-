@@ -738,6 +738,9 @@ MUST NOT 按 daemon tick 重复写入；该层恢复后再次失效时 SHOULD �
 较晚的 Deadline 安全边距不得遮蔽更早的决策点；否则实现不能声称对
 `next_decision_at` 提供唤醒对齐。若该最早时刻已在过去，目标 MUST 钳制为
 当前时刻，表示立即重算，不得把过去时间直接交给平台调度器。
+参考实现的 Windows L1 端口使用一次性 Task Scheduler 任务；任务动作只能
+调用本机认证的 `daemon/wake` RPC，唤醒信号写入 `wakeup/rtc-fired` 后由
+daemon 下一轮消费。计划任务不得直接读取或修改合同状态。
 
 ### 13.2 事件族
 

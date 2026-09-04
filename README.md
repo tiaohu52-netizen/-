@@ -112,7 +112,7 @@ path and the pinned commit for every claim.
 | Executor registry, capability matching, cost-priority dispatch | Verified | `executor-registry-matching` |
 | File projections + handover.md schema | Verified | `file-projections-and-handover` |
 | CLI + daemon control plane + dry-run | Verified | `cli-and-daemon-control-plane` |
-| Strict-deadline layered wakeup (L0/L1 done; L2/L3 designed, not deployed) | Accepted debt (review by 2026-12-01) | `strict-deadline-wakeup-design` |
+| Strict-deadline layered wakeup (L0/L1 local adapter done; L2/L3 designed, not deployed) | Accepted debt (review by 2026-12-01) | `strict-deadline-wakeup-design` |
 | MCP server + model-facing skill (core tools, LHGP aliases, contract/Goal reads, decision/attempt/verification history, doctor preflight, audit, and control extensions) | Verified | `mcp-server-and-skill` |
 | Ephemeral context + cross-checking verifier | Verified | `ephemeral-context-and-verifier` |
 | User-triggered verification without re-dispatching an executor | Verified | `ephemeral-context-and-verifier` |

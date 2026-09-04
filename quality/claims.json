@@ -388,7 +388,9 @@
       "lifecycle": "accepted_debt",
       "scope_paths": [
         "src/longtask/scheduler/wakeup.py",
+        "src/lhgp/rpc/handlers/protocol.py",
         "tests/unit/test_wakeup.py",
+        "tests/unit/test_daemon_wakeup_rpc.py",
         "docs/decisions/"
       ],
       "evidence": [
@@ -396,7 +398,7 @@
           "kind": "focused_test",
           "path": "tests/unit/test_wakeup.py",
           "recorded_at": "2026-09-01",
-          "summary": "11 个场景：guard_needed 四路判定（活租约/u>=1.0/越 Deadline/无需守卫）、SleepGuard 持有释放即事件与 acquire 失败降级、RtcAlarm 注册时刻 max(next_wakeup, deadline-margin) 与终态注销、端口不可用降级、事件词汇与 ADR-0002 一致。"
+          "summary": "覆盖 L0 判定与失败降级、Windows Task Scheduler argv/分钟取整/权限失败、L1 取最早决策点、过去时刻立即唤醒、一次性 fired 重新登记、终态注销、端口不可用降级，以及 daemon/wake RPC 的认证、合同校验与 wakeup/rtc-fired 审计。"
         }
       ],
       "notes": "L2/L3 未部署：strict_deadline=notify_only/notify_and_wake 的对应能力如实记 wakeup/degraded，不假装 strict。写前上传最小字段与 scoped token（仅 notify+WoL）在 L2/L3 部署时补 conformance 场景后收口。",

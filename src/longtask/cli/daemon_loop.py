@@ -14,6 +14,7 @@ import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
+from queue import Empty, SimpleQueue
 from typing import Any
 
 from longtask.adapters.registry import ExecutorRegistry
@@ -39,6 +40,7 @@ from longtask.persistence.store import (
     list_contracts,
 )
 from longtask.promoter.reconcile import reconcile_attempts
+from longtask.rpc.methods import Method
 from longtask.rpc.server import RequestEnvelope, parse_envelope, route
 from longtask.rpc.transport import serve_unix_socket
 from longtask.scheduler.wakeup import (
@@ -78,6 +80,8 @@ def run_daemon_loop(
     conn = connect(StoreConfig(db_path=root / "state.db"))
     ensure_schema(conn)
     rpc_stop = threading.Event()
+    wake_event = threading.Event()
+    fired_tasks: SimpleQueue[str] = SimpleQueue()
     rpc_thread: threading.Thread | None = None
     token_path = root / "daemon.token"
     if token_path.is_file():
@@ -95,12 +99,18 @@ def run_daemon_loop(
                 rpc_conn = connect(StoreConfig(db_path=root / "state.db"))
                 try:
                     ensure_schema(rpc_conn)
-                    return route(
+                    result = route(
                         envelope,
                         conn=rpc_conn,
                         now=clock(),
                         registry=ExecutorRegistry.load_from_file(root / REGISTRY_FILE),
                     )
+                    if envelope.method is Method.DAEMON_WAKE and result.get("ok"):
+                        task_id = result.get("result", {}).get("task_id")
+                        if isinstance(task_id, str):
+                            fired_tasks.put(task_id)
+                            wake_event.set()
+                    return result
                 finally:
                     rpc_conn.close()
 
@@ -153,6 +163,14 @@ def run_daemon_loop(
             _consume_interrupt_requests(root, conn, runner, now_val)
             # 消费 verification/requested 请求（用户直接请求验收，§12.4）
             _consume_verification_requests(root, conn, runner, now_val)
+            # 消费由本机计划任务经 daemon/wake 投递的一次性 fired 信号；
+            # 先解除旧登记，再由本轮 tick 计算并重新 arm 下一决策点。
+            while True:
+                try:
+                    rtc_task_id = fired_tasks.get_nowait()
+                except Empty:
+                    break
+                rtc.note_fired(rtc_task_id)
             res = run_daemon_tick(root, conn, registry, now=now_val, emit_fn=emit_fn)
             if emit_fn is not None:
                 drain_notifications(
@@ -216,7 +234,13 @@ def run_daemon_loop(
                     if next_at is not None:
                         until = (next_at - now_val).total_seconds()
                         sleep_seconds = min(interval_seconds, max(0.5, until))
-                sleep_fn(sleep_seconds)
+                if sleep_fn is time.sleep:
+                    # 真实 daemon 用可被 daemon/wake 唤醒的等待；测试注入的
+                    # sleep_fn 保持原有确定性语义，不触碰线程事件。
+                    wake_event.wait(sleep_seconds)
+                    wake_event.clear()
+                else:
+                    sleep_fn(sleep_seconds)
     finally:
         rpc_stop.set()
         if rpc_thread is not None:
