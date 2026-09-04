@@ -484,7 +484,10 @@ class ExecutorRegistry:
             snapshot.append(
                 {
                     "executor_id": entry.id,
-                    "enabled": True,
+                    # Admission is a fact snapshot: preserve the user's
+                    # explicit registry switch instead of claiming every
+                    # executor is globally enabled.
+                    "enabled": entry.enabled,
                     "concurrency_available": running < max_concurrent,
                     "capability_satisfied": capability_satisfied,
                     "constraint_enforcement_proven": enforcement != "none",

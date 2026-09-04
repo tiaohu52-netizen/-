@@ -320,6 +320,19 @@ class TestExecutorRegistry:
         assert loaded.get("dsh-1") is not None
         assert not loaded.get("dsh-1").enabled  # type: ignore[union-attr]
 
+    def test_admission_snapshot_preserves_enabled_switch(self) -> None:
+        reg = ExecutorRegistry(
+            [
+                make_entry("enabled", enabled=True),
+                make_entry("disabled", enabled=False),
+            ]
+        )
+
+        snapshot = {item["executor_id"]: item for item in reg.snapshot_for_admission()}
+
+        assert snapshot["enabled"]["enabled"] is True
+        assert snapshot["disabled"]["enabled"] is False
+
 
 class TestBuildAdapter:
     """kind → 适配器默认构造（DESIGN §12）：调度层只经公开协议，不感知具体实现。"""
