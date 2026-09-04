@@ -46,13 +46,19 @@ class CheckSpec:
     def from_dict(cls, data: dict[str, Any]) -> CheckSpec:
         if not isinstance(data, dict):
             raise TypeError("check must be an object")
+        raw_target = data.get("target")
+        if not isinstance(raw_target, str) or not raw_target.strip():
+            raise TypeError("check target must be a non-empty string")
         raw_mandatory = data.get("mandatory", True)
         if not isinstance(raw_mandatory, bool):
             raise TypeError("check mandatory must be a boolean")
+        raw_args = data.get("args", {})
+        if raw_args is not None and not isinstance(raw_args, dict):
+            raise TypeError("check args must be an object")
         return cls(
             kind=CheckKind(str(data["kind"])),
-            target=str(data["target"]),
-            args=dict(data.get("args") or {}),
+            target=raw_target,
+            args=dict(raw_args or {}),
             mandatory=raw_mandatory,
             note=str(data.get("note", "")),
         )
