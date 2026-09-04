@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import sqlite3
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from longtask.cli.tick import _completed_attempt_durations
 from longtask.forecast.model import (
     RISK_TIER_THRESHOLDS,
     Forecast,
@@ -147,3 +149,22 @@ def test_historical_finish_probability_uses_empirical_deadline_cdf() -> None:
     # 排队/启动/验收/安全开销共 4 分钟，只有 10 分钟样本能在
     # 合同剩余的执行窗口内完成；不能把 27 分钟样本误算为可交付。
     assert snapshot.forecast.p_finish == pytest.approx(1 / 3)
+
+
+def test_finish_probability_samples_exclude_failed_attempts() -> None:
+    conn = sqlite3.connect(":memory:")
+    conn.execute(
+        "CREATE TABLE attempts (goal_id TEXT, role TEXT, state TEXT, "
+        "started_at TEXT, terminal_at TEXT)"
+    )
+    conn.executemany(
+        "INSERT INTO attempts VALUES (?, 'executor', ?, ?, ?)",
+        [
+            ("goal-a", "succeeded", "2026-09-03T12:00:00+00:00", "2026-09-03T12:10:00+00:00"),
+            ("goal-a", "failed", "2026-09-03T12:00:00+00:00", "2026-09-03T12:01:00+00:00"),
+        ],
+    )
+    conn.commit()
+    assert _completed_attempt_durations(conn, "goal-a") == [10.0, 1.0]
+    assert _completed_attempt_durations(conn, "goal-a", successful_only=True) == [10.0]
+    conn.close()

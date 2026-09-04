@@ -272,6 +272,7 @@ def run_daemon_tick(
         # 但仍给出保守 p50/p90、slack 和下一决策点，供 UI/恢复流程使用。
         remaining_minutes = remaining_hours * 60.0
         historical_minutes = _completed_attempt_durations(conn, c.goal_id)
+        successful_minutes = _completed_attempt_durations(conn, c.goal_id, successful_only=True)
         if historical_minutes:
             ordered = sorted(historical_minutes)
             p50_index = (len(ordered) - 1) // 2
@@ -297,8 +298,8 @@ def run_daemon_tick(
             computed_at=now,
             due_at=c.draft.deadline_at,
             next_decision_at=next_at,
-            sample_count=len(historical_minutes),
-            sample_durations_minutes=historical_minutes,
+            sample_count=len(successful_minutes),
+            sample_durations_minutes=successful_minutes,
         )
         snapshot_payload = snapshot.to_dict()
         previous_snapshot: dict[str, Any] | None = None
@@ -642,15 +643,38 @@ def _safe_json(text: str) -> dict[str, Any]:
     return {}
 
 
-def _completed_attempt_durations(conn: sqlite3.Connection, goal_id: str) -> list[float]:
-    """Return trusted completed executor durations in minutes for this Goal."""
-    rows = conn.execute(
-        "SELECT started_at, terminal_at FROM attempts "
-        "WHERE goal_id = ? AND role = 'executor' AND state IN "
-        "('succeeded', 'failed', 'cancelled', 'stale', 'orphaned') "
-        "AND started_at IS NOT NULL AND terminal_at IS NOT NULL",
-        (goal_id,),
-    ).fetchall()
+def _completed_attempt_durations(
+    conn: sqlite3.Connection,
+    goal_id: str,
+    *,
+    successful_only: bool = False,
+) -> list[float]:
+    """Return ended executor durations, optionally restricted to successes."""
+    state_values = (
+        ("succeeded",)
+        if successful_only
+        else (
+            "succeeded",
+            "failed",
+            "cancelled",
+            "stale",
+            "orphaned",
+        )
+    )
+    if successful_only:
+        query = (
+            "SELECT started_at, terminal_at FROM attempts "
+            "WHERE goal_id = ? AND role = 'executor' AND state IN (?) "
+            "AND started_at IS NOT NULL AND terminal_at IS NOT NULL"
+        )
+    else:
+        query = (
+            "SELECT started_at, terminal_at FROM attempts "
+            "WHERE goal_id = ? AND role = 'executor' "
+            "AND state IN (?, ?, ?, ?, ?) "
+            "AND started_at IS NOT NULL AND terminal_at IS NOT NULL"
+        )
+    rows = conn.execute(query, (goal_id, *state_values)).fetchall()
     durations: list[float] = []
     for started_at, terminal_at in rows:
         try:
