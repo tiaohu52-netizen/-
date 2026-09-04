@@ -35,6 +35,12 @@ description: 将需要跨会话、跨 Agent 推进的用户目标转成 LHGP 合
 6. （等待 daemon 派 attempt；轮询 get_contract 或订阅 events）
 7. `list_contracts` — 复盘历史 + 审计事件链
 
+如果执行预算已经耗尽、但工作区可能已经满足验收，不要重新起草或继续派
+executor；调用 `lhgp_request_verification`（兼容名
+`longtask_request_verification`）请求只验收当前交付物。它写入
+`verification/requested`，由 daemon 下一次 tick 幂等派生独立 verifier；终态、
+已有 verifier 运行中或验证预算耗尽时必须接受协议拒接并按提示升级。
+
 ## 运行中审计与控制（扩展工具）
 
 - `lhgp_notifications` 是只读通知 outbox 视图；优先按 `goal_id` 或
