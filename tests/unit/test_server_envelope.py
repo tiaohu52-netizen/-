@@ -57,6 +57,11 @@ class TestParseEnvelope:
         with pytest.raises(RpcError, match="non-empty"):
             parse_envelope(make_raw(request_id=""))
 
+    @pytest.mark.parametrize("field", ["request_id", "client_id"])
+    def test_non_string_identifiers_rejected(self, field: str) -> None:
+        with pytest.raises(RpcError, match="must be strings"):
+            parse_envelope(make_raw(**{field: 7}))
+
     @pytest.mark.parametrize("params", [None, [], "not-an-object"])
     def test_non_object_params_rejected(self, params: object) -> None:
         with pytest.raises(RpcError, match="params must be an object"):
