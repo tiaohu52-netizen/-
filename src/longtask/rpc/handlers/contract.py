@@ -178,8 +178,11 @@ def handle_contract_get(
             code=ErrorCode.VALIDATION_FAILED,
             message="decision_limit must be an integer",
         ) from exc
-    if decision_limit <= 0:
-        raise RpcError(code=ErrorCode.VALIDATION_FAILED, message="decision_limit must be positive")
+    if not 1 <= decision_limit <= 200:
+        raise RpcError(
+            code=ErrorCode.VALIDATION_FAILED,
+            message="decision_limit must be between 1 and 200",
+        )
     raw_attempt_limit = envelope.params.get("attempt_limit", 20)
     try:
         attempt_limit = int(raw_attempt_limit)
@@ -188,8 +191,11 @@ def handle_contract_get(
             code=ErrorCode.VALIDATION_FAILED,
             message="attempt_limit must be an integer",
         ) from exc
-    if attempt_limit <= 0:
-        raise RpcError(code=ErrorCode.VALIDATION_FAILED, message="attempt_limit must be positive")
+    if not 1 <= attempt_limit <= 100:
+        raise RpcError(
+            code=ErrorCode.VALIDATION_FAILED,
+            message="attempt_limit must be between 1 and 100",
+        )
     result["decision_history"] = list_decisions(
         conn,
         contract_id=contract_id,

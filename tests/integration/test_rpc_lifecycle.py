@@ -1021,3 +1021,37 @@ def test_contract_get_exposes_isolated_decision_history(tmp_path: Path) -> None:
         assert attempts[0]["role"] == "verifier"
     finally:
         conn.close()
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("decision_limit", 201), ("attempt_limit", 101), ("decision_limit", 0)],
+)
+def test_contract_get_rejects_history_limit_out_of_range(
+    tmp_path: Path, field: str, value: int
+) -> None:
+    conn = connect(setup_test_db(tmp_path))
+    try:
+        cid = "lt-20260831-limit-validation"
+        route(
+            make_env(
+                Method.CONTRACT_PREPARE,
+                "req-limit-prep",
+                {"contract_id": cid, "draft": make_valid_draft_payload()},
+            ),
+            conn=conn,
+            now=NOW,
+        )
+        with pytest.raises(RpcError) as exc:
+            route(
+                make_env(
+                    Method.CONTRACT_GET,
+                    f"req-limit-get-{field}-{value}",
+                    {"contract_id": cid, field: value},
+                ),
+                conn=conn,
+                now=NOW,
+            )
+        assert exc.value.code is ErrorCode.VALIDATION_FAILED
+    finally:
+        conn.close()
