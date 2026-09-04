@@ -24,6 +24,7 @@ RECONCILABLE_STATES: tuple[str, ...] = ("admitted", "starting", "running", "wait
 _ATTEMPT_COLS = (
     "attempt_id",
     "goal_id",
+    "contract_id",
     "contract_revision",
     "role",
     "executor_id",
@@ -72,6 +73,7 @@ class StoredAttempt:
     capability_snapshot: dict[str, Any]
     handle_registered_at: datetime | None
     orphaned_at: datetime | None
+    contract_id: str | None = None
 
     def is_terminal(self) -> bool:
         return self.state in {s.value for s in ATTEMPT_TERMINAL_STATES}
@@ -115,6 +117,7 @@ def _row_to_attempt(data: dict[str, Any]) -> StoredAttempt:
         capability_snapshot=_json_obj("capability_snapshot_json"),
         handle_registered_at=_ts("handle_registered_at"),
         orphaned_at=_ts("orphaned_at"),
+        contract_id=str(data["contract_id"]) if data.get("contract_id") else None,
     )
 
 

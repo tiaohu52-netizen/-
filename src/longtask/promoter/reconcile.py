@@ -148,7 +148,7 @@ def _reconcile_one(
     emit: Callable[[str], None] | None,
 ) -> ReconcileOutcome | None:
     """单条 attempt 的四分支判定。"""
-    cid = attempt.goal_id
+    cid = attempt.contract_id or attempt.goal_id
     lease = get_lease(conn, cid)
     holds_lease = lease is not None and lease.holder_attempt_id == attempt.attempt_id
 
@@ -297,7 +297,7 @@ def _reattach(
     emit: Callable[[str], None] | None,
 ) -> ReconcileOutcome:
     """分支 1：确认同一外部 run 仍活着 → 重新绑定并续租（§11.3）。"""
-    cid = attempt.goal_id
+    cid = attempt.contract_id or attempt.goal_id
     set_attempt_state(
         conn,
         attempt_id=attempt.attempt_id,
@@ -355,7 +355,7 @@ def _collect(
     exit_code_known=False + collect_note：pid 确认消失但无法 collect 的
     收尸后窗口（reattach 已拒绝）——如实结算 failed，不猜退出码。
     """
-    cid = attempt.goal_id
+    cid = attempt.contract_id or attempt.goal_id
     payload: dict[str, Any] = {
         "external_run_id": handle.external_run_id,
         "session_locator": handle.session_locator,

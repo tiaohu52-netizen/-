@@ -222,10 +222,11 @@ def test_daemon_consumes_request_and_dispatches_verifier(tmp_path: Path) -> None
         _consume_verification_requests(root, conn, runner, NOW + timedelta(seconds=1))
 
         verifiers = conn.execute(
-            "SELECT attempt_id, executor_id FROM attempts WHERE role='verifier'"
+            "SELECT attempt_id, contract_id, executor_id FROM attempts WHERE role='verifier'"
         ).fetchall()
         assert len(verifiers) == 1
-        assert verifiers[0][1] == "exec-b"  # ≠ 执行者 exec-a
+        assert verifiers[0][1] == cid
+        assert verifiers[0][2] == "exec-b"  # ≠ 执行者 exec-a
         types = [e.event_type for e in get_events(conn, contract_id=cid)]
         assert EventType.VERIFICATION_STARTED.value in types
 

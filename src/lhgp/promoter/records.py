@@ -15,6 +15,7 @@ def _record_attempt(
     conn: sqlite3.Connection,
     *,
     goal_id: str,
+    contract_id: str | None = None,
     attempt_id: str,
     contract_revision: int,
     role: str,
@@ -32,10 +33,10 @@ def _record_attempt(
     payload_json = json.dumps(payload or {}, ensure_ascii=False)
     conn.execute(
         """INSERT INTO attempts (
-        attempt_id, goal_id, contract_revision, role, executor_id, model_id, state,
+        attempt_id, goal_id, contract_id, contract_revision, role, executor_id, model_id, state,
         lease_generation, partition_id, admitted_at, started_at, terminal_at,
         return_code, error_class, payload_json, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT (attempt_id) DO UPDATE SET state=excluded.state,
       lease_generation=excluded.lease_generation,
       model_id=COALESCE(excluded.model_id, attempts.model_id),
@@ -46,6 +47,7 @@ def _record_attempt(
         (
             attempt_id,
             goal_id,
+            contract_id,
             contract_revision,
             role,
             executor_id,
