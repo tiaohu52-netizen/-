@@ -74,6 +74,8 @@ contract blocked(need-user)                 ← 如实升级，不假装
 ```bash
 python .dogfood/dogfood_v5.py setup    # 建 Goal + 3 阶段 + 绑定合同
 python .dogfood/dogfood_v5.py stage1   # 真实 daemon + 断裂①注入 + 恢复观察
+python .dogfood/dogfood_v5.py stage1-verify  # 验收 stage-1 并记录修复/重验结果
+python .dogfood/dogfood_v5.py build-registry  # 仅重建本地执行器注册表
 python .dogfood/dogfood_v5.py status   # 状态检查
 # 前置：.dogfood/dsh-home（minimax key）+ .dogfood/dsh-home-verifier
 #（deepseek key，复制后删 profiles/node_modules 让 dsh 重建 symlink）
@@ -84,7 +86,7 @@ python .dogfood/dogfood_v5.py status   # 状态检查
 - `events.jsonl`：2532 个事件完整审计流（含 lease 心跳）；
 - `final_state.json`：收尾时 attempts/contracts/goal 快照；
 - `charfreq.py` / `test_charfreq.py`：MiniMax 真实交付物；
-- `dogfood_v5.py`：驱动脚本（setup/stage1/status）；
+- `dogfood_v5.py`：驱动脚本（setup/build-registry/stage1/stage1-verify/status）；
 - `dsh_executor_wrap.py` / `dsh_verifier_wrap.py`：per-executor
   DSH_HOME 包装器（发现 1 的解法）。
 

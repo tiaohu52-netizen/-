@@ -16,10 +16,15 @@
   stage-2 用 kimi 接力写第二个工具 + 修复闭环
   stage-3 验证整合（daemon 重启发生在本阶段开始前）
 
+当前实现范围：stage-1 断裂①与验收修复闭环；stage-2/3 的切换 CLI 与 daemon
+重启剧本尚未实现。
+
 用法：
-  python .dogfood/dogfood_v5.py setup     # 建 Goal + 阶段计划 + 绑定合同
-  python .dogfood/dogfood_v5.py run       # 全程驱动（阶段内含断裂注入）
-  python .dogfood/dogfood_v5.py status    # 查看当前状态
+  python .dogfood/dogfood_v5.py setup          # 建 Goal + 阶段计划 + 绑定合同
+  python .dogfood/dogfood_v5.py build-registry # 重建本地执行器注册表
+  python .dogfood/dogfood_v5.py stage1         # 真实 daemon + 断裂①注入
+  python .dogfood/dogfood_v5.py stage1-verify  # 验收 stage-1
+  python .dogfood/dogfood_v5.py status         # 查看当前状态
 """
 
 from __future__ import annotations
