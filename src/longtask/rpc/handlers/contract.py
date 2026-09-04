@@ -180,6 +180,16 @@ def handle_contract_get(
         ) from exc
     if decision_limit <= 0:
         raise RpcError(code=ErrorCode.VALIDATION_FAILED, message="decision_limit must be positive")
+    raw_attempt_limit = envelope.params.get("attempt_limit", 20)
+    try:
+        attempt_limit = int(raw_attempt_limit)
+    except (TypeError, ValueError) as exc:
+        raise RpcError(
+            code=ErrorCode.VALIDATION_FAILED,
+            message="attempt_limit must be an integer",
+        ) from exc
+    if attempt_limit <= 0:
+        raise RpcError(code=ErrorCode.VALIDATION_FAILED, message="attempt_limit must be positive")
     result["decision_history"] = list_decisions(
         conn,
         contract_id=contract_id,
@@ -202,7 +212,7 @@ def handle_contract_get(
             "external_run_id": attempt.external_run_id,
             "recovery_strategy": attempt.recovery_strategy,
         }
-        for attempt in list_contract_attempts(conn, contract_id=contract_id)
+        for attempt in list_contract_attempts(conn, contract_id=contract_id, limit=attempt_limit)
     ]
     return {"ok": True, "result": result}
 

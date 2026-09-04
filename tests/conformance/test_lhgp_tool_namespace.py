@@ -89,6 +89,9 @@ def test_contract_read_schema_exposes_decision_history_limit() -> None:
     assert properties["decision_limit"]["type"] == "integer"
     assert properties["decision_limit"]["minimum"] == 1
     assert properties["decision_limit"]["maximum"] == 200
+    assert properties["attempt_limit"]["type"] == "integer"
+    assert properties["attempt_limit"]["minimum"] == 1
+    assert properties["attempt_limit"]["maximum"] == 100
 
 
 def test_canonical_aliases_reuse_the_same_handlers() -> None:

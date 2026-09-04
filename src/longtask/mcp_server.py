@@ -169,6 +169,7 @@ def tool_get_contract(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, An
             "params": {
                 "contract_id": args["contract_id"],
                 "decision_limit": args.get("decision_limit", 50),
+                "attempt_limit": args.get("attempt_limit", 20),
             },
         }
     )
@@ -549,6 +550,13 @@ TOOLS: dict[
                         "maximum": 200,
                         "default": 50,
                         "description": "返回该合同最近决策历史条数",
+                    },
+                    "attempt_limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100,
+                        "default": 20,
+                        "description": "返回该合同最近 attempt 历史条数",
                     },
                 },
             },
