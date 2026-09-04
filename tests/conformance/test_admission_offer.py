@@ -23,6 +23,7 @@ from longtask.persistence.store import (
 )
 from longtask.rpc.errors import ErrorCode, RpcError
 from longtask.rpc.handlers.goal import (
+    _build_admission_offer,
     handle_goal_advance,
     handle_goal_get,
     handle_goal_list,
@@ -364,3 +365,14 @@ def test_goal_prepare_with_registry_passes_executor_through_seven_conditions(tmp
     assert "exec-a" in eligible
     assert "exec-b" in rejected
     conn.close()
+
+
+def test_admission_rejects_string_candidate_fact() -> None:
+    """外部快照的字符串布尔值不得被 truthiness 转换为通过。"""
+    with pytest.raises(RpcError) as exc_info:
+        _build_admission_offer(
+            draft_dict=_draft_payload(),
+            registry_view=[{"executor_id": "exec-a", "enabled": "false"}],
+        )
+    assert exc_info.value.code == ErrorCode.VALIDATION_FAILED
+    assert "enabled" in exc_info.value.message
