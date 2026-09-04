@@ -195,6 +195,7 @@ class RtcAlarm:
         self._schedule = schedule
         self._safety_margin = safety_margin
         self._armed: dict[str, datetime] = {}
+        self._degraded_reported = False
 
     def refresh(
         self,
@@ -204,16 +205,22 @@ class RtcAlarm:
     ) -> tuple[str, ...]:
         """对齐 active 合同与已注册任务集；返回当前 armed 的合同 id 元组。"""
         if not self._schedule.is_available():
-            append_event(
-                conn,
-                contract_id=None,
-                event_type=EventType.WAKEUP_DEGRADED,
-                payload={"layer": "L1", "reason": "schedule port unavailable on this platform"},
-                now=now,
-                actor="daemon",
-            )
+            # 不可用状态可能持续数小时；每个 tick 重复写一条 degraded
+            # 会制造事件噪声并掩盖真正的风险。状态恢复后允许再次报告。
+            if not self._degraded_reported:
+                append_event(
+                    conn,
+                    contract_id=None,
+                    event_type=EventType.WAKEUP_DEGRADED,
+                    payload={"layer": "L1", "reason": "schedule port unavailable on this platform"},
+                    now=now,
+                    actor="daemon",
+                )
+                self._degraded_reported = True
             self._armed.clear()
             return ()
+
+        self._degraded_reported = False
 
         from longtask.contracts.schema import ContractState
 
