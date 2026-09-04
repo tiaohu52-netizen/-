@@ -148,3 +148,19 @@ class TestEvaluateCheck:
         )
         assert doubled.outcome == "fail"
         assert "artifact does not exist" in doubled.details
+
+    def test_command_timeout_is_bounded_and_reported_as_undetermined(self, tmp_path) -> None:
+        """慢验收命令不能阻塞 daemon，也不能伪造 pass/fail。"""
+        result = evaluate_check(
+            CheckSpec(
+                kind=CheckKind.COMMAND_EXIT_ZERO,
+                target="python",
+                args={
+                    "argv": ["-c", "import time; time.sleep(0.2)"],
+                    "timeout_seconds": 0.1,
+                },
+            ),
+            workspace_root=tmp_path,
+        )
+        assert result.outcome == "undetermined"
+        assert "timed out" in result.details.lower()

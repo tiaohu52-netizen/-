@@ -72,6 +72,11 @@ executor；调用 `lhgp_request_verification`（兼容名
 - **authority.executors** — 你知道哪些 CLI 可用；未列即拒（default-deny）
 - **deadline** — 给时区，ISO-8601
 
+对于 `command-exit-zero` 验收，若命令可能耗时较长，可在 check 的
+`args.timeout_seconds` 中给出更短上限。运行时还会以合同剩余 Deadline
+进一步收紧超时；超时只代表 `undetermined`，不要把它解释成通过或失败，
+应交给 verifier 判定块或用户仲裁补证据。
+
 ## 不要做
 
 - 不要把模型输出塞进 argv 或环境变量（注入防线 §14）

@@ -531,6 +531,31 @@
       ]
     },
     {
+      "id": "deadline-bounded-command-checks",
+      "statement": "typed command-exit-zero 验收不会无限阻塞 daemon：命令超时受 check 参数、60 秒硬上限和合同剩余 Deadline 三重约束，超时以 undetermined 证据交给 verifier/仲裁。",
+      "lifecycle": "verified",
+      "scope_paths": [
+        "src/lhgp/acceptance/evaluator.py",
+        "src/longtask/cli/runner.py",
+        "tests/unit/test_p5_acceptance.py",
+        "docs/LHGP-SPEC.md"
+      ],
+      "evidence": [
+        {
+          "kind": "integration_real_store",
+          "path": "tests/unit/test_p5_acceptance.py",
+          "recorded_at": "2026-09-05",
+          "summary": "慢 command-exit-zero 在短超时下返回 undetermined，未等待命令自然结束。"
+        },
+        {
+          "kind": "source_static",
+          "path": "src/longtask/cli/runner.py",
+          "recorded_at": "2026-09-05",
+          "summary": "verifier 收尾把合同剩余 Deadline 作为 evaluate_check 的运行时上限。"
+        }
+      ]
+    },
+    {
       "id": "mcp-mutation-annotations-complete",
       "statement": "所有暴露给模型的 MCP 持久状态变更工具均声明 destructiveHint=true，所有只读工具声明 readOnlyHint=true，避免宿主把合同或 Goal 变更误判为无副作用调用。",
       "lifecycle": "verified",
