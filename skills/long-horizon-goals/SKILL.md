@@ -27,15 +27,17 @@ description: 将需要跨会话、跨 Agent 推进的用户目标转成 LHGP 合
 
 ## 七步走通 MCP 工具链
 
-1. `health` — 确认 daemon 在线
-2. `list_executors` — 查可用执行器池（Codex / Claude Code / agent-cli / 任何 CLI 适配器）
-3. `prepare_contract` — 起草合同：objective / acceptance / deadline / budget / authority
-4. `approve_contract` — 用户确认后批准（drafted → active）
-5. `get_contract` — 看运行状态、当前 attempt、leasing，以及该合同隔离的
+1. `health` — 确认 MCP/daemon 在线
+2. `doctor` — 做本机只读预检，确认数据库和已启用 CLI 可启动；发现缺失命令时先
+   修环境或换候选，不要先批准合同消耗预算
+3. `list_executors` — 查可用执行器池（Codex / Claude Code / agent-cli / 任何 CLI 适配器）
+4. `prepare_contract` — 起草合同：objective / acceptance / deadline / budget / authority
+5. `approve_contract` — 用户确认后批准（drafted → active）
+6. `get_contract` — 看运行状态、当前 attempt、leasing，以及该合同隔离的
    `decision_history`（风险档、升级原因、预算余量和下一步依据）；可传
    `decision_limit` 控制决策历史条数，`attempt_limit` 控制 attempt 历史条数
-6. （等待 daemon 派 attempt；轮询 get_contract 或订阅 events）
-7. `list_contracts` — 复盘历史 + 审计事件链
+7. （等待 daemon 派 attempt；轮询 get_contract 或订阅 events）
+8. `list_contracts` — 复盘历史 + 审计事件链
 
 调用 `get_contract` 后，优先读取返回的 `verification_history`：
 `verification/requested` 表示用户已请求验收，`verification/consumed` 表示
