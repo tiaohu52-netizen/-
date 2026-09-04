@@ -113,7 +113,7 @@ path and the pinned commit for every claim.
 | File projections + handover.md schema | Verified | `file-projections-and-handover` |
 | CLI + daemon control plane + dry-run | Verified | `cli-and-daemon-control-plane` |
 | Strict-deadline layered wakeup (L0/L1 done; L2/L3 designed, not deployed) | Accepted debt (review by 2026-12-01) | `strict-deadline-wakeup-design` |
-| MCP server + model-facing skill (core tools, LHGP aliases, contract/Goal reads, decision and attempt history, audit, and control extensions) | Verified | `mcp-server-and-skill` |
+| MCP server + model-facing skill (core tools, LHGP aliases, contract/Goal reads, decision/attempt/verification history, doctor preflight, audit, and control extensions) | Verified | `mcp-server-and-skill` |
 | Ephemeral context + cross-checking verifier | Verified | `ephemeral-context-and-verifier` |
 | User-triggered verification without re-dispatching an executor | Verified | `ephemeral-context-and-verifier` |
 | Executor-side RPC (status / renew / write-back) | Verified | `executor-session-rpc` |
@@ -302,7 +302,7 @@ scripts/                  the 7-gate quality runner (local == CI)
 
 ## Help, it's not working
 
-- **First stop**: `uv run lhgp doctor`. It runs 4 sanity checks and tells you which one failed.
+- **First stop**: `uv run lhgp doctor`. It runs local sanity checks, including enabled CLI launchability, and tells you which one failed.
 - **Stuck contract**: `uv run lhgp get <id>`. Look at `state`, `blocked_reason`, and the events.
 - **Kill switch**: `uv run lhgp kill-switch --activate` halts all dispatching immediately. Re-arming is `--deactivate`.
 - **Daemon wedged**: `uv run lhgp stop`, then `start` again. State is preserved.
