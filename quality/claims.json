@@ -531,6 +531,23 @@
       ]
     },
     {
+      "id": "mcp-mutation-annotations-complete",
+      "statement": "所有暴露给模型的 MCP 持久状态变更工具均声明 destructiveHint=true，所有只读工具声明 readOnlyHint=true，避免宿主把合同或 Goal 变更误判为无副作用调用。",
+      "lifecycle": "verified",
+      "scope_paths": [
+        "src/longtask/mcp_server.py",
+        "tests/integration/test_mcp_server.py"
+      ],
+      "evidence": [
+        {
+          "kind": "integration_real_store",
+          "path": "tests/integration/test_mcp_server.py",
+          "recorded_at": "2026-09-05",
+          "summary": "MCP tools/list 集成测试逐项核对所有当前 state-changing 工具与只读工具的 annotations 闭集。"
+        }
+      ]
+    },
+    {
       "id": "control-rpc-preempts-idle-daemon",
       "statement": "会改变调度语义的本机 RPC（批准、修订、暂停/恢复/取消、仲裁、验收请求、控制和执行者写回）会唤醒正在自适应休眠的 daemon，使用户控制不必等待下一个自然 Deadline 决策点。",
       "lifecycle": "verified",
