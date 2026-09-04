@@ -300,10 +300,26 @@ def handle_contract_list(
     except StoreError as exc:
         raise RpcError(code=ErrorCode.INTERNAL, message=str(exc)) from exc
 
+    contract_rows: list[dict[str, Any]] = []
+    for contract in contracts:
+        row = contract.to_dict()
+        row["deadline_snapshot"] = None
+        for event in reversed(get_events(conn, contract_id=contract.contract_id)):
+            if event.event_type != EventType.FORECAST_UPDATED:
+                continue
+            try:
+                snapshot = json.loads(event.payload_json or "{}")
+            except (TypeError, ValueError):
+                snapshot = None
+            if isinstance(snapshot, dict):
+                row["deadline_snapshot"] = snapshot
+            break
+        contract_rows.append(row)
+
     return {
         "ok": True,
         "result": {
-            "contracts": [c.to_dict() for c in contracts],
+            "contracts": contract_rows,
             "next_cursor": contracts[-1].contract_id if contracts else after_contract_id,
             "has_more": len(contracts) == limit,
         },

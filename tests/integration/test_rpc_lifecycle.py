@@ -565,6 +565,14 @@ class TestPagination:
                     conn=conn,
                     now=NOW + timedelta(seconds=i),
                 )
+            append_event(
+                conn,
+                contract_id="lt-20260831-001",
+                event_type=EventType.FORECAST_UPDATED,
+                payload={"risk": "red", "slack_p90_minutes": -3.0},
+                now=NOW + timedelta(seconds=6),
+                actor="promoter",
+            )
 
             # 分页 1：limit=2
             p1_res = route(
@@ -574,6 +582,7 @@ class TestPagination:
             )
             assert len(p1_res["result"]["contracts"]) == 2
             assert p1_res["result"]["has_more"] is True
+            assert p1_res["result"]["contracts"][0]["deadline_snapshot"]["risk"] == "red"
             cursor1 = p1_res["result"]["next_cursor"]
             assert cursor1 == "lt-20260831-002"
 
