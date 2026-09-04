@@ -144,6 +144,18 @@ class TestExecutorRpc:
         assert res["healthy"] is True
         assert res["cost_hint"] == "low"
         assert res["capabilities"]["spawn"] is True
+        assert "health_reason" in res
+
+        # A registry entry with an unsupported transport is not healthy merely
+        # because it is present in the configuration.
+        bridge_env = make_envelope(
+            Method.EXECUTOR_HEALTH,
+            params={"executor_id": "dsh-bridge"},
+            request_id="req-health-bridge",
+        )
+        bridge_resp = route(bridge_env, registry=reg, now=NOW)
+        assert bridge_resp["result"]["healthy"] is False
+        assert "no adapter available" in bridge_resp["result"]["health_reason"]
 
     def test_unknown_executor_error(self) -> None:
         reg = make_test_registry()

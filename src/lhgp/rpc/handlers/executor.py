@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from lhgp.adapters.factory import build_adapter
 from lhgp.adapters.registry import ExecutorRegistry, RegistryEntry
 from lhgp.rpc.errors import ErrorCode, RpcError
 
@@ -96,11 +97,29 @@ def handle_executor_health(
     reg = registry or ExecutorRegistry()
     executor_id = _require_executor_id(envelope.params)
     entry = _lookup(reg, executor_id)
+    # Registration is not proof of liveness.  Probe the concrete adapter so
+    # callers can distinguish a configured executor from one that can be
+    # launched now; unknown transports fail closed instead of reporting a
+    # misleading healthy=True.
+    adapter = build_adapter(entry)
+    if adapter is None:
+        healthy = False
+        health_reason = f"no adapter available for kind '{entry.kind}'"
+    else:
+        try:
+            healthy = bool(adapter.health())
+            health_reason = (
+                "adapter health probe passed" if healthy else "adapter health probe failed"
+            )
+        except Exception as exc:
+            healthy = False
+            health_reason = f"adapter health probe error: {type(exc).__name__}"
     return {
         "ok": True,
         "result": {
             "executor_id": entry.id,
-            "healthy": True,
+            "healthy": healthy,
+            "health_reason": health_reason,
             "enabled": entry.enabled,
             "kind": entry.kind,
             "cost_hint": entry.cost_hint.value,
