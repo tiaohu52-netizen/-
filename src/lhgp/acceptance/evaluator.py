@@ -82,15 +82,28 @@ def evaluate_check(spec: CheckSpec, *, workspace_root: Path) -> CheckResult:
             return CheckResult(check_id, "pass" if matched else "fail", str(target))
         if spec.kind == CheckKind.COMMAND_EXIT_ZERO:
             argv = [spec.target, *(str(x) for x in spec.args.get("argv", ()))]
-            completed = subprocess.run(  # noqa: S603 — structured argv + shell=False
-                argv,
-                cwd=workspace_root,
-                shell=False,
-                capture_output=True,
-                text=True,
-                timeout=60,
-                check=False,
-            )
+            try:
+                completed = subprocess.run(  # noqa: S603 — structured argv + shell=False
+                    argv,
+                    cwd=workspace_root,
+                    shell=False,
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    check=False,
+                )
+            except FileNotFoundError:
+                # SPEC §12.1 环境契约：命令在守护进程环境执行，其 PATH
+                # 通常不含项目虚拟环境。给声明者可行动的指引，而不是裸
+                # WinError 2 / ENOENT。
+                return CheckResult(
+                    check_id,
+                    "undetermined",
+                    " ".join(argv),
+                    f"command not found in daemon PATH: {spec.target!r} — "
+                    "use an absolute interpreter path or rely on the "
+                    "verifier verdict block (§12.4)",
+                )
             return CheckResult(
                 check_id,
                 "pass" if completed.returncode == 0 else "fail",
