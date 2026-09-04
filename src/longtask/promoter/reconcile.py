@@ -148,7 +148,19 @@ def _reconcile_one(
     emit: Callable[[str], None] | None,
 ) -> ReconcileOutcome | None:
     """单条 attempt 的四分支判定。"""
-    cid = attempt.contract_id or attempt.goal_id
+    cid = _resolve_contract_id(conn, attempt)
+    if cid is None:
+        _emit(
+            emit,
+            f"reconcile/skipped-ambiguous-contract:{attempt.attempt_id}:{attempt.goal_id}",
+        )
+        return ReconcileOutcome(
+            attempt_id=attempt.attempt_id,
+            contract_id=attempt.goal_id,
+            branch=ReconcileBranch.SKIPPED,
+            detail="attempt contract identity is ambiguous; no recovery or write-back performed",
+            external_state=None,
+        )
     lease = get_lease(conn, cid)
     holds_lease = lease is not None and lease.holder_attempt_id == attempt.attempt_id
 
@@ -333,6 +345,30 @@ def _reattach(
         + ("renewed" if renewed else "not held, left untouched"),
         external_state=AttemptState.RUNNING.value,
     )
+
+
+def _resolve_contract_id(conn: sqlite3.Connection, attempt: StoredAttempt) -> str | None:
+    """Resolve a persisted attempt to one contract without guessing.
+
+    New rows carry ``contract_id`` explicitly.  For legacy rows, fallback is
+    safe only when the Goal has exactly one contract (or one revision match).
+    """
+    if attempt.contract_id:
+        return attempt.contract_id
+    rows = conn.execute(
+        "SELECT contract_id FROM contracts WHERE goal_id = ? ORDER BY contract_id",
+        (attempt.goal_id,),
+    ).fetchall()
+    if len(rows) == 1:
+        return str(rows[0][0])
+    matching = [
+        str(row[0])
+        for row in conn.execute(
+            "SELECT contract_id FROM contracts WHERE goal_id = ? AND revision = ?",
+            (attempt.goal_id, attempt.contract_revision),
+        ).fetchall()
+    ]
+    return matching[0] if len(matching) == 1 else None
 
 
 def _collect(
