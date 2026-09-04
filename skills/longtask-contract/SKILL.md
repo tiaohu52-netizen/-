@@ -92,6 +92,10 @@ longtask cancel lt-20260903-001
 longtask arbitrate lt-20260903-001 --decision hand_to_user --note "需要确认 X"
 ```
 
+在 MCP 中，建议先调用只读 `lhgp_doctor`（兼容名
+`longtask_doctor`）检查已启用 CLI；诊断失败时先修复本机环境或调整
+registry，再批准合同，避免把不可启动的 executor 计入长期任务预算。
+
 当执行预算耗尽但交付物可能已经就绪时，不要重新起草合同；直接请求一次
 “验收现状”。该命令只派 verifier，不会再派 executor：
 
