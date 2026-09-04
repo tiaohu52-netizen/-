@@ -171,6 +171,11 @@ def handle_contract_get(
     # 避免同一 Goal 下不同合同的升级记录串线。
     result = contract.to_dict()
     raw_limit = envelope.params.get("decision_limit", 50)
+    if isinstance(raw_limit, bool):
+        raise RpcError(
+            code=ErrorCode.VALIDATION_FAILED,
+            message="decision_limit must be an integer",
+        )
     try:
         decision_limit = int(raw_limit)
     except (TypeError, ValueError) as exc:
@@ -184,6 +189,11 @@ def handle_contract_get(
             message="decision_limit must be between 1 and 200",
         )
     raw_attempt_limit = envelope.params.get("attempt_limit", 20)
+    if isinstance(raw_attempt_limit, bool):
+        raise RpcError(
+            code=ErrorCode.VALIDATION_FAILED,
+            message="attempt_limit must be an integer",
+        )
     try:
         attempt_limit = int(raw_attempt_limit)
     except (TypeError, ValueError) as exc:
