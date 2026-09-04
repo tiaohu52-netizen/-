@@ -549,6 +549,23 @@
       ]
     },
     {
+      "id": "handover-untrusted-prompt-boundary",
+      "statement": "上一 attempt 的 handover 文本在重新派发时明确标为不可信交接数据，仅作参考，不升级为当前会话指令；该边界与 active.md 中的 progress data 标记一致。",
+      "lifecycle": "verified",
+      "scope_paths": [
+        "src/longtask/persistence/context.py",
+        "tests/unit/test_context.py"
+      ],
+      "evidence": [
+        {
+          "kind": "integration_real_store",
+          "path": "tests/unit/test_context.py",
+          "recorded_at": "2026-09-05",
+          "summary": "handover_prompt_addendum 与 build_attempt_input 回归断言要求交接内容带不可信标记。"
+        }
+      ]
+    },
+    {
       "id": "real-multi-executor-handoff",
       "statement": "合同授权池内的不同 executor 可以跨 attempt 串行接力：首个真实 subprocess 执行器失败后被停用，下一轮由另一个授权 executor 修复，独立 verifier 验收后合同完成。",
       "lifecycle": "verified",
