@@ -551,7 +551,7 @@
           "kind": "integration_real_store",
           "path": "tests/integration/test_executor_session_rpc.py",
           "recorded_at": "2026-09-01",
-          "summary": "10 个集成场景：status 返回事件史与租约（UNKNOWN_CONTRACT 校验）；renew 持有者续约心跳 + 非持有人 fenced + timeout_seconds 校验；write-back 进度+终态落库 + 旧代次 fenced 不落库 + request_id 幂等（重试同 event_ids）+ 缺 write_generation 与非法 attempt_state 校验。"
+          "summary": "12 个集成场景：status 返回事件史与租约（UNKNOWN_CONTRACT 校验）；renew 持有者续约心跳 + 非持有人 fenced + timeout_seconds 严格整数校验（拒绝 bool）；write-back 进度+终态落库 + 旧代次 fenced 不落库 + request_id 幂等（重试同 event_ids）+ write_generation 严格整数校验（拒绝 bool）与非法 attempt_state 校验。"
         }
       ]
     },

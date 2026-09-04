@@ -48,6 +48,16 @@ def _require(params: dict[str, Any], key: str) -> str:
     return value
 
 
+def _strict_int(value: Any, *, field: str) -> int:
+    """Reject booleans and lossy numeric coercions at the executor boundary."""
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise RpcError(
+            code=ErrorCode.VALIDATION_FAILED,
+            message=f"{field} must be an integer",
+        )
+    return value
+
+
 def _require_contract(conn: sqlite3.Connection, contract_id: str) -> Any:
     contract = get_contract(conn, contract_id)
     if contract is None:
@@ -123,10 +133,10 @@ def handle_lease_renew(
     lease = _require_lease(conn, contract_id=contract_id, attempt_id=attempt_id)
 
     try:
-        timeout_seconds = int(params.get("timeout_seconds", 1800))
+        timeout_seconds = _strict_int(params.get("timeout_seconds", 1800), field="timeout_seconds")
         if timeout_seconds <= 0:
             raise ValueError
-    except (TypeError, ValueError):
+    except ValueError:
         raise RpcError(
             code=ErrorCode.VALIDATION_FAILED,
             message="timeout_seconds must be a positive integer",
@@ -222,8 +232,8 @@ def handle_attempt_write_back(
     _require_contract(conn, contract_id)
 
     try:
-        write_generation = int(params.get("write_generation", -1))
-    except (TypeError, ValueError):
+        write_generation = _strict_int(params.get("write_generation", -1), field="write_generation")
+    except RpcError:
         raise RpcError(
             code=ErrorCode.VALIDATION_FAILED, message="write_generation must be an integer"
         ) from None

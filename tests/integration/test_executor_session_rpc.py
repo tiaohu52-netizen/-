@@ -167,8 +167,41 @@ class TestLeaseRenew:
             )
         assert exc_info.value.code == ErrorCode.VALIDATION_FAILED
 
+    def test_boolean_timeout_rejected(self, store: Any) -> None:
+        acquired(store)
+        with pytest.raises(RpcError) as exc_info:
+            route(
+                make_envelope(
+                    Method.LEASE_RENEW,
+                    {"contract_id": CID, "attempt_id": "att-1", "timeout_seconds": True},
+                    "req-renew-bool",
+                ),
+                conn=store,
+                now=NOW,
+            )
+        assert exc_info.value.code == ErrorCode.VALIDATION_FAILED
+
 
 class TestAttemptWriteBack:
+    def test_boolean_write_generation_rejected(self, store: Any) -> None:
+        acquired(store)
+        with pytest.raises(RpcError) as exc_info:
+            route(
+                make_envelope(
+                    Method.ATTEMPT_WRITE_BACK,
+                    {
+                        "contract_id": CID,
+                        "attempt_id": "att-1",
+                        "write_generation": True,
+                        "progress_note": "invalid generation type",
+                    },
+                    "req-wb-bool-generation",
+                ),
+                conn=store,
+                now=NOW,
+            )
+        assert exc_info.value.code == ErrorCode.VALIDATION_FAILED
+
     def test_verifier_terminal_write_back_requires_structured_evidence(self, store: Any) -> None:
         acquired(store)
         store.execute(
