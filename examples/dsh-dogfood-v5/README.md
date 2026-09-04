@@ -98,3 +98,9 @@ python examples/dsh-dogfood-v5/dogfood_v5.py status   # 状态检查
 stage2/stage3 驱动脚本现已实现，但需要本机可用的 kimi CLI、DSH provider
 凭据与真实运行窗口；代码提交不等于已完成 Alpha 实测。事件与最终快照应在
 本地运行后核对，并把结果追加到 `docs/evidence/`。
+
+当执行预算耗尽但工作区疑似已经满足验收时，当前协议优先使用
+`longtask request-verification <contract_id>`（或 MCP 的
+`lhgp_request_verification`）请求只验收现状，不应立即重新起草合同。
+只有该请求因验证预算耗尽、终态或其他明确拒接原因无法执行时，才进入
+新合同/人工升级路径；本目录早期归档记录的 workaround 不代表当前首选流程。
