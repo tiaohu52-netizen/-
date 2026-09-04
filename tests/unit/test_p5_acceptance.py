@@ -49,6 +49,16 @@ class TestCheckSpec:
         original = CheckSpec(kind=CheckKind.FILE_EXISTS, target="dist/app.js")
         assert CheckSpec.from_dict(original.to_dict()) == original
 
+    def test_from_dict_rejects_non_boolean_mandatory(self) -> None:
+        with pytest.raises(TypeError, match="mandatory must be a boolean"):
+            CheckSpec.from_dict(
+                {
+                    "kind": "file-exists",
+                    "target": "dist/app.js",
+                    "mandatory": "false",
+                }
+            )
+
     def test_acceptance_validates_typed_check(self) -> None:
         acceptance = Acceptance(
             standard="all artifacts",
