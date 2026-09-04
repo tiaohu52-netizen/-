@@ -76,6 +76,8 @@ python .dogfood/dogfood_v5.py setup    # 建 Goal + 3 阶段 + 绑定合同
 python .dogfood/dogfood_v5.py stage1   # 真实 daemon + 断裂①注入 + 恢复观察
 python .dogfood/dogfood_v5.py stage1-verify  # 验收 stage-1 并记录修复/重验结果
 python .dogfood/dogfood_v5.py build-registry  # 仅重建本地执行器注册表
+python .dogfood/dogfood_v5.py stage2   # kimi CLI 接力 + 独立 verifier
+python .dogfood/dogfood_v5.py stage3   # 重启 daemon 后继续 stage-3
 python .dogfood/dogfood_v5.py status   # 状态检查
 # 前置：.dogfood/dsh-home（minimax key）+ .dogfood/dsh-home-verifier
 #（deepseek key，复制后删 profiles/node_modules 让 dsh 重建 symlink）
@@ -90,9 +92,8 @@ python .dogfood/dogfood_v5.py status   # 状态检查
 - `dsh_executor_wrap.py` / `dsh_verifier_wrap.py`：per-executor
   DSH_HOME 包装器（发现 1 的解法）。
 
-## v5 剩余（未跑，如实声明）
+## v5 运行状态（如实声明）
 
-断裂②（切换 CLI 接力）与断裂③（daemon 重启无损）的剧本已在
-STAGES 中定义（stage-2/stage-3），本会话未执行——归档只覆盖
-断裂① + repair 循环。发现 4/5/6 是比继续跑更有价值的产出，
-应先回填 SPEC/ROADMAP 再继续。
+stage2/stage3 驱动脚本现已实现，但需要本机可用的 kimi CLI、DSH provider
+凭据与真实运行窗口；代码提交不等于已完成 Alpha 实测。事件与最终快照应在
+本地运行后核对，并把结果追加到 `docs/evidence/`。

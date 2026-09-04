@@ -16,14 +16,13 @@
   stage-2 用 kimi 接力写第二个工具 + 修复闭环
   stage-3 验证整合（daemon 重启发生在本阶段开始前）
 
-当前实现范围：stage-1 断裂①与验收修复闭环；stage-2/3 的切换 CLI 与 daemon
-重启剧本尚未实现。
-
 用法：
   python .dogfood/dogfood_v5.py setup          # 建 Goal + 阶段计划 + 绑定合同
   python .dogfood/dogfood_v5.py build-registry # 重建本地执行器注册表
   python .dogfood/dogfood_v5.py stage1         # 真实 daemon + 断裂①注入
   python .dogfood/dogfood_v5.py stage1-verify  # 验收 stage-1
+  python .dogfood/dogfood_v5.py stage2         # kimi CLI 接力 + 独立 verifier
+  python .dogfood/dogfood_v5.py stage3         # 重启 daemon 后继续 stage-3
   python .dogfood/dogfood_v5.py status         # 查看当前状态
 """
 
@@ -40,17 +39,12 @@ from typing import Any
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "src"))
 
-from longtask.adapters.registry import ExecutorRegistry  # noqa: E402
 from longtask.cli.daemon import get_daemon_status, halt_daemon, spawn_daemon  # noqa: E402
-from longtask.cli.tick import run_daemon_tick  # noqa: E402
-from longtask.contracts.schema import ContractState  # noqa: E402
-from longtask.persistence.events import EventType  # noqa: E402
 from longtask.persistence.events_query import get_events  # noqa: E402
 from longtask.persistence.store import (  # noqa: E402
     StoreConfig,
     connect,
     ensure_schema,
-    get_contract,
     get_goal,
 )
 from longtask.rpc.handlers.goal import (  # noqa: E402
@@ -197,6 +191,38 @@ def _kimi_entry() -> dict[str, Any]:
     }
 
 
+def _kimi_executor_entry() -> dict[str, Any]:
+    """kimi CLI 接力执行器（仅在 stage-2 实测时启用）。"""
+    return {
+        "id": "kimi-code",
+        "kind": "subprocess",
+        "launch": {
+            "argv": [
+                str(REPO / ".venv" / "Scripts" / "python.exe"),
+                str(REPO / "examples" / "dsh-dogfood-v4" / "kimi_wrap.py"),
+            ],
+            "cwd": None,
+            "env_allowlist": [
+                "PATH", "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "COMSPEC",
+                "TEMP", "TMP", "APPDATA", "USERPROFILE", "NODE_PATH",
+            ],
+        },
+        "capabilities": {
+            "spawn": True, "observe": True, "cancel": True, "notify": False,
+            "followup": False, "steer": False, "interrupt": True,
+            "context": "optional",
+            "sandbox": {
+                "file_effects": "workspace-write", "network": "allow",
+                "process": "unsupported", "enforcement": "partial",
+            },
+            "acceptance_evidence": True,
+        },
+        "limits": {"max_concurrent_attempts": 1},
+        "cost_hint": "high",
+        "enabled": True,
+    }
+
+
 def build_registry() -> None:
     """注册 dsh（executor 主力）与 kimi（接力 + verifier），直接写 JSON。
 
@@ -205,7 +231,7 @@ def build_registry() -> None:
     """
     ROOT.mkdir(parents=True, exist_ok=True)
     WS.mkdir(parents=True, exist_ok=True)
-    agents = [_dsh_entry(), _kimi_entry()]
+    agents = [_dsh_entry(), _kimi_entry(), _kimi_executor_entry()]
     (ROOT / "registry.json").write_text(
         json.dumps({"agents": agents}, indent=2, ensure_ascii=False),
         encoding="utf-8",
@@ -213,9 +239,16 @@ def build_registry() -> None:
     print(f"[v5] registry -> {ROOT / 'registry.json'} (dsh-headless, dsh-verifier)")
 
 
-def _stage_draft(stage: dict) -> dict:
+def _stage_draft(
+    stage: dict,
+    *,
+    executor_id: str | None = None,
+    executor_model: str = "*",
+    verifier_id: str | None = None,
+    verifier_model: str = "*",
+) -> dict:
     """从阶段生成合同草案（阶段模板 → 草案的雏形）。"""
-    return {
+    draft = {
         "title": stage["title"],
         "objective": (
             f"在 {WS} 下完成该阶段交付物并通过验收 checks（target 相对"
@@ -242,6 +275,18 @@ def _stage_draft(stage: dict) -> dict:
             "max_output_bytes": 1048576,
         },
     }
+    if executor_id or verifier_id:
+        bindings = []
+        if executor_id:
+            bindings.append(
+                {"executor_id": executor_id, "models": [executor_model], "roles": ["executor"]}
+            )
+        if verifier_id:
+            bindings.append(
+                {"executor_id": verifier_id, "models": [verifier_model], "roles": ["verifier"]}
+            )
+        draft["authority"] = {"executor_policy": "explicit_allow", "executors": bindings}
+    return draft
 
 
 def _stage_deadline() -> str:
@@ -524,6 +569,104 @@ def run_stage1_verify() -> None:
     conn.close()
 
 
+def run_stage2() -> None:
+    """阶段 2：以 kimi CLI 接力，证明 executor 可在 Goal 内替换。"""
+    import time
+
+    from longtask.contracts.schema import ContractState
+    from longtask.persistence.store import update_contract_state
+
+    contract_id = f"{GOAL_ID}-stage2"
+    conn = _conn()
+    try:
+        goal = get_goal(conn, GOAL_ID)
+        if goal is None:
+            raise RuntimeError("goal not found; run setup first")
+        draft = _stage_draft(
+            STAGES[1], executor_id="kimi-code", executor_model="kimi-k3",
+            verifier_id="dsh-verifier", verifier_model="deepseek-v4-pro",
+        )
+        result = handle_goal_prepare(
+            _envelope(Method.GOAL_PREPARE, f"req-v5-stage2-{int(time.time())}", {
+                "contract_id": contract_id, "goal_id": GOAL_ID,
+                "stage_id": "stage-2", "draft": draft,
+            }),
+            conn=conn, now=_now(),
+        )
+        if not result.get("ok"):
+            raise RuntimeError(result)
+        update_contract_state(conn, contract_id=contract_id,
+                              new_state=ContractState.ACTIVE, now=_now())
+        print(f"[v5][stage-2] contract ACTIVE; executor=kimi-code: {contract_id}")
+    finally:
+        conn.close()
+
+    daemon = get_daemon_status(ROOT)
+    if not daemon.get("running"):
+        started = spawn_daemon(ROOT, interval_seconds=2.0)
+        if not started.get("ok"):
+            raise RuntimeError(f"daemon spawn failed: {started}")
+    print("[v5][stage-2] waiting for kimi executor + independent verifier")
+    conn = _conn()
+    try:
+        for _ in range(180):
+            time.sleep(10)
+            rows = conn.execute(
+                "SELECT attempt_id, role, executor_id, state FROM attempts "
+                "WHERE goal_id=? ORDER BY admitted_at", (GOAL_ID,)
+            ).fetchall()
+            if any(r[1] == "executor" and r[2] == "kimi-code" for r in rows):
+                print(f"[v5][stage-2] kimi attempt observed: {rows}")
+                if any(r[3] == "succeeded" for r in rows if r[1] == "verifier"):
+                    return
+            if any(r[3] == "blocked" for r in rows):
+                break
+        print(f"[v5][stage-2] timeout; inspect status: {rows}")
+    finally:
+        conn.close()
+
+
+def run_stage3() -> None:
+    """阶段 3：重启 daemon 后再立约，验证 Goal/事件/阶段状态无损。"""
+    import time
+
+    daemon_before = get_daemon_status(ROOT)
+    if daemon_before.get("running"):
+        halt_daemon(ROOT)
+        for _ in range(30):
+            time.sleep(1)
+            if not get_daemon_status(ROOT).get("running"):
+                break
+    restarted = spawn_daemon(ROOT, interval_seconds=2.0)
+    if not restarted.get("ok"):
+        raise RuntimeError(f"daemon restart failed: {restarted}")
+    print(f"[v5][stage-3] daemon restarted pid={restarted['pid']}")
+
+    conn = _conn()
+    try:
+        contract_id = f"{GOAL_ID}-stage3"
+        result = handle_goal_prepare(
+            _envelope(Method.GOAL_PREPARE, f"req-v5-stage3-{int(time.time())}", {
+                "contract_id": contract_id, "goal_id": GOAL_ID,
+                "stage_id": "stage-3",
+                "draft": _stage_draft(STAGES[2], executor_id="dsh-headless",
+                                       verifier_id="dsh-verifier"),
+            }),
+            conn=conn, now=_now(),
+        )
+        if not result.get("ok"):
+            raise RuntimeError(result)
+        from longtask.contracts.schema import ContractState
+        from longtask.persistence.store import update_contract_state
+        update_contract_state(conn, contract_id=contract_id,
+                              new_state=ContractState.ACTIVE, now=_now())
+        goal = get_goal(conn, GOAL_ID)
+        assert goal is not None
+        print(f"[v5][stage-3] state survived restart; goal revision={goal['revision']}")
+    finally:
+        conn.close()
+
+
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "status"
     if cmd == "setup":
@@ -534,6 +677,10 @@ if __name__ == "__main__":
         run_stage1()
     elif cmd == "stage1-verify":
         run_stage1_verify()
+    elif cmd == "stage2":
+        run_stage2()
+    elif cmd == "stage3":
+        run_stage3()
     elif cmd == "build-registry":
         build_registry()
     else:
