@@ -473,8 +473,15 @@ class AttemptRunner:
                         # SPEC §12.4 裁决合成：确定性评估优先；协议
                         # undetermined 时模型显式 pass/fail 填补；冲突记录
                         # model_outcome 供审计。
+                        deadline_budget = max(
+                            0.1, (contract.draft.deadline_at - now).total_seconds()
+                        )
                         results = [
-                            evaluate_check(check, workspace_root=Path(workspace))
+                            evaluate_check(
+                                check,
+                                workspace_root=Path(workspace),
+                                timeout_seconds=deadline_budget,
+                            )
                             for check in typed_checks
                         ]
                         payload["evidence"] = [

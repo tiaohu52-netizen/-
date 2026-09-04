@@ -42,8 +42,19 @@ def _safe_target(root: Path, target: str) -> Path | None:
     return candidate
 
 
-def evaluate_check(spec: CheckSpec, *, workspace_root: Path) -> CheckResult:
-    """Evaluate one check, converting execution errors to audit outcomes."""
+def evaluate_check(
+    spec: CheckSpec,
+    *,
+    workspace_root: Path,
+    timeout_seconds: float | None = None,
+) -> CheckResult:
+    """Evaluate one check, converting execution errors to audit outcomes.
+
+    ``timeout_seconds`` is supplied by the runner from the contract's remaining
+    deadline.  A typed check may still request a shorter ``args.timeout``;
+    neither path can exceed the hard 60-second safety cap.  A timeout is
+    ``undetermined`` evidence, not a fabricated pass/fail verdict.
+    """
     check_id = f"{spec.kind.value}:{spec.target}"
     target = _safe_target(workspace_root, spec.target)
     if spec.kind in (
@@ -82,6 +93,7 @@ def evaluate_check(spec: CheckSpec, *, workspace_root: Path) -> CheckResult:
             return CheckResult(check_id, "pass" if matched else "fail", str(target))
         if spec.kind == CheckKind.COMMAND_EXIT_ZERO:
             argv = [spec.target, *(str(x) for x in spec.args.get("argv", ()))]
+            timeout = _command_timeout_seconds(spec, timeout_seconds)
             try:
                 completed = subprocess.run(  # noqa: S603 — structured argv + shell=False
                     argv,
@@ -89,7 +101,7 @@ def evaluate_check(spec: CheckSpec, *, workspace_root: Path) -> CheckResult:
                     shell=False,
                     capture_output=True,
                     text=True,
-                    timeout=60,
+                    timeout=timeout,
                     check=False,
                 )
             except FileNotFoundError:
@@ -121,6 +133,18 @@ def evaluate_check(spec: CheckSpec, *, workspace_root: Path) -> CheckResult:
         )
     except (OSError, json.JSONDecodeError, re.error, subprocess.SubprocessError) as exc:
         return CheckResult(check_id, "undetermined", spec.target, str(exc))
+
+
+def _command_timeout_seconds(spec: CheckSpec, deadline_budget: float | None) -> float:
+    """Return a bounded command timeout (contract budget wins over defaults)."""
+    requested = spec.args.get("timeout_seconds")
+    try:
+        timeout = float(requested) if requested is not None else 60.0
+    except (TypeError, ValueError):
+        timeout = 60.0
+    if deadline_budget is not None:
+        timeout = min(timeout, float(deadline_budget))
+    return min(60.0, max(0.1, timeout))
 
 
 __all__ = ["CheckResult", "evaluate_check"]

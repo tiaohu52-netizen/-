@@ -626,6 +626,12 @@ MVP 默认串行接力。只有计划显式给出互斥分区、写入范围、�
 verifier 的判定块填补）。命令不可执行（解释器缺失等）产出
 `undetermined` 而非 `fail`——「跑不了」与「跑挂了」是不同的事实。
 
+命令类 check MAY 在 `args.timeout_seconds` 中声明更短的超时。参考实现对
+每次命令执行施加不超过 60 秒的硬上限，并将剩余 Deadline 时间作为更严格的
+运行时上限；超时结果 MUST 是 `undetermined`，由 verifier 判定块或人工仲裁
+补充证据，不能把超时伪装成通过或失败。这样一个失控命令不会阻塞 daemon 的
+Deadline 决策和用户控制面。
+
 ### 12.2 独立性
 
 默认 verifier：

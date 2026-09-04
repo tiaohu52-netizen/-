@@ -179,6 +179,9 @@ DESIGN §5.2 强调"自己考自己不算数"——协议会派一个 verifier �
   deadline 才动**——这是 v1/v2 真实运行踩过的坑
 - `budget.max_dispatches`：默认值 5 已经够绝大多数任务；想留更多尝试机会
   就调大，触顶自动转 `blocked(need-user)` 不假装能完成
+- `command-exit-zero` typed check 可在 `args.timeout_seconds` 指定更短的命令
+  上限；运行时还会按合同剩余 Deadline 收紧。超时只表示
+  `undetermined`，应由 verifier 判定块或用户仲裁补充证据。
 
 ## 5. 你的工作流
 
