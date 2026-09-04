@@ -996,6 +996,14 @@ def test_contract_get_exposes_isolated_decision_history(tmp_path: Path) -> None:
             ) VALUES (?, ?, ?, 1, 'verifier', 'failed', ?, ?)""",
             ("ver-decision-history", goal_id, cid, NOW.isoformat(), NOW.isoformat()),
         )
+        # 遗留行没有可证明的 contract_id：合同级视图必须 fail-closed 排除。
+        conn.execute(
+            """INSERT INTO attempts (
+                attempt_id, goal_id, contract_revision, role,
+                state, admitted_at, updated_at
+            ) VALUES ('legacy-unbound', ?, 1, 'executor', 'failed', ?, ?)""",
+            (goal_id, NOW.isoformat(), NOW.isoformat()),
+        )
         conn.execute(
             """INSERT INTO decisions (
                 goal_id, contract_id, contract_revision, tier, decision_type,
@@ -1019,6 +1027,7 @@ def test_contract_get_exposes_isolated_decision_history(tmp_path: Path) -> None:
         attempts = result["result"]["attempt_history"]
         assert attempts[0]["attempt_id"] == "ver-decision-history"
         assert attempts[0]["role"] == "verifier"
+        assert all(item["attempt_id"] != "legacy-unbound" for item in attempts)
     finally:
         conn.close()
 
