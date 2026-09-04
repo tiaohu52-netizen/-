@@ -37,7 +37,8 @@ description: 将需要跨会话、跨 Agent 推进的用户目标转成 LHGP 合
   `decision_history`（风险档、升级原因、预算余量和下一步依据）；可传
   `decision_limit` 控制决策历史条数，`attempt_limit` 控制 attempt 历史条数。
   响应中的 `deadline_snapshot` 是最新的风险快照（p50/p90、slack、risk、
-  confidence、forecast_level、reason、next_decision_at），应优先用于判断
+  confidence、forecast_level、sample_count、p_finish_basis、reason、
+  next_decision_at），应优先用于判断
   是否等待、请求验收、暂停或升级；它不是按时完成保证。
 7. （等待 daemon 派 attempt；轮询 get_contract 或订阅 events）
 8. `list_contracts` — 复盘历史 + 审计事件链

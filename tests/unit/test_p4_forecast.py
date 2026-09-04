@@ -97,6 +97,7 @@ def test_deadline_snapshot_is_conservative_for_low_sample_forecast() -> None:
     assert snapshot.forecast_level == "coarse"
     assert snapshot.slack_p90_minutes == -10
     assert snapshot.risk == "red"
+    assert snapshot.p_finish_basis == "coarse-heuristic"
 
 
 def test_deadline_snapshot_treats_due_at_equality_as_not_missed() -> None:
@@ -149,6 +150,8 @@ def test_historical_finish_probability_uses_empirical_deadline_cdf() -> None:
     # 排队/启动/验收/安全开销共 4 分钟，只有 10 分钟样本能在
     # 合同剩余的执行窗口内完成；不能把 27 分钟样本误算为可交付。
     assert snapshot.forecast.p_finish == pytest.approx(1 / 3)
+    assert snapshot.sample_count == 3
+    assert snapshot.p_finish_basis == "empirical-success-cdf"
 
 
 def test_finish_probability_samples_exclude_failed_attempts() -> None:

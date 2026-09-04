@@ -462,6 +462,9 @@ slack_p = (due_at - now) - T_required,p
 `forecast_level: historical` 表示估计主要来自本地历史 attempt 时长，尚未完成
 回放校准与置信区间验证；只有经过独立校准流程的实现才能使用
 `forecast_level: calibrated`。模型不得仅凭样本数量把 historical 解读为高精度保证。
+Deadline snapshot MUST also expose `sample_count` and `p_finish_basis` so a model
+can distinguish `empirical-success-cdf`, `coarse-heuristic`, and `unavailable`
+probability evidence without guessing from the numeric value alone.
 
 ### 10.3 风险档与动作
 
