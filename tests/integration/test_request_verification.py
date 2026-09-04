@@ -40,7 +40,7 @@ from longtask.persistence.store import (
     update_contract_state,
 )
 from longtask.rpc.errors import ErrorCode, RpcError
-from longtask.rpc.handlers.contract import handle_contract_request_verification
+from longtask.rpc.handlers.contract import handle_contract_get, handle_contract_request_verification
 from longtask.rpc.server import RequestEnvelope
 
 pytestmark = pytest.mark.integration
@@ -354,3 +354,32 @@ def test_verification_request_survives_store_reopen_before_daemon_consumes(
         reopened.commit()
     finally:
         reopened.close()
+
+
+def test_contract_get_exposes_verification_history(tmp_path: Path) -> None:
+    """模型读取合同即可判断验收请求是否已被 daemon 消费。"""
+    root, conn, cid, reg = _setup(tmp_path, state=ContractState.BLOCKED)
+    try:
+        _request(conn, cid)
+        runner = AttemptRunner(root, conn, reg)
+        _consume_verification_requests(root, conn, runner, NOW + timedelta(seconds=1))
+        from longtask.rpc.methods import Method
+
+        result = handle_contract_get(
+            RequestEnvelope(
+                method=Method.CONTRACT_GET,
+                request_id="get-ver-history",
+                client_id="mcp",
+                protocol_version=2,
+                params={"contract_id": cid},
+            ),
+            conn=conn,
+            now=NOW,
+        )
+        history = result["result"]["verification_history"]
+        types = [entry["event_type"] for entry in history]
+        assert EventType.VERIFICATION_REQUESTED.value in types
+        assert EventType.VERIFICATION_CONSUMED.value in types
+        assert EventType.VERIFICATION_STARTED.value in types
+    finally:
+        conn.close()
