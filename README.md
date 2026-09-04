@@ -115,6 +115,7 @@ path and the pinned commit for every claim.
 | Strict-deadline layered wakeup (L0/L1 done; L2/L3 designed, not deployed) | Accepted debt (review by 2026-12-01) | `strict-deadline-wakeup-design` |
 | MCP server + model-facing skill (core tools plus LHGP aliases, audit, and control extensions) | Verified | `mcp-server-and-skill` |
 | Ephemeral context + cross-checking verifier | Verified | `ephemeral-context-and-verifier` |
+| User-triggered verification without re-dispatching an executor | Verified | `ephemeral-context-and-verifier` |
 | Executor-side RPC (status / renew / write-back) | Verified | `executor-session-rpc` |
 | Authenticated local Unix-socket RPC (daemon + `rpc-call` client) | Verified | `local-rpc-transport` |
 | Durable notification outbox (idempotency, retry, quiet hours) | Verified | `notification-outbox` |
