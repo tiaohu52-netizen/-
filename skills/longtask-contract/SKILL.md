@@ -35,6 +35,10 @@ prepare` 调用，并把任务交出去。
 默认不会把通知 payload 带回对话；只有用户明确要求审计详情时才追加
 `--include-payload`。
 
+使用 `get_contract` 跟踪时，优先读取响应中的 `deadline_snapshot`：其中的
+`forecast_p50/p90`、`slack`、`risk`、`confidence` 与 `next_decision_at`
+是协议当前风险判断的依据；快照用于决策和审计，不构成严格按时完成承诺。
+
 **对比**：
 
 | 形态 | 你当场干 | cron / 自动化 | 远期任务协议 |
