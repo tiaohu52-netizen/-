@@ -60,7 +60,9 @@ follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
 - The Windows L1 adapter now arms one-shot Task Scheduler entries that call
   authenticated `daemon/wake`; fired signals are audited and consumed before
   the next decision tick, while non-Windows platforms remain explicit
-  `wakeup/degraded` fallbacks.
+  `wakeup/degraded` fallbacks. Its date serialization follows the actual
+  Windows `schtasks.exe` `yyyy/mm/dd` parser, verified by a real create/query/
+  delete smoke.
 - L1 RTC wakeup targets now use the earliest available decision, wakeup, or
   deadline-safety point; a later safety margin can no longer postpone an
   earlier `next_decision_at`.

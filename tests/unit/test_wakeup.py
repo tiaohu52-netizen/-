@@ -381,7 +381,7 @@ class TestRtcAlarm:
         # schtasks 精度为分钟；带秒的目标必须向上取整，不能提前唤醒。
         expected_local = (NOW + timedelta(hours=8, seconds=1)).astimezone() + timedelta(minutes=1)
         assert command[command.index("/ST") + 1] == expected_local.strftime("%H:%M")
-        assert command[command.index("/SD") + 1] == expected_local.strftime("%m/%d/%Y")
+        assert command[command.index("/SD") + 1] == expected_local.strftime("%Y/%m/%d")
         assert "daemon/wake" in command[command.index("/TR") + 1]
 
     def test_windows_task_scheduler_disarm_reports_access_failure(
