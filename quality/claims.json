@@ -429,7 +429,8 @@
         "examples/agent-cli-model-provider-run-v2/",
         "examples/mcp-discovery/README.md",
         "examples/mcp-discovery/mcp-trace.example.log",
-        "docs/evidence/P6-fresh-machine-smoke-2026-09-05.md"
+        "docs/evidence/P6-fresh-machine-smoke-2026-09-05.md",
+        "README.zh-CN.md"
       ],
       "evidence": [
         {
