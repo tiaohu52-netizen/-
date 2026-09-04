@@ -82,7 +82,7 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
         """
         CREATE TABLE IF NOT EXISTS contracts (
             contract_id TEXT PRIMARY KEY,
-            goal_id TEXT NOT NULL,  -- P1：与 contract_id 同义（§7 命名迁移）
+            goal_id TEXT NOT NULL,  -- 稳定 Goal 身份（可跨多个阶段合同）
             revision INTEGER NOT NULL DEFAULT 1,
             state TEXT NOT NULL,  -- commitment lifecycle 轴
             deadline_status TEXT NOT NULL DEFAULT 'not_due',  -- P1：deadline 轴
@@ -129,7 +129,7 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS events (
             event_id INTEGER PRIMARY KEY AUTOINCREMENT,
             contract_id TEXT,
-            goal_id TEXT,  -- P1：与 contract_id 同义
+            goal_id TEXT,  -- 稳定 Goal 身份（可与 contract_id 不同）
             attempt_id TEXT,
             lease_generation INTEGER,
             contract_revision INTEGER,  -- P1：事件所属合同修订号
@@ -321,6 +321,15 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
 
     # ── 迁移：v1 → v2 ──
     _migrate_v1_to_v2(conn)
+
+    # contract_id is additive for old attempts tables, so build its index only
+    # after the migration has materialized the column.
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_attempts_contract
+        ON attempts(contract_id, admitted_at)
+        """
+    )
 
     _add_goal_columns(conn)
 
