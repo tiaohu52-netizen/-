@@ -594,10 +594,12 @@ def save_contract(
                     ),
                     None,
                 )
-                existing_contract = get_contract(
-                    conn,
-                    prepared_event.contract_id if prepared_event else contract_id,
+                replay_contract_id = (
+                    str(prepared_event.contract_id)
+                    if prepared_event and prepared_event.contract_id
+                    else contract_id
                 )
+                existing_contract = get_contract(conn, replay_contract_id)
                 if existing_contract is not None:
                     return existing_contract
 
