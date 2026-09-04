@@ -148,6 +148,31 @@ class TestMCPDiscovery:
                     "destructiveHint": True,
                     "openWorldHint": False,
                 }
+
+            # Every exposed state-changing tool must advertise its durable
+            # side effect so an MCP host can apply its confirmation policy.
+            mutating = {
+                "longtask_prepare_contract",
+                "longtask_approve_contract",
+                "longtask_request_verification",
+                "longtask_update_goal",
+                "longtask_advance_goal",
+                "longtask_attach_to_executor",
+                "lhgp_prepare_goal",
+                "lhgp_approve_goal",
+                "lhgp_request_verification",
+                "lhgp_update_goal",
+                "lhgp_advance_goal",
+                "lhgp_attach_executor",
+                "lhgp_interrupt_attempt",
+                "lhgp_write_back",
+            }
+            for name in mutating:
+                assert by_name[name]["annotations"] == {
+                    "readOnlyHint": False,
+                    "destructiveHint": True,
+                    "openWorldHint": False,
+                }
         finally:
             _stop_mcp(proc)
 

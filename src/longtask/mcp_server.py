@@ -808,10 +808,21 @@ TOOLS.update(
 # Keep the policy explicit here so aliases and future tools cannot silently lose
 # the local-only trust boundary or be presented as harmless reads.
 _DESTRUCTIVE_TOOLS = {
+    # Contract/Goal mutations.  ``destructiveHint`` is intentionally used for
+    # any persistent state change, not only process termination: MCP hosts need
+    # to request confirmation before a model edits the durable commitment.
+    "longtask_prepare_contract",
     "longtask_approve_contract",
+    "longtask_request_verification",
+    "longtask_update_goal",
+    "longtask_advance_goal",
     "longtask_attach_to_executor",
     "lhgp_approve_goal",
+    "lhgp_prepare_goal",
+    "lhgp_update_goal",
+    "lhgp_advance_goal",
     "lhgp_attach_executor",
+    "lhgp_request_verification",
     "lhgp_interrupt_attempt",
     "lhgp_write_back",
 }
