@@ -238,7 +238,7 @@ def build_registry() -> None:
         json.dumps({"agents": agents}, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
-    print(f"[v5] registry -> {ROOT / 'registry.json'} (dsh-headless, dsh-verifier)")
+    print(f"[v5] registry -> {ROOT / 'registry.json'} (dsh-headless, dsh-verifier, kimi-code)")
 
 
 def _stage_draft(

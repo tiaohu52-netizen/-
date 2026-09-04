@@ -76,6 +76,7 @@ python examples/dsh-dogfood-v5/dogfood_v5.py setup    # 建 Goal + 3 阶段 + �
 python examples/dsh-dogfood-v5/dogfood_v5.py stage1   # 真实 daemon + 断裂①注入 + 恢复观察
 python examples/dsh-dogfood-v5/dogfood_v5.py stage1-verify  # 验收 stage-1 并记录修复/重验结果
 python examples/dsh-dogfood-v5/dogfood_v5.py build-registry  # 仅重建本地执行器注册表
+python examples/dsh-dogfood-v5/dogfood_v5.py stage2-plan  # 不启动外部 CLI 的授权预演
 python examples/dsh-dogfood-v5/dogfood_v5.py stage2   # kimi CLI 接力 + 独立 verifier
 python examples/dsh-dogfood-v5/dogfood_v5.py stage3   # 重启 daemon 后继续 stage-3
 python examples/dsh-dogfood-v5/dogfood_v5.py status   # 状态检查
