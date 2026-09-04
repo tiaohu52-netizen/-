@@ -250,6 +250,12 @@ def run_daemon_tick(
         next_at = _compute_next_decision_at(
             c, now=now, lease=active_lease, decision_tier=decision.tier
         )
+        # Do not postpone an already scheduled decision on every daemon tick.
+        # Keep the persisted future point stable, while still allowing a new
+        # risk signal (lease loss, urgency, or deadline cap) to move it earlier.
+        persisted_next_at = c.next_decision_at
+        if persisted_next_at is not None and persisted_next_at > now:
+            next_at = persisted_next_at if next_at is None else min(persisted_next_at, next_at)
         if next_at is not None:
             set_next_decision_at(
                 conn,

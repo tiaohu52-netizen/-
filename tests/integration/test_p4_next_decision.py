@@ -263,6 +263,34 @@ class TestTickIntegration:
         finally:
             conn.close()
 
+    def test_repeated_ticks_do_not_shift_forecast_decision_or_spam_events(
+        self, tmp_path: Path
+    ) -> None:
+        """高频 tick 保持未来决策点稳定，forecast 只记录事实变化。"""
+        from longtask.adapters.registry import ExecutorRegistry
+        from longtask.cli.tick import run_daemon_tick
+
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        setup_contract(data_dir, "lt-p4i", NOW + timedelta(hours=2))
+        conn = connect(StoreConfig(db_path=data_dir / "state.db"))
+        try:
+            registry = ExecutorRegistry()
+            run_daemon_tick(data_dir, conn, registry, now=NOW)
+            first = get_contract(conn, "lt-p4i")
+            assert first.next_decision_at is not None
+            run_daemon_tick(data_dir, conn, registry, now=NOW + timedelta(seconds=1))
+            second = get_contract(conn, "lt-p4i")
+            assert second.next_decision_at == first.next_decision_at
+            forecast_events = [
+                event
+                for event in get_events(conn, contract_id="lt-p4i")
+                if event.event_type == EventType.FORECAST_UPDATED
+            ]
+            assert len(forecast_events) == 1
+        finally:
+            conn.close()
+
 
 class TestDaemonLoopSleepsUntilDecisionPoint:
     """主循环自适应休眠（P4）：空闲时按最早决策点睡，不做 60s 盲轮询。
