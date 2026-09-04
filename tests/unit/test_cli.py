@@ -480,3 +480,26 @@ class TestDaemonLoop:
         assert called["n"] == 0  # 从未进入循环体
         # 退出时清理停止标记，下次 start 不会被残留标记立刻杀掉
         assert not (data_dir / DAEMON_STOP_FILE).exists()
+
+
+def test_request_verification_cli_dry_run(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    """用户可从 CLI 发起仅验收请求，且 dry-run 不写入状态。"""
+    assert (
+        main(
+            [
+                "--data-dir",
+                str(tmp_path / "data"),
+                "--dry-run",
+                "request-verification",
+                "lt-20260904-verify",
+                "--reason",
+                "检查现有交付物",
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+    assert "contract/request-verification" in output
+    assert "检查现有交付物" in output

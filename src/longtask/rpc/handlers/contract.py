@@ -397,7 +397,12 @@ def handle_contract_request_verification(
         contract_id=contract_id,
         goal_id=current.goal_id,
         event_type=EventType.VERIFICATION_REQUESTED,
-        payload={"requested_by": actor, "budget_used": used, "budget_reserved": reserved},
+        payload={
+            "requested_by": actor,
+            "reason": str(params.get("reason") or "user requested verification"),
+            "budget_used": used,
+            "budget_reserved": reserved,
+        },
         now=now,
         actor=actor,
     )
