@@ -44,7 +44,14 @@ def _dispatch_attempt(
     """
     cid = contract.contract_id
     draft = contract.draft
-    attempt_id = f"att-{now.strftime('%Y%m%d%H%M%S')}-{attempt_seq}"
+    attempt_prefix = f"att-{now.strftime('%Y%m%d%H%M%S')}-{attempt_seq}"
+    attempt_id = attempt_prefix
+    sequence = 1
+    while conn.execute(
+        "SELECT 1 FROM attempts WHERE attempt_id = ? LIMIT 1", (attempt_id,)
+    ).fetchone():
+        attempt_id = f"{attempt_prefix}-{sequence}"
+        sequence += 1
     active_lease = get_lease(conn, cid)
     expected_gen = active_lease.generation if active_lease else 0
     probe_input = build_attempt_input(

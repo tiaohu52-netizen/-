@@ -174,17 +174,19 @@ def test_real_subprocess_fail_repair_reverify(tmp_path: Path) -> None:
 
         # Round 2: the same real executor observes its durable counter and
         # writes the repaired artifact; a fresh verifier is independently spawned.
-        second_tick = run_daemon_tick(root, conn, registry, now=NOW + timedelta(minutes=1))
+        # Deliberately reuse the same wall-clock second: ID allocation must
+        # still produce a distinct executor and verifier attempt.
+        second_tick = run_daemon_tick(root, conn, registry, now=NOW)
         second = second_tick["attempts_started"][0]
         assert runner.start_attempt(
-            NOW + timedelta(minutes=1),
+            NOW,
             contract_id=second["contract_id"],
             attempt_id=second["attempt_id"],
             executor_id=second["executor_id"],
         )
-        _wait_and_poll(runner, NOW + timedelta(minutes=1, seconds=1))
-        _wait_and_poll(runner, NOW + timedelta(minutes=1, seconds=2))
-        _judge_verifier_outcomes(root, conn, NOW + timedelta(minutes=1, seconds=3))
+        _wait_and_poll(runner, NOW + timedelta(seconds=1))
+        _wait_and_poll(runner, NOW + timedelta(seconds=2))
+        _judge_verifier_outcomes(root, conn, NOW + timedelta(seconds=3))
 
         assert get_contract(conn, contract_id).state == ContractState.COMPLETE
         assert (root / "ws" / "result.txt").read_text(encoding="utf-8") == "good"
