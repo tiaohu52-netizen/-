@@ -119,6 +119,9 @@ def build_parser() -> argparse.ArgumentParser:
     get_p = sub.add_parser("get", help="查看指定合同当前状态与详情")
     get_p.add_argument("contract_id", type=str, help="合同 ID")
     get_p.add_argument("--decision-limit", type=int, default=50, help="决策历史返回上限（1-200）")
+    get_p.add_argument(
+        "--attempt-limit", type=int, default=20, help="attempt 历史返回上限（1-100）"
+    )
 
     # list
     list_p = sub.add_parser("list", help="列出合同列表")
@@ -448,7 +451,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "get":
         return _dispatch_rpc(
             Method.CONTRACT_GET,
-            {"contract_id": args.contract_id, "decision_limit": args.decision_limit},
+            {
+                "contract_id": args.contract_id,
+                "decision_limit": args.decision_limit,
+                "attempt_limit": args.attempt_limit,
+            },
             data_dir=root,
             dry_run=dry_run,
         )
