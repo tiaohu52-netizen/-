@@ -24,6 +24,9 @@ follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
 - Canonical RPC and persistence package APIs now expose stable protocol,
   schema, event, notification, and executor-side entry points with lazy
   loading where legacy import order requires it.
+- `contract/get` now exposes contract-scoped `decision_history` and
+  `attempt_history`, with bounded `decision_limit` / `attempt_limit` controls
+  across RPC, CLI, MCP, and model skills.
 
 ### Fixed
 
@@ -35,7 +38,9 @@ follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
   including missing external-handle capability columns, before daemon scans.
 - Doctor output and README quickstart commands now use the canonical LHGP name.
 - Claims evidence is re-anchored to the latest verified implementation commit;
-  the full 7-gate suite remains green with 492 tests.
+  the full 7-gate suite remains green with 557 tests at 81.50% coverage.
+- Unavailable L1 wakeup channels now emit one deduplicated `wakeup/degraded`
+  event per daemon lifecycle instead of writing noise on every tick.
 
 ## [0.1.0a0] - 2026-09-01
 
