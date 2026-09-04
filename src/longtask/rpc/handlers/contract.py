@@ -32,7 +32,11 @@ from longtask.contracts.state_machine import (
 from longtask.persistence.attempts import list_contract_attempts
 from longtask.persistence.decisions import list_decisions
 from longtask.persistence.events import EventType
-from longtask.persistence.events_query import get_events, get_recent_events
+from longtask.persistence.events_query import (
+    get_events,
+    get_latest_forecast_snapshot,
+    get_recent_events,
+)
 from longtask.persistence.store import (
     STORE_SCHEMA_VERSION,
     IdempotencyMismatchError,
@@ -203,19 +207,7 @@ def handle_contract_get(
     )
     # Deadline 风险是合同级模型可见性的一部分；不要要求调用方再读取
     # 全量事件流才能知道当前快照。只暴露本合同最新的协议生成快照。
-    result["deadline_snapshot"] = None
-    # 不用固定窗口：长寿命合同可能有数百次调度/验收事件，最新快照
-    # 不能因为历史日志变长而从模型视图中消失。
-    for event in reversed(get_events(conn, contract_id=contract_id)):
-        if event.event_type != EventType.FORECAST_UPDATED:
-            continue
-        try:
-            snapshot = json.loads(event.payload_json or "{}")
-        except (TypeError, ValueError):
-            snapshot = None
-        if isinstance(snapshot, dict):
-            result["deadline_snapshot"] = snapshot
-        break
+    result["deadline_snapshot"] = get_latest_forecast_snapshot(conn, contract_id=contract_id)
     result["attempt_history"] = [
         {
             "attempt_id": attempt.attempt_id,
@@ -303,17 +295,9 @@ def handle_contract_list(
     contract_rows: list[dict[str, Any]] = []
     for contract in contracts:
         row = contract.to_dict()
-        row["deadline_snapshot"] = None
-        for event in reversed(get_events(conn, contract_id=contract.contract_id)):
-            if event.event_type != EventType.FORECAST_UPDATED:
-                continue
-            try:
-                snapshot = json.loads(event.payload_json or "{}")
-            except (TypeError, ValueError):
-                snapshot = None
-            if isinstance(snapshot, dict):
-                row["deadline_snapshot"] = snapshot
-            break
+        row["deadline_snapshot"] = get_latest_forecast_snapshot(
+            conn, contract_id=contract.contract_id
+        )
         contract_rows.append(row)
 
     return {

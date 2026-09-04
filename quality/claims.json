@@ -572,6 +572,7 @@
       "scope_paths": [
         "src/longtask/rpc/handlers/contract.py",
         "src/longtask/mcp_server.py",
+        "src/lhgp/persistence/events_query.py",
         "tests/integration/test_rpc_lifecycle.py"
       ],
       "evidence": [
@@ -579,7 +580,7 @@
           "kind": "integration_real_store",
           "path": "tests/integration/test_rpc_lifecycle.py",
           "recorded_at": "2026-09-05",
-          "summary": "contract/get 在真实 SQLite 合同事件流中返回最新 forecast/updated 快照，且按合同隔离。"
+          "summary": "contract/get 与 contract/list 在真实 SQLite 合同事件流中返回最新 forecast/updated 快照，且由数据库侧按合同隔离查询，不受历史长度影响。"
         }
       ]
     },
