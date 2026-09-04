@@ -715,6 +715,12 @@ verifier 报告验收结果的通道有两条，按 harness 能力选择：
 
 状态快照、事件和幂等记录必须在同一事务提交。文件投影只能在事务提交后生成；损坏或落后时从权威数据重建。
 
+模型侧读取合同（`contract/get`，以及对应的 MCP 工具）MUST 在权威合同视图之外返回
+`decision_history` 数组。数组按 `recorded_at` 倒序，仅包含该 `contract_id` 的决定，
+并保留 `decision_id`、`contract_revision`、`tier`、`decision_type`、`reason`、预算余量、
+`payload`、`recorded_at` 与 `actor`。旧库中无法证明合同归属的历史行 MUST 不得被猜测拼入，
+以免跨合同污染模型上下文；调用方可用 `decision_limit` 限制返回条数。
+
 ### 13.2 事件族
 
 事件名采用 `lower_snake_case` 载荷和 `domain/action` 类型，例如：

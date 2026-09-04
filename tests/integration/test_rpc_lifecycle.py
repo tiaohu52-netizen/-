@@ -970,3 +970,44 @@ class TestHandlerValidationBranches:
                 assert exc.value.code is ErrorCode.VALIDATION_FAILED
         finally:
             conn.close()
+
+
+def test_contract_get_exposes_isolated_decision_history(tmp_path: Path) -> None:
+    """模型读取合同时可解释本合同的风险决策，且不会串入同 Goal 记录。"""
+    conn = connect(setup_test_db(tmp_path))
+    try:
+        cid = "lt-20260831-decision-history"
+        route(
+            make_env(
+                Method.CONTRACT_PREPARE,
+                "req-decision-prep",
+                {"contract_id": cid, "draft": make_valid_draft_payload()},
+            ),
+            conn=conn,
+            now=NOW,
+        )
+        goal_id = conn.execute(
+            "SELECT goal_id FROM contracts WHERE contract_id = ?", (cid,)
+        ).fetchone()[0]
+        conn.execute(
+            """INSERT INTO decisions (
+                goal_id, contract_id, contract_revision, tier, decision_type,
+                reason, budget_dispatches_left, budget_escalations_left,
+                payload_json, recorded_at, actor
+            ) VALUES (?, ?, 1, '3', 'hand-to-user', 'deadline risk', 2, 1, '{}', ?, 'promoter')""",
+            (goal_id, cid, NOW.isoformat()),
+        )
+        conn.commit()
+
+        result = route(
+            make_env(Method.CONTRACT_GET, "req-decision-get", {"contract_id": cid}),
+            conn=conn,
+            now=NOW,
+        )
+        history = result["result"]["decision_history"]
+        assert len(history) == 1
+        assert history[0]["contract_id"] == cid
+        assert history[0]["decision_type"] == "hand-to-user"
+        assert history[0]["tier"] == 3
+    finally:
+        conn.close()

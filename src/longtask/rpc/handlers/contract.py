@@ -28,6 +28,7 @@ from longtask.contracts.state_machine import (
     is_terminal_state,
     is_valid_transition,
 )
+from longtask.persistence.decisions import list_decisions
 from longtask.persistence.events import EventType
 from longtask.persistence.store import (
     STORE_SCHEMA_VERSION,
@@ -165,7 +166,25 @@ def handle_contract_get(
             code=ErrorCode.UNKNOWN_CONTRACT,
             message=f"contract {contract_id} not found",
         )
-    return {"ok": True, "result": contract.to_dict()}
+    # 决策历史属于合同的可审计风险上下文；按 contract_id 精确隔离，
+    # 避免同一 Goal 下不同合同的升级记录串线。
+    result = contract.to_dict()
+    raw_limit = envelope.params.get("decision_limit", 50)
+    try:
+        decision_limit = int(raw_limit)
+    except (TypeError, ValueError) as exc:
+        raise RpcError(
+            code=ErrorCode.VALIDATION_FAILED,
+            message="decision_limit must be an integer",
+        ) from exc
+    if decision_limit <= 0:
+        raise RpcError(code=ErrorCode.VALIDATION_FAILED, message="decision_limit must be positive")
+    result["decision_history"] = list_decisions(
+        conn,
+        contract_id=contract_id,
+        limit=decision_limit,
+    )
+    return {"ok": True, "result": result}
 
 
 def handle_contract_list(
