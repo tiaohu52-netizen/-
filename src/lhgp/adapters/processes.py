@@ -80,35 +80,59 @@ else:  # pragma: no cover - exercised on POSIX CI
     import signal
     from pathlib import Path
 
-    def process_start_time(pid: int) -> float | None:
-        if pid <= 0:
-            return None
-        try:
-            return Path(f"/proc/{pid}").stat().st_ctime
-        except OSError:
-            return None
+    def _read_proc_stat(pid: int) -> list[str] | None:
+        """Fields of /proc/<pid>/stat after comm, or None without /proc.
 
-    def _proc_state(pid: int) -> str | None:
-        """First state letter from /proc/<pid>/stat, or None without /proc.
-
-        The comm field may contain spaces and parentheses, so parse after the
-        final ')' rather than splitting the line.
+        comm may contain spaces and parentheses, so parse after the final ')'
+        rather than splitting the whole line.
         """
         try:
             stat_line = Path(f"/proc/{pid}/stat").read_text(encoding="ascii", errors="replace")
         except OSError:
             return None
-        tail = stat_line.rpartition(")")[2].strip()
-        return tail[:1] or None
+        return stat_line.rpartition(")")[2].split() or None
+
+    def _boot_time_epoch() -> float | None:
+        try:
+            for stat_line in (
+                Path("/proc/stat").read_text(encoding="ascii", errors="replace").splitlines()
+            ):
+                if stat_line.startswith("btime "):
+                    return float(stat_line.split()[1])
+        except (OSError, ValueError, IndexError):
+            return None
+        return None
+
+    def process_start_time(pid: int) -> float | None:
+        """Epoch start time from /proc field 22 (stable after process exit).
+
+        st_ctime is not a start-time proxy: it changes when the process exits
+        or is reaped, breaking identity checks for dead-but-unreaped runs.
+        """
+        if pid <= 0:
+            return None
+        boot = _boot_time_epoch()
+        fields = _read_proc_stat(pid)
+        if boot is None or not fields or len(fields) < 20:
+            return None
+        try:
+            clk_tck = float(os.sysconf("SC_CLK_TCK"))
+        except (ValueError, OSError):
+            clk_tck = 100.0
+        try:
+            ticks = float(fields[19])
+        except ValueError:
+            return None
+        return boot + ticks / clk_tck
 
     def process_alive(pid: int) -> bool | None:
         if pid <= 0:
             return None
-        state = _proc_state(pid)
-        if state is not None:
+        fields = _read_proc_stat(pid)
+        if fields:
             # kill(pid, 0) succeeds on zombies, so without this check an
             # exited-but-unreaped detached run looks alive forever on Linux.
-            return state != "Z"
+            return fields[0] != "Z"
         try:
             os.kill(pid, 0)
         except ProcessLookupError:

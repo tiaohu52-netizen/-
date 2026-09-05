@@ -19,6 +19,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from longtask.adapters.processes import process_alive
 from longtask.promoter.killswitch import is_kill_switch_active
 
 PID_FILE = "daemon.pid"
@@ -97,22 +98,33 @@ def _windows_pid_running(pid: int) -> bool:
         kernel32.CloseHandle(handle)
 
 
+def _posix_pid_running(pid: int) -> bool:
+    """POSIX 存活检查：先收尸判定，再识别僵尸状态。
+
+    优雅退出的 daemon 常是本进程的僵尸子进程，kill(pid, 0) 对它仍会成功。
+    父进程用 waitpid(WNOHANG) 直接判定并顺带收尸；非子进程（如重启后的
+    另一个 CLI 进程）退回 process_alive——Linux 下能从 /proc 识别僵尸。
+    """
+    wnohang = getattr(os, "WNOHANG", 1)
+    waitpid = getattr(os, "waitpid", None)
+    if waitpid is not None:
+        try:
+            waited, _status = waitpid(pid, wnohang)
+            if waited == pid:
+                return False
+        except OSError:
+            pass
+    alive = process_alive(pid)
+    return True if alive is None else bool(alive)
+
+
 def _pid_alive(pid: int) -> bool:
     """进程存活检查（区分「真在跑」与「已退出未收尸」）。"""
     # 经变量间接判断：mypy 平台收窄会把另一分支标记为 unreachable
     is_windows = sys.platform == "win32"
     if is_windows:
         return _windows_pid_running(pid)
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        # 存在但无权发信号：进程活着
-        return True
-    except OSError:
-        return False
-    return True
+    return _posix_pid_running(pid)
 
 
 def _read_log_tail(log_path: Path, limit: int = 2000) -> str | None:
