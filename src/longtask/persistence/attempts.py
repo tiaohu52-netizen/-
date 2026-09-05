@@ -162,6 +162,20 @@ def list_contract_attempts(
     return [_row_to_attempt(row) for row in rows]
 
 
+def count_running_by_executor(conn: sqlite3.Connection) -> dict[str, int]:
+    """按执行器统计未终态 attempt 数（并发限额准入，DESIGN §8.2 条件 4）。
+
+    审计调度-R3：match_candidates 的 running_attempts 入参在两条生产派发
+    路径上都未注入，合同/执行器的 max_concurrent_attempts 从未真正生效。
+    """
+    rows = conn.execute(
+        "SELECT executor_id, COUNT(*) FROM attempts"
+        " WHERE state IN ('admitted', 'running', 'orphaned')"
+        " AND executor_id IS NOT NULL GROUP BY executor_id"
+    ).fetchall()
+    return {str(r[0]): int(r[1]) for r in rows}
+
+
 def list_reconcilable_attempts(conn: sqlite3.Connection) -> list[StoredAttempt]:
     """列出所有非终态 attempt（reconcile 的扫描集，§9 步骤 2 / §11.3）。
 

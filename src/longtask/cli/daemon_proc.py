@@ -42,6 +42,17 @@ def rpc_socket_path(root: Path) -> Path:
     return Path(tempfile.gettempdir()) / f"lhgp-{digest}.sock"
 
 
+def _read_pid_file(pid_path: Path) -> tuple[int | None, float | None]:
+    """解析 pid 文件：`pid [start_time]` 两格式兼容（旧格式无身份）。"""
+    try:
+        parts = pid_path.read_text(encoding="utf-8").split()
+        pid = int(parts[0])
+        start_time = float(parts[1]) if len(parts) > 1 else None
+        return pid, start_time
+    except (ValueError, IndexError):
+        return None, None
+
+
 def get_daemon_status(root: Path) -> dict[str, Any]:
     """获取 daemon 进程与熔断开关状态。"""
     pid_path = root / PID_FILE
@@ -49,13 +60,12 @@ def get_daemon_status(root: Path) -> dict[str, Any]:
     ks_active = is_kill_switch_active(root)
 
     pid: int | None = None
+    recorded_start: float | None = None
     running = False
     if pid_path.is_file():
-        try:
-            pid = int(pid_path.read_text(encoding="utf-8").strip())
-            running = _pid_alive(pid)
-        except ValueError:
-            pid = None
+        pid, recorded_start = _read_pid_file(pid_path)
+        if pid is not None:
+            running = _pid_matches_identity(pid, recorded_start)
 
     token: str | None = None
     if token_path.is_file():
@@ -125,6 +135,20 @@ def _pid_alive(pid: int) -> bool:
     if is_windows:
         return _windows_pid_running(pid)
     return _posix_pid_running(pid)
+
+
+def _pid_matches_identity(pid: int, recorded_start_time: float | None) -> bool:
+    """pid 存活且（有记录时）身份吻合——PID 复用检测（审计进程-R4）。"""
+    if not _pid_alive(pid):
+        return False
+    if recorded_start_time is None:
+        return True  # 旧格式 pid 文件：无身份可查，维持旧行为
+    from lhgp.adapters.processes import process_start_time
+
+    actual = process_start_time(pid)
+    if actual is None:
+        return False
+    return abs(actual - recorded_start_time) <= 2.0
 
 
 def _read_log_tail(log_path: Path, limit: int = 2000) -> str | None:
@@ -208,7 +232,12 @@ def spawn_daemon(
                 }
             time.sleep(0.05)
 
-        (root / PID_FILE).write_text(f"{proc.pid}\n", encoding="utf-8")
+        # 审计进程-R4：pid 复用会让 halt 误杀无关进程——记录启动时刻做身份
+        from lhgp.adapters.processes import process_start_time
+
+        start_time = process_start_time(proc.pid)
+        identity = f"{proc.pid} {start_time}" if start_time is not None else str(proc.pid)
+        (root / PID_FILE).write_text(identity + chr(10), encoding="utf-8")
         # The daemon is intentionally detached and outlives this short-lived
         # CLI process.  Popen's destructor warns when its owner disappears
         # while the child is still running; PID_FILE is the durable ownership
@@ -230,12 +259,24 @@ def halt_daemon(root: Path, *, grace_seconds: float = STOP_GRACE_SECONDS) -> dic
     if not pid_path.is_file():
         (root / TOKEN_FILE).unlink(missing_ok=True)
         return {"ok": True, "was_running": False, "forced": False}
-    try:
-        pid = int(pid_path.read_text(encoding="utf-8").strip())
-    except ValueError:
+    pid, recorded_start = _read_pid_file(pid_path)
+    if pid is None:
         pid_path.unlink(missing_ok=True)
         (root / TOKEN_FILE).unlink(missing_ok=True)
         return {"ok": True, "was_running": False, "forced": False, "stale_pid_file": True}
+
+    # 审计进程-R4：pid 存活但身份不吻合（复用）→ 视为陈旧 pid 文件，
+    # 不对其发信号——SIGTERM 会误杀无辜进程。
+    if not _pid_matches_identity(pid, recorded_start):
+        pid_path.unlink(missing_ok=True)
+        (root / TOKEN_FILE).unlink(missing_ok=True)
+        return {
+            "ok": True,
+            "was_running": False,
+            "forced": False,
+            "stale_pid_file": True,
+            "pid": pid,
+        }
 
     was_running = _pid_alive(pid)
     forced = False

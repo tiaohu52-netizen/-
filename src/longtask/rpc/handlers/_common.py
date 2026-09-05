@@ -230,11 +230,26 @@ def idempotent_replay(
 
     若 envelope.request_id 已在 events 表里有事件，直接返回当前合同视图，
     不重复执行副作用。返回 None 表示这不是重放，调用方继续正常路径。
+    归属校验（审计持久化-R1）：已有事件的 contract_id 与本次操作的
+    contract_id 不一致时不再静默吞掉合法写入——跨合同复用 request_id
+    属于客户端错误，抛 IdempotencyMismatchError。
     """
     if not envelope.request_id:
         return None
-    if not get_events_by_request_id(conn, envelope.request_id):
+    existing_events = get_events_by_request_id(conn, envelope.request_id)
+    if not existing_events:
         return None
+    event_contract_ids = {e.contract_id for e in existing_events if e.contract_id}
+    if event_contract_ids and contract_id not in event_contract_ids:
+        # 跨合同复用 request_id 是客户端错误，不能静默吞掉本次写入
+        # （审计持久化-R1）。
+        raise RpcError(
+            code=ErrorCode.VALIDATION_FAILED,
+            message=(
+                f"request_id {envelope.request_id!r} belongs to contract(s) "
+                f"{sorted(event_contract_ids)}, not {contract_id!r}"
+            ),
+        )
     existing = get_contract(conn, contract_id)
     if existing is None:
         return None

@@ -39,7 +39,7 @@ from longtask.persistence.store import (
     get_events,
     list_contracts,
 )
-from longtask.promoter.reconcile import reconcile_attempts
+from longtask.promoter.reconcile import ReconcileBranch, reconcile_attempts
 from longtask.rpc.methods import Method
 from longtask.rpc.server import parse_envelope, route
 from longtask.rpc.transport import serve_unix_socket
@@ -170,7 +170,7 @@ def run_daemon_loop(
             runner.replace_registry(registry)
             # §9 步骤 2 / §11.3：先 reconcile 外部 attempt，再谈其它。
             # 本进程仍持有活句柄的 attempt 让给 runner 自己管（locally_tracked）。
-            reconcile_attempts(
+            reconciled = reconcile_attempts(
                 root,
                 conn,
                 now=now_val,
@@ -179,6 +179,10 @@ def run_daemon_loop(
                 emit=emit_fn,
             )
             runner.adopt_reconciled_attempts()
+            # 审计调度-R6：reconcile 分支 2 结算的 executor 成功同样要走
+            # 交叉验收——否则重启窗口内的成功永远到不了 verifier，且下一轮
+            # tick 会再派一个冗余 executor。
+            _dispatch_verifiers_for_reconciled(root, conn, runner, reconciled, now_val)
             # 合同进入 cancelled/expired 后，控制面已不再允许继续推进；
             # 在 poll 前终止本进程持有的外部 attempt，避免已终止承诺
             # 继续消耗资源或产生迟到写回。
@@ -287,6 +291,36 @@ def run_daemon_loop(
     }
 
 
+def _dispatch_verifiers_for_reconciled(
+    root: Path,
+    conn: sqlite3.Connection,
+    runner: Any,
+    outcomes: Any,
+    now: datetime,
+) -> None:
+    """reconcile 分支 2 结算的 executor 成功 → 派生交叉 verifier（§5.2）。
+
+    审计调度-R6：reconcile 路径绕过 _finish_attempt，成功结算后从不派
+    verifier，交叉验收断链且下一轮 tick 重派冗余 executor。此处对每个
+    COLLECTED 且 state=succeeded 的 executor attempt 补一次验收派发；
+    _dispatch_verifier 自带的活租约/预算守卫会拒绝越权派发。
+    """
+    for outcome in outcomes:
+        if outcome.branch != ReconcileBranch.COLLECTED:
+            continue
+        row = conn.execute(
+            "SELECT role, state, executor_id FROM attempts WHERE attempt_id = ? LIMIT 1",
+            (outcome.attempt_id,),
+        ).fetchone()
+        if row is None or row[0] != "executor" or row[1] != "succeeded":
+            continue
+        runner._dispatch_verifier(
+            now,
+            contract_id=outcome.contract_id,
+            executor_id=str(row[2] or ""),
+        )
+
+
 def _consume_verification_requests(
     root: Path,
     conn: sqlite3.Connection,
@@ -337,10 +371,10 @@ def _consume_verification_requests(
         # request-consumption idempotence guarantee.
         already = conn.execute(
             "SELECT attempt_id FROM attempts "
-            "WHERE goal_id = ? AND role = 'verifier' "
+            "WHERE contract_id = ? AND role = 'verifier' "
             "AND state NOT IN ('succeeded', 'failed', 'cancelled', 'stale', 'orphaned') "
             "LIMIT 1",
-            (contract.goal_id,),
+            (contract.contract_id,),
         ).fetchone()
         if already is not None:
             continue
