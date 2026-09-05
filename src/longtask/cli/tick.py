@@ -151,6 +151,19 @@ def run_daemon_tick(
     # 这里给出最小近似：连续两次 attempt 同角色（executor）且未派生 verifier 即视为停滞。
     estimate_stalled_by_contract: dict[str, bool] = {}
 
+    # E2 多合同公平调度：预扫 ACTIVE 合同的紧迫档位，主循环按档位降序
+    # 处理（红/橙/黄/绿），同档位按 contract_id 稳定排序。此前按 ID 字典
+    # 序遍历，低紧迫合同会先于高紧迫合同抢占执行器池。
+    urgency_tier_by_contract: dict[str, int] = {}
+    for c in all_contracts:
+        if c.state != ContractState.ACTIVE:
+            continue
+        time_left = max(0.0, (c.draft.deadline_at - now).total_seconds() / 3600.0)
+        remaining = _remaining_workload_hours(root, c)
+        tier = classify(urgency(remaining, time_left))
+        if tier is not None:
+            urgency_tier_by_contract[c.contract_id] = int(tier)
+
     # 预扫一遍以建立两个映射
     for c in all_contracts:
         cid = c.contract_id
@@ -165,7 +178,18 @@ def run_daemon_tick(
         escalations_used_by_contract[cid] = verifier_count + steer_count
         estimate_stalled_by_contract[cid] = _estimate_stalled_from_attempts(conn, cid)
 
-    for c in all_contracts:
+    ordered_contracts = sorted(
+        (c for c in all_contracts if c.state != ContractState.ACTIVE),
+        key=lambda c: c.contract_id,
+    ) + sorted(
+        (c for c in all_contracts if c.state == ContractState.ACTIVE),
+        key=lambda c: (
+            -urgency_tier_by_contract.get(c.contract_id, -1),
+            c.contract_id,
+        ),
+    )
+
+    for c in ordered_contracts:
         cid = c.contract_id
         clock = clock_map.get(cid)
         if clock is None:
