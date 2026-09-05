@@ -539,14 +539,14 @@ def handle_contract_request_verification(
         event_type=EventType.VERIFICATION_REQUESTED,
         payload={
             "requested_by": actor,
-            "reason": str(params.get("reason") or "user requested verification"),
+            "reason": str(params.get("reason") or f"{actor} requested verification"),
             "budget_used": used,
             "budget_reserved": reserved,
         },
         now=now,
         actor=actor,
         contract_revision=current.revision,
-        role="user",
+        role=actor,
         payload_schema_version=STORE_SCHEMA_VERSION,
     )
     return {

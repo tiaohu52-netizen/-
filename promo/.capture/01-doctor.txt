@@ -1,8 +1,0 @@
-=== LHGP doctor (v0.1.0a1, protocol v1) ===
-[PASS] python_runtime: Python 3.13.13
-[PASS] storage_directory: directory C:\lhgp-demo-data accessible
-[PASS] database_integrity: state.db healthy
-[PASS] executor_registry: registry accessible (0 enabled / 0 registered)
-[PASS] kill_switch: inactive (normal operation)
------------------------------------------------------
-Result: ALL SYSTEMS GO

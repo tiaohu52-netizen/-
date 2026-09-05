@@ -146,7 +146,8 @@ def test_request_on_blocked_contract_resumes_and_records(tmp_path: Path) -> None
             if e.event_type == EventType.VERIFICATION_REQUESTED
         ]
         assert requested[-1].contract_revision == contract.revision
-        assert requested[-1].role == "user"
+        # R3 归因修正：role 反映真实发起者（本测试经 mcp 客户端 → model）
+        assert requested[-1].role == requested[-1].actor
     finally:
         conn.close()
 

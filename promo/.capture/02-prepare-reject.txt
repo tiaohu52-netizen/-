@@ -1,2 +1,0 @@
-Error [VALIDATION_FAILED]: deadline_at must carry an explicit timezone
-Details: {"errors": ["deadline_at must carry an explicit timezone"]}

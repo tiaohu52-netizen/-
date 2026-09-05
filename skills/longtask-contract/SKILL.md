@@ -89,7 +89,8 @@ longtask get lt-20260903-001
 longtask list
 
 # 4. 修改可修订区（soft_guidance、acceptance、workload；冻结区不可改）
-longtask patch lt-20260903-001 --patch-json '{...}'
+longtask patch lt-20260903-001 --revision N --guidance '{"note":"..."}'
+# --revision 必填（CAS）；--workload-hours 可改工作量；冻结区字段 patch 拒接
 
 # 5. 暂停/恢复/取消
 longtask pause lt-20260903-001
@@ -97,7 +98,8 @@ longtask resume lt-20260903-001
 longtask cancel lt-20260903-001
 
 # 6. 修完成不了的事：转给人裁
-longtask arbitrate lt-20260903-001 --decision hand_to_user --note "需要确认 X"
+longtask arbitrate lt-20260903-001 --decision archived --note "作废交人裁"
+# 合法 decision：complete / archived / active
 ```
 
 在 MCP 中，建议先调用只读 `lhgp_doctor`（兼容名

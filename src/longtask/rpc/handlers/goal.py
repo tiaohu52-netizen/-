@@ -55,6 +55,7 @@ from longtask.rpc.errors import ErrorCode, RpcError
 from longtask.rpc.handlers._common import (
     _is_safe_contract_id,
     _parse_iso,
+    require_principal,
     resolve_actor,
 )
 
@@ -405,8 +406,14 @@ def handle_goal_update(
     now: datetime,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    """CAS-update the long-lived Goal plan or progress document."""
+    """CAS-update the long-lived Goal plan or progress document.
+
+    Goal 计划是长期承诺的权威状态：按 ADR-004 规则 6，模型只能提议修订、
+    不得直接写入——本方法收归 Principal（user）。模型应向用户陈述修订
+    建议由其执行，或等待未来的「计划提案」通道（E3）。
+    """
     params = envelope.params
+    require_principal(envelope, params, action="goal/update")
     goal_id = str(params.get("goal_id", "")).strip()
     if not goal_id:
         raise RpcError(code=ErrorCode.VALIDATION_FAILED, message="goal_id is required")
