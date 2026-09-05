@@ -175,3 +175,14 @@ dogfood v5 展示了一个三阶段目标完成，不等于三个独立真实目
   包含 `lhgp_doctor`、`lhgp_request_verification`、`longtask_get_contract`。
 - 敏感模式扫描未发现实际凭证；命中内容仅为归档示例中声明的环境变量名，发布前仍需人工复核公开归档是否应保留。
 - 仓库当前无 Git remote；本记录因此不宣称已推送或已发布 GitHub。
+
+## 追记：remote 配置与推送尝试（2026-09-05，总控）
+
+- 上述「无 Git remote」记录之后，用户提供了发布仓库地址并配置 remote：
+  `origin = https://github.com/tiaohu52-netizen/-.git`。
+- 总控于 2026-09-05 执行推送前复查：跟踪文件与全历史新增文件名无凭证模式；
+  归档示例内容无密钥值命中（与上方敏感扫描结论一致）。
+- 推送 `main → origin/main` **失败**：GitHub 拒绝密码认证（不支持 password auth），
+  用户提供的凭据为账号密码格式；本机 `~/.ssh/id_rsa.pub` 未绑定 GitHub 账号。
+  需要用户提供 PAT（repo 写权限）或绑定 SSH 公钥后重试。
+- 本记录只代表源码推送尝试，不构成发布、打 tag 或 Release。
