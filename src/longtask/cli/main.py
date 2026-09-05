@@ -576,6 +576,68 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 0
 
+    if args.command == "proposal-apply":
+        # E3：提案审批落地——用户读取 pending 提案后以此命令批准；
+        # 实际的 CAS 更新由 goal/update（user 通道）执行，提案事件
+        # 标记为 applied 以避免重复应用。
+        from lhgp.persistence.events_query import get_events
+        from longtask.persistence.events import EventType
+        from longtask.persistence.store import append_event, get_goal
+        from longtask.rpc.handlers.goal import handle_goal_update
+
+        root = Path(args.data_dir).expanduser().resolve() if args.data_dir else default_data_root()
+        conn = connect(StoreConfig(db_path=root / "state.db"))
+        try:
+            matching = [
+                e
+                for e in get_events(conn, contract_id=args.goal_id)
+                if e.event_id == args.event_id and e.event_type == EventType.GOAL_PROPOSED.value
+            ]
+            if not matching:
+                print(
+                    f"error: proposal event {args.event_id} not found for goal {args.goal_id}",
+                    file=sys.stderr,
+                )
+                return 1
+            payload = json.loads(matching[0].payload_json or "{}")
+            plan = payload.get("plan")
+            if not isinstance(plan, dict):
+                print("error: proposal has no plan object", file=sys.stderr)
+                return 1
+            goal_before = get_goal(conn, args.goal_id)
+            if goal_before is None:
+                print(f"error: goal {args.goal_id} not found", file=sys.stderr)
+                return 1
+            revision = goal_before["revision"]
+            handle_goal_update(
+                RequestEnvelope(
+                    method=Method.GOAL_UPDATE,
+                    request_id=f"proposal-apply-{args.event_id}",
+                    client_id="longtask-cli",
+                    protocol_version=2,
+                    params={"goal_id": args.goal_id, "revision": revision, "plan": plan},
+                ),
+                conn=conn,
+                now=datetime.now(UTC),
+            )
+            append_event(
+                conn,
+                contract_id=args.goal_id,
+                goal_id=args.goal_id,
+                event_type=EventType.GOAL_AMENDED,
+                payload={
+                    "source": "proposal",
+                    "proposal_event_id": args.event_id,
+                    "applied_by": "user",
+                },
+                now=datetime.now(UTC),
+                actor="user",
+            )
+            print(f"proposal {args.event_id} applied to goal {args.goal_id}")
+        finally:
+            conn.close()
+        return 0
+
     if args.command == "prune-events":
         from pathlib import Path as _Path
 
