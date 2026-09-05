@@ -42,6 +42,7 @@ from longtask.persistence.store import (
 from longtask.rpc.errors import ErrorCode, RpcError
 from longtask.rpc.handlers.contract import handle_contract_get, handle_contract_request_verification
 from longtask.rpc.server import RequestEnvelope
+from lhgp.rpc.server import route as canonical_route
 
 pytestmark = pytest.mark.integration
 
@@ -158,6 +159,31 @@ def test_request_on_active_contract_records_without_resume(tmp_path: Path) -> No
         # active 态不再产生多余的 resume 事件
         types = [e.event_type for e in get_events(conn, contract_id=cid)]
         assert EventType.CONTRACT_RESUMED.value not in types
+    finally:
+        conn.close()
+
+
+def test_canonical_rpc_route_exposes_request_verification(tmp_path: Path) -> None:
+    """The published ``lhgp`` RPC route must expose the new command surface.
+
+    The legacy route already had the handler, but the canonical namespace is
+    what the CLI and model-facing MCP clients use.  A missing canonical
+    registration silently turned a valid request into ``not implemented``.
+    """
+    _root, conn, cid, _reg = _setup(tmp_path, state=ContractState.BLOCKED)
+    try:
+        from lhgp.rpc.methods import Method as CanonicalMethod
+
+        envelope = RequestEnvelope(
+            method=CanonicalMethod.CONTRACT_REQUEST_VERIFICATION,
+            request_id="req-ver-canonical",
+            client_id="mcp",
+            protocol_version=2,
+            params={"contract_id": cid},
+        )
+        result = canonical_route(envelope, conn=conn, now=NOW)
+        assert result["ok"] is True
+        assert get_contract(conn, cid).state == ContractState.ACTIVE
     finally:
         conn.close()
 
