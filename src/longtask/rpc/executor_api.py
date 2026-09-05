@@ -92,6 +92,16 @@ def handle_attempt_status(
     attempt_id = _require(params, "attempt_id")
     _require_contract(conn, contract_id)
 
+    # O4（工具面审计）：未知 attempt 曾返回 ok+空事件，与「尚无事件」
+    # 不可区分，模型无法发现 attempt_id 拼错。fail-closed：
+    # attempts 表无此行即 UNKNOWN_ATTEMPT。
+    attempt_row = get_attempt(conn, attempt_id)
+    if attempt_row is None:
+        raise RpcError(
+            code=ErrorCode.UNKNOWN_ATTEMPT,
+            message=f"attempt {attempt_id} does not exist under contract {contract_id}",
+        )
+
     contract_events = get_events(conn, contract_id=contract_id)
     events = [e for e in contract_events if e.attempt_id == attempt_id]
     lease = get_lease(conn, contract_id)

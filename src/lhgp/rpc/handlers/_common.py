@@ -103,8 +103,15 @@ def _is_safe_contract_id(contract_id: str) -> bool:
 
 
 def require_contract_id(params: dict[str, Any]) -> str:
-    """校验 contract_id 必填、非空且为安全 slug（防路径穿越）。"""
-    contract_id = str(params.get("contract_id", "")).strip()
+    """入参 contract_id 必填、非空且为安全 slug（防路径穿越）。
+
+    非字符串（如数字 123）直接 VALIDATION_FAILED，不静默 str() 化——
+    类型错误就该报类型错误（工具面审计 O6）。
+    """
+    raw = params.get("contract_id")
+    if raw is not None and not isinstance(raw, str):
+        raise RpcError(code=ErrorCode.VALIDATION_FAILED, message="contract_id must be a string")
+    contract_id = str(raw or "").strip()
     if not contract_id:
         raise RpcError(code=ErrorCode.VALIDATION_FAILED, message="contract_id is required")
     if not _is_safe_contract_id(contract_id):

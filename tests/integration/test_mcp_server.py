@@ -518,6 +518,15 @@ class TestMCPLifecycle:
             )
             ensure_schema(conn)
             aid = "att-mcp-test"
+            # O4 修复后 attempt_status 对未知 attempt 报 UNKNOWN_ATTEMPT，
+            # 租约必须对应真实的 attempts 行。
+            conn.execute(
+                "INSERT INTO attempts (attempt_id, contract_id, goal_id, role, state,"
+                " admitted_at, contract_revision, updated_at)"
+                " VALUES (?, ?, ?, 'executor', 'running', ?, 1, ?)",
+                (aid, cid, cid, now.isoformat(), now.isoformat()),
+            )
+            conn.commit()
             acquire_lease(
                 conn,
                 contract_id=cid,
