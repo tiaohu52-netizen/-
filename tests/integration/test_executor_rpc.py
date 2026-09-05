@@ -68,9 +68,11 @@ def make_test_registry() -> ExecutorRegistry:
     )
     reg.register(
         RegistryEntry(
-            id="agent-cli-bridge",
+            id="cli-bridge",
             kind="bridge",
-            launch=LaunchSpec(argv=("agent-cli", "--headless"), cwd=None, env_allowlist=("agent-cli_CONFIG",)),
+            launch=LaunchSpec(
+                argv=("cli-bridge", "--headless"), cwd=None, env_allowlist=("cli-bridge_CONFIG",)
+            ),
             capabilities=caps,
             limits={"max_concurrent_attempts": 1},
             cost_hint=CostHint.MEDIUM,
@@ -103,14 +105,14 @@ class TestExecutorRpc:
         assert resp["ok"] is True
         result = resp["result"]
         assert result["total"] == 2
-        assert [e["id"] for e in result["executors"]] == ["codex-cli", "agent-cli-bridge"]
+        assert [e["id"] for e in result["executors"]] == ["cli-bridge", "codex-cli"]
 
         # 仅查已启用
         env_enabled = make_envelope(Method.EXECUTOR_LIST, params={"enabled_only": True})
         resp_enabled = route(env_enabled, registry=reg, now=NOW)
         assert resp_enabled["ok"] is True
         assert resp_enabled["result"]["total"] == 1
-        assert resp_enabled["result"]["executors"][0]["id"] == "agent-cli-bridge"
+        assert resp_enabled["result"]["executors"][0]["id"] == "cli-bridge"
 
         # JSON 字符串不能被宽松地真值化，否则 "false" 会错误过滤掉执行器。
         env_invalid = make_envelope(Method.EXECUTOR_LIST, params={"enabled_only": "false"})
@@ -153,7 +155,7 @@ class TestExecutorRpc:
         # because it is present in the configuration.
         bridge_env = make_envelope(
             Method.EXECUTOR_HEALTH,
-            params={"executor_id": "agent-cli-bridge"},
+            params={"executor_id": "cli-bridge"},
             request_id="req-health-bridge",
         )
         bridge_resp = route(bridge_env, registry=reg, now=NOW)

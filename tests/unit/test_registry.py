@@ -105,13 +105,15 @@ class TestCostHint:
 class TestLaunchSpec:
     def test_to_dict_and_from_dict(self) -> None:
         spec = LaunchSpec(
-            argv=("agent-cli", "--headless"), cwd="/workspace", env_allowlist=("agent-cli_CONFIG",)
+            argv=("cli-bridge", "--headless"),
+            cwd="/workspace",
+            env_allowlist=("cli-bridge_CONFIG",),
         )
         d = spec.to_dict()
         assert d == {
-            "argv": ["agent-cli", "--headless"],
+            "argv": ["cli-bridge", "--headless"],
             "cwd": "/workspace",
-            "env_allowlist": ["agent-cli_CONFIG"],
+            "env_allowlist": ["cli-bridge_CONFIG"],
         }
         restored = LaunchSpec.from_dict(d)
         assert restored == spec
@@ -307,7 +309,7 @@ class TestExecutorRegistry:
     def test_serialization_and_file_io(self, tmp_path: Path) -> None:
         reg = ExecutorRegistry()
         reg.register(make_entry("codex-1", cost_hint=CostHint.LOW, enabled=True))
-        reg.register(make_entry("agent-cli-1", cost_hint=CostHint.MEDIUM, enabled=False))
+        reg.register(make_entry("cli-bridge-1", cost_hint=CostHint.MEDIUM, enabled=False))
 
         file_path = tmp_path / "registry.json"
         reg.save_to_file(file_path)
@@ -317,8 +319,8 @@ class TestExecutorRegistry:
         assert len(loaded.list_entries()) == 2
         assert loaded.get("codex-1") is not None
         assert loaded.get("codex-1").enabled  # type: ignore[union-attr]
-        assert loaded.get("agent-cli-1") is not None
-        assert not loaded.get("agent-cli-1").enabled  # type: ignore[union-attr]
+        assert loaded.get("cli-bridge-1") is not None
+        assert not loaded.get("cli-bridge-1").enabled  # type: ignore[union-attr]
 
     def test_admission_snapshot_preserves_enabled_switch(self) -> None:
         reg = ExecutorRegistry(

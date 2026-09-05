@@ -4,7 +4,7 @@
 1. **管道死锁（真 bug 级）**：PIPE 约 64KB 缓冲写满 → 子进程 write 阻塞 →
    永不退出。后台 reader 线程持续排水，1MB 输出不卡死；
 2. **终态时机（观察窗口问题的根治）**：harness 主进程与内部 worker 生命
-   周期不对齐（agent-cli 实测）——stdout 结构化事件
+   周期不对齐（cli-bridge 实测）——stdout 结构化事件
    {"event":"attempt/finished","outcome":...} 让「干完了」由 harness 主动
    声明：主进程还活着也能判终态、collect 不等退出码也能结算；
 3. **成功语义**：CLI 软失败退 0——事件 outcome=failed 与退出码 0 矛盾
@@ -36,7 +36,7 @@ BIG_OUTPUT = (
 )
 
 # harness 形态：先干活输出，写终态事件行，然后「收尾」sleep 很久
-# （模拟 agent-cli 主进程在 worker turn/end 之后才退出）
+# （模拟 cli-bridge 主进程在 worker turn/end 之后才退出）
 HARNESS_WITH_EVENT = (
     "import sys, time\n"
     "sys.stdout.write('working...\\n')\n"

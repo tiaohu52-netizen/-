@@ -26,7 +26,7 @@ def request() -> str:
     )
 
 
-def test_token_hanagent-cliake_and_dispatch() -> None:
+def test_token_handshake_and_dispatch() -> None:
     seen: list[dict[str, object]] = []
     out = process_lines(
         [json.dumps({"token": "secret"}), request()],

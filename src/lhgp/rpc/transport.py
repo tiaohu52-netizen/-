@@ -32,14 +32,14 @@ def process_lines(
 
     iterator = iter(lines)
     try:
-        raw_hanagent-cliake = next(iterator)
+        raw_handshake = next(iterator)
     except StopIteration:
         return []
     try:
-        hanagent-cliake = json.loads(raw_hanagent-cliake)
+        handshake = json.loads(raw_handshake)
     except (TypeError, ValueError):
-        return [json.dumps(_error(ErrorCode.AUTH_REQUIRED, "token hanagent-cliake required"))]
-    supplied = hanagent-cliake.get("token") if isinstance(hanagent-cliake, dict) else None
+        return [json.dumps(_error(ErrorCode.AUTH_REQUIRED, "token handshake required"))]
+    supplied = handshake.get("token") if isinstance(handshake, dict) else None
     if not isinstance(supplied, str) or not hmac.compare_digest(supplied, token):
         return [json.dumps(_error(ErrorCode.AUTH_FAILED, "invalid endpoint token"))]
 
@@ -133,7 +133,7 @@ def _serve_loopback_tcp(
 
     Python builds without ``AF_UNIX`` are common on Windows. The endpoint file
     contains only ``127.0.0.1`` and an ephemeral port; the existing token
-    hanagent-cliake remains the authentication boundary. No non-loopback bind is
+    handshake remains the authentication boundary. No non-loopback bind is
     permitted, so this does not widen the protocol to a network transport.
     """
     if endpoint.exists():

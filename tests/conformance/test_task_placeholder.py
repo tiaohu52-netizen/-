@@ -1,6 +1,6 @@
 """{task} 占位符（DESIGN §12.1 任务文本位置）测试。
 
-dogfood v4 教训：各 CLI 参数语法不同——agent-cli 是位置参数（尾元素追加可用），
+dogfood v4 教训：各 CLI 参数语法不同——cli-bridge 是位置参数（尾元素追加可用），
 flag 值型 CLI 是 -p 的值（尾元素被当子命令名报错）。占位符把「prompt 插在哪」
 变成注册表配置数据：argv 含一个 {task} → 原位替换；无占位符 → 尾元素
 追加（向后兼容）。手写包装器从此不需要。
@@ -102,7 +102,7 @@ class TestPlaceholderPositioning:
         adapter.collect("att-t1")
 
     def test_no_placeholder_appends_at_tail(self, tmp_path: Path) -> None:
-        """无占位符：尾元素追加（agent-cli 等位置参数 CLI 的既有形态，零破坏）。"""
+        """无占位符：尾元素追加（cli-bridge 等位置参数 CLI 的既有形态，零破坏）。"""
         script = "import sys; open('argv.txt','w',encoding='utf-8').write(repr(sys.argv[1:]))"
         adapter = SubprocessAdapter(
             make_manifest(),

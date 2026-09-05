@@ -6,7 +6,7 @@
 错误处理（unknown tool / invalid args → JSON-RPC error）。
 
 MCP 薄层对模型的意义：任何支持 MCP 的 agent harness（Claude Desktop、
-agent-zero、agent-cli 等）只需 `longtask-mcp` 一个 stdio 入口就能让模型
+agent-zero、cli-bridge 等）只需 `longtask-mcp` 一个 stdio 入口就能让模型
 发现并使用协议，无需自己解析 CLI。
 """
 

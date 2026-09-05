@@ -6,7 +6,7 @@ spawn 只收结构化 argv（列表参数、shell=False），模型输出是不�
 永不进入命令行（DESIGN §12.1、§14 注入防线）。
 
 任务文本位置（dogfood v4 教训：各 CLI 参数语法不同）：
-- 位置参数型（agent-cli headless）：argv 不含占位符 → task_prompt 追加为尾元素；
+- 位置参数型（cli-bridge headless）：argv 不含占位符 → task_prompt 追加为尾元素；
 - flag 值型（如 `<cli> -p "<task>"`）：argv 含一个 {task} 占位符 → 原位替换。
 「prompt 插在哪」由此成为注册表配置数据，不再需要每个 CLI 手写包装器。
 """
@@ -95,10 +95,10 @@ class _DetachedProcess:
 
 
 # ── CLI 兼容性：harness 结构化终态事件（v2 归档候选路径的落地）──
-# harness（agent-cli/自研 CLI）在 stdout 写一行 JSON 声明终态：
+# harness（cli-bridge/自研 CLI）在 stdout 写一行 JSON 声明终态：
 #   {"event":"attempt/finished","outcome":"succeeded|failed","returncode":0}
 # 适配器持续排水并扫描该行。价值（v2/v3/v4 实测教训）：
-# 1. 终态时机：agent-cli 主进程与内部 worker 生命周期不对齐——事件行让
+# 1. 终态时机：cli-bridge 主进程与内部 worker 生命周期不对齐——事件行让
 #    「干完了」由 harness 主动声明，不再等主进程退出；
 # 2. 成功语义：CLI 软失败也退 0——事件行的 outcome 是 harness 的显式
 #    判定，比裸退出码诚实（退出码仍如实并报，两者矛盾时以事件为准
@@ -350,7 +350,7 @@ class SubprocessAdapter(ExecutorAdapter):
         # 环境白名单：只透显式列出的变量；模型输出永不进入 argv 或环境
         env = {name: os.environ[name] for name in launch.env_allowlist if name in os.environ}
         # 任务文本注入（DESIGN §12.1）：{task} 占位符 → 原位替换；无占位符
-        # → 尾元素追加（向后兼容：agent-cli 等位置参数 CLI 的既有形态）。
+        # → 尾元素追加（向后兼容：cli-bridge 等位置参数 CLI 的既有形态）。
         # 文本是用户审定的冻结区数据，非模型输出；列表参数 + shell=False，
         # 无 shell 拼接面（§14 注入防线）——占位符只是位置标记，不引入拼接。
         argv = list(launch.argv)
@@ -439,7 +439,7 @@ class SubprocessAdapter(ExecutorAdapter):
 
         判定优先级（v2/v3/v4 实测教训的落地）：
         1. harness 结构化事件 attempt/finished——「干完了」由 harness 主动
-           声明（agent-cli 主进程与 worker 生命周期不对齐的根治路径）：主进程
+           声明（cli-bridge 主进程与 worker 生命周期不对齐的根治路径）：主进程
            还活着但事件已到 → 按事件的 outcome 判终态，事件早于退出即
            价值的全部所在；
         2. 主进程退出码（既有语义，无事件的 CLI 走这里）。
@@ -569,7 +569,7 @@ class SubprocessAdapter(ExecutorAdapter):
         if isinstance(proc, _MonitoredProcess):
             event = proc.finished_event
             if event is not None:
-                # harness 已声明完成：不等主进程退出（agent-cli 收尾期可长达分钟）
+                # harness 已声明完成：不等主进程退出（cli-bridge 收尾期可长达分钟）
                 proc.join_readers(timeout=5.0)
                 outcome = str(event.get("outcome", ""))
                 if attempt_id in self._cancelled:
