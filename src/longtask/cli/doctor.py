@@ -102,6 +102,14 @@ def run_doctor(root: Path | None = None) -> DoctorReport:
             if cur_ver != STORE_SCHEMA_VERSION:
                 db_ok = False
                 db_msg = f"schema version mismatch: got {cur_ver}, expected {STORE_SCHEMA_VERSION}"
+            else:
+                # 审计持久化-R5：版本对了不等于页没坏——quick_check 才是
+                # 损坏探测；小库开销可忽略，失败 fail-closed。
+                quick = conn.execute("PRAGMA quick_check").fetchone()
+                quick_result = str(quick[0]) if quick else "error"
+                if quick_result != "ok":
+                    db_ok = False
+                    db_msg = f"quick_check failed: {quick_result}"
         finally:
             conn.close()
     except (OSError, sqlite3.Error, Exception) as exc:

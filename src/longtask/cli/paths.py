@@ -131,6 +131,18 @@ def migrate_data_dir(
         shutil.copytree(src, backup_path)
 
     if not dry_run:
+        # 审计持久化-R6：拷贝 WAL 库前先 checkpoint 到主文件，否则逐文件
+        # 复制会产生「旧 db + 新 wal」的撕裂副本（daemon 运行中同样危险）。
+        source_db = src / "state.db"
+        if source_db.is_file():
+            try:
+                wal_conn = sqlite3.connect(source_db)
+                try:
+                    wal_conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                finally:
+                    wal_conn.close()
+            except sqlite3.Error:
+                pass  # checkpoint 失败不阻断（可能本就不是 WAL 库），quick_check 兜底
         for f in files:
             rel = f.relative_to(src)
             out = dst / rel

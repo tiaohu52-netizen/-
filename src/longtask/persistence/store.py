@@ -608,12 +608,14 @@ def save_contract(
                     return existing_contract
 
         resolved_goal_id = goal_id or contract_id
+        # 已存在的 Goal 身份字段不被合同创建覆盖（审计持久化-R2）：
+        # Goal 计划/标题的修订只能走 patch_goal（CAS + GOAL_AMENDED 事件）。
+        # 这里只在 Goal 尚不存在时创建；冲突时仅刷新 updated_at。
         conn.execute(
             """
             INSERT INTO goals (goal_id, title, objective, created_at, updated_at, schema_version)
             VALUES (?, ?, ?, ?, ?, ?)
-            ON CONFLICT(goal_id) DO UPDATE SET title=excluded.title,
-                objective=excluded.objective, updated_at=excluded.updated_at
+            ON CONFLICT(goal_id) DO UPDATE SET updated_at=excluded.updated_at
             """,
             (
                 resolved_goal_id,

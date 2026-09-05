@@ -100,13 +100,19 @@ def reconcile_attempts(
     for attempt in list_reconcilable_attempts(conn):
         if locally_tracked is not None and locally_tracked(attempt.attempt_id):
             continue
+        # 审计进程-R2：合同冻结区 continuity.recovery_grace_minutes 是
+        # 生效配置而非文档摆设——按 attempt 所属合同覆盖默认宽限。
+        effective_grace = recovery_grace
+        contract = get_contract(conn, attempt.contract_id or attempt.goal_id)
+        if contract is not None:
+            effective_grace = timedelta(minutes=contract.draft.continuity.recovery_grace_minutes)
         outcome = _reconcile_one(
             root,
             conn,
             attempt,
             now=now,
             resolve_adapter=resolve_adapter,
-            grace=recovery_grace,
+            grace=effective_grace,
             emit=emit,
         )
         if outcome is not None:
@@ -533,6 +539,48 @@ def _orphan(
     )
 
 
+def _terminate_if_identity_confirmed(
+    conn: sqlite3.Connection, attempt: StoredAttempt, now: datetime
+) -> None:
+    """宽限到期 fence 前，身份可证的外部进程 best-effort 终止。
+
+    只对 RECOVERY_REATTACH 策略句柄动作：pid+start_time 身份比对通过
+    （确认还是当年那个 run）才 terminate；比对失败或不可判定一律不动——
+    绝不凭 pid 撞名杀无辜进程。结果如实落 handle 事件供审计。
+    """
+    handle = attempt_handle(attempt)
+    if handle is None or not handle.is_recoverable():
+        return
+    identity = handle.process_identity
+    pid = identity.get("pid")
+    start_time = identity.get("start_time")
+    if not isinstance(pid, int) or not isinstance(start_time, (int, float)):
+        return
+    from lhgp.adapters.processes import identity_matches, process_alive, terminate_pid
+
+    if process_alive(pid) is not True:
+        return  # 已退出或不可判定：不动
+    if identity_matches(pid, float(start_time)) is not True:
+        return  # pid 被复用：不是我们的 run，绝不碰
+    if terminate_pid(pid):
+        append_event(
+            conn,
+            contract_id=attempt.contract_id or attempt.goal_id,
+            attempt_id=attempt.attempt_id,
+            event_type=EventType.HANDLE_REGISTERED,
+            payload={
+                "action": "terminate_on_fence",
+                "pid": pid,
+                "reason": "orphan grace expired; confirmed-identity run terminated",
+            },
+            now=now,
+            actor="daemon",
+            goal_id=attempt.goal_id,
+            contract_revision=attempt.contract_revision,
+            role="system",
+        )
+
+
 def _sweep_orphan(
     root: Path,
     conn: sqlite3.Connection,
@@ -569,6 +617,9 @@ def _sweep_orphan(
 
     # 宽限到期：fence 旧 generation（释放租约使旧写回 LEASE_FENCED），
     # 记录风险，重新派发交由 Dispatcher 下一轮决定（§8 边界）。
+    # 审计进程-R3：fence 前对 reattach 策略句柄做身份确认下的 best-effort
+    # 终止——「状态未知」的活进程与新 attempt 双写 workspace 是最坏结局。
+    _terminate_if_identity_confirmed(conn, attempt, now)
     with contextlib.suppress(LeaseFencedError):
         release_lease(
             conn,

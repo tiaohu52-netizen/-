@@ -670,6 +670,10 @@ class AttemptRunner:
             now=now,
             actor="daemon",
         )
+        # 审计进程-R1：stale 是终态，遗留的租约会让 decide() 封顶 REMIND、
+        # workspace 排他把死租约当占用者——合同空转最长一个 attempt 超时。
+        # 释放失败（已换代）不影响终态记账。
+        self._release_lease_if_held(now, str(info["contract_id"]), attempt_id)
         # P1：更新 attempts 行
         self._conn.execute(
             """
@@ -799,14 +803,16 @@ class AttemptRunner:
         # SPEC §12.3 明确「历史 verifier 不得阻止新的 verifier 派生」——
         # 只有当存在非 terminal 的 verifier attempt 时才视为正在派生，
         # 避免与同 attempt_id 上后续轮次冲突。
+        # 审计调度-R5：在途判定与预算同作用域（contract_id）。曾按 goal_id
+        # 圈定——同 Goal 兄弟合同的 verifier 会让本合同的验收无限期延后。
         existing_verifier = self._conn.execute(
             """
             SELECT state FROM attempts
-            WHERE goal_id = ? AND role = 'verifier'
+            WHERE contract_id = ? AND role = 'verifier'
               AND state NOT IN ('succeeded', 'failed', 'cancelled', 'stale', 'orphaned')
             ORDER BY admitted_at DESC LIMIT 1
             """,
-            (contract.goal_id,),
+            (contract.contract_id,),
         ).fetchone()
         if existing_verifier is not None:
             return False
