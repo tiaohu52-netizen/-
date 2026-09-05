@@ -373,7 +373,7 @@ def handle_goal_list(
 ) -> dict[str, Any]:
     """List stable Goals independently from individual contract revisions."""
     raw_limit = envelope.params.get("limit", 20)
-    if isinstance(raw_limit, bool):
+    if isinstance(raw_limit, (bool, float)):
         raise RpcError(
             code=ErrorCode.VALIDATION_FAILED,
             message="limit must be an integer",
