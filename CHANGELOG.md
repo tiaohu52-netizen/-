@@ -6,6 +6,17 @@ follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
 
 ## [Unreleased]
 
+### Changed
+
+- Position LHGP as a multi-agent task contract runtime with an LLM-independent
+  scheduling core; retain protocol names, package identity and compatibility.
+- Align English/Chinese README and specification framing; distinguish multiple
+  contracts and submitted-plan progression from optional future semantic planning.
+- Replace the incomplete automatic-execution quickstart with an isolated,
+  non-LLM contract lifecycle smoke. Add ADR-004, an executable release-first plan
+  and an audit recording known blockers. This is documentation work, not a
+  runtime fix or a new release.
+
 ### Added
 
 - MCP tool safety annotations (`readOnlyHint`, `destructiveHint`,
@@ -30,6 +41,11 @@ follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
 
 ### Fixed
 
+- Timeout cancellation failures now orphan the attempt and retain its lease for
+  reconcile grace/fencing instead of releasing execution control before the
+  external process is known to have stopped.
+- Verifier `attempt/started` events no longer consume the executor
+  `max_dispatches` budget; execution and verification budgets remain separate.
 - Detached daemon and subprocess test lifecycle cleanup, including parent
   pipe closure after child exit.
 - MCP canonical aliases now retain their safety annotations and report the

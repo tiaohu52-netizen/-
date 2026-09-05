@@ -1,8 +1,21 @@
-# Deadline Decision Reliability v1
+# 当前工作计划
+
+当前目标：统一“多 Agent 任务合同运行时”定位，修复已承诺能力的发布阻断项，优先发布 Developer Preview。
+
+- 定位权威：[ADR-004](../docs/decisions/0004-contract-runtime-and-release-scope.md) 与 [SPEC](../docs/LHGP-SPEC.md)。
+- 执行顺序、任务卡、验收条件：[RELEASE-PLAN.md](../docs/RELEASE-PLAN.md)。
+- 当前结论与复现：[发布检查](../docs/evidence/release-readiness-2026-09-05.md)。
+- 下一项：R1 超时取消失败的控制权保护；随后 R2 执行／验证预算隔离。
+- 本轮已实施 R1/R2 运行时修复，未提交、打 tag、推送或对外发布。以下计划作为历史记录保留。
+
+---
+
+# 历史：Deadline Decision Reliability v1
 
 ## Objective
 
-在单机、离线可用的范围内，把 Deadline 从“定时扫描提示”提升为可解释、可审计、可恢复的决策控制面。跨主机、跨网络、云端中继和严格墙钟结果保证明确留到后续版本。
+在单机、离线可用的范围内，把 Deadline 从“定时扫描提示”提升为可解释、可审计、可恢复的决策控制面。
+范围澄清：跨主机、跨网络和云端中继不在当前计划；严格墙钟结果担保不作为待实现能力。
 
 ## Design assumptions
 
