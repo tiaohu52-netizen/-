@@ -753,26 +753,34 @@ def run_stage2() -> None:
             verifier_id="dsh-verifier",
             verifier_model="deepseek-v4-pro",
         )
-        result = handle_goal_prepare(
-            _envelope(
-                Method.GOAL_PREPARE,
-                f"req-v5-stage2-{int(time.time())}",
-                {
-                    "contract_id": contract_id,
-                    "goal_id": GOAL_ID,
-                    "stage_id": "stage-2",
-                    "draft": draft,
-                },
-            ),
-            conn=conn,
-            now=_now(),
-        )
-        if not result.get("ok"):
-            raise RuntimeError(result)
-        update_contract_state(
-            conn, contract_id=contract_id, new_state=ContractState.ACTIVE, now=_now()
-        )
-        print(f"[v5][stage-2] contract ACTIVE; executor=kimi-code: {contract_id}")
+        existing = get_contract(conn, contract_id)
+        if existing is None:
+            result = handle_goal_prepare(
+                _envelope(
+                    Method.GOAL_PREPARE,
+                    f"req-v5-stage2-{int(time.time())}",
+                    {
+                        "contract_id": contract_id,
+                        "goal_id": GOAL_ID,
+                        "stage_id": "stage-2",
+                        "draft": draft,
+                    },
+                ),
+                conn=conn,
+                now=_now(),
+            )
+            if not result.get("ok"):
+                raise RuntimeError(result)
+            update_contract_state(
+                conn, contract_id=contract_id, new_state=ContractState.ACTIVE, now=_now()
+            )
+            print(f"[v5][stage-2] contract ACTIVE; executor=kimi-code: {contract_id}")
+        elif existing.state in (ContractState.COMPLETE, ContractState.CANCELLED):
+            raise RuntimeError(
+                f"stage-2 contract already terminal ({existing.state.value}); run reset first"
+            )
+        else:
+            print(f"[v5][stage-2] reusing existing {existing.state.value} contract: {contract_id}")
     finally:
         conn.close()
 
