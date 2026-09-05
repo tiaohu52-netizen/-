@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import socket
+import tempfile
 import threading
 import time
+from pathlib import Path
+
+import pytest
 
 from lhgp.rpc.transport import _serve_loopback_tcp
 from longtask import PROTOCOL_VERSION
@@ -65,8 +70,12 @@ def test_malformed_request_is_recoverable() -> None:
 
 def test_unix_socket_round_trip(tmp_path) -> None:
     if not hasattr(socket, "AF_UNIX"):
-        return
-    endpoint = tmp_path / "rpc.sock"
+        pytest.skip("AF_UNIX unavailable")
+    # macOS 的 AF_UNIX 路径上限约 104 字节，pytest tmp 目录层级深——
+    # 用临时目录 + 内容哈希保证短而稳定（与产品 rpc_socket_path 同策略）。
+    endpoint = Path(tempfile.gettempdir()) / (
+        "lhgp-test-" + hashlib.sha256(str(tmp_path).encode()).hexdigest()[:16] + ".sock"
+    )
     stopped = threading.Event()
     thread = threading.Thread(
         target=serve_unix_socket,
@@ -96,7 +105,7 @@ def test_unix_socket_round_trip(tmp_path) -> None:
 
 def test_unix_socket_does_not_delete_regular_file(tmp_path) -> None:
     if not hasattr(socket, "AF_UNIX"):
-        return
+        pytest.skip("AF_UNIX unavailable")
     endpoint = tmp_path / "rpc.sock"
     endpoint.write_text("sentinel", encoding="utf-8")
     stopped = threading.Event()

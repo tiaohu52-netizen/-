@@ -1,9 +1,18 @@
-"""Process identity and liveness probes for restart-safe adapters."""
+"""Process identity and liveness probes for restart-safe adapters.
+
+三平台实现（审计遗留的 macOS 身份模型适配）：
+- Windows: OpenProcess + GetExitCodeProcess / GetProcessTimes；
+- Linux: /proc/<pid>/stat（状态判活含僵尸 + 字段 22 启动时刻）；
+- macOS: libproc.proc_pidinfo(PROC_PIDTBSDINFO)——pbi_status 判活含
+  SZOMB，pbi_start_tvsec/tvusec 给出与 Linux 同精度的稳定启动时刻。
+"""
 
 from __future__ import annotations
 
 import os
 import sys
+import typing
+from typing import Any
 
 IDENTITY_TOLERANCE_SECONDS = 2.0
 
@@ -76,7 +85,111 @@ if sys.platform == "win32":  # pragma: no cover - platform-specific branch
         finally:
             _kernel32.CloseHandle(handle)
 
-else:  # pragma: no cover - exercised on POSIX CI
+elif sys.platform == "darwin":  # pragma: no cover - exercised on macOS CI
+    import ctypes
+    import signal
+    from pathlib import Path
+
+    # libproc 的 PROC_PIDTBSDINFO 让 macOS 拿到与 Linux /proc 等价的两个
+    # 事实：进程状态（SZOMB 判僵尸）与稳定的启动时刻（身份比对）。
+    _PROC_PIDTBSDINFO = 3
+    _SZOMB = 6  # BSD 进程状态常量：zombie
+
+    class _ProcBsdInfo(ctypes.Structure):
+        """struct proc_bsdinfo（64 位 darwin 布局，总长 152 字节）。"""
+
+        _fields_: typing.ClassVar[list[Any]] = [
+            ("pbi_flags", ctypes.c_uint32),
+            ("pbi_status", ctypes.c_uint32),
+            ("pbi_xstatus", ctypes.c_uint32),
+            ("pbi_pid", ctypes.c_uint32),
+            ("pbi_uid", ctypes.c_uint32),
+            ("pbi_ruid", ctypes.c_uint32),
+            ("pbi_svuid", ctypes.c_uint32),
+            ("pbi_gid", ctypes.c_uint32),
+            ("pbi_rgid", ctypes.c_uint32),
+            ("pbi_svgid", ctypes.c_uint32),
+            ("rfu_1", ctypes.c_uint32),
+            ("pbi_comm", ctypes.c_char * 17),
+            ("pbi_name", ctypes.c_char * 33),
+            ("pbi_nfiles", ctypes.c_uint32),
+            ("pbi_pgid", ctypes.c_uint32),
+            ("pbi_ppid", ctypes.c_uint32),
+            ("pbi_tdev", ctypes.c_uint32),
+            ("eflags", ctypes.c_uint32),
+            ("pbi_ruid2", ctypes.c_uint32),
+            ("pbi_svuid2", ctypes.c_uint32),
+            ("pbi_gid2", ctypes.c_uint32),
+            ("pbi_rgid2", ctypes.c_uint32),
+            ("pbi_svgid2", ctypes.c_uint32),
+            ("pbi_start_tvsec", ctypes.c_uint64),
+            ("pbi_start_tvusec", ctypes.c_uint64),
+        ]
+
+    def _load_libproc() -> ctypes.CDLL | None:
+        try:
+            lib = ctypes.CDLL("/usr/lib/libproc.dylib")
+        except OSError:
+            return None
+        lib.proc_pidinfo.restype = ctypes.c_int
+        lib.proc_pidinfo.argtypes = [
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_uint64,
+            ctypes.c_void_p,
+            ctypes.c_int,
+        ]
+        return lib
+
+    _LIBPROC = _load_libproc()
+
+    def _bsd_info(pid: int) -> _ProcBsdInfo | None:
+        if _LIBPROC is None or pid <= 0:
+            return None
+        info = _ProcBsdInfo()
+        ret = _LIBPROC.proc_pidinfo(
+            pid, _PROC_PIDTBSDINFO, 0, ctypes.byref(info), ctypes.sizeof(info)
+        )
+        if ret <= 0:
+            return None
+        return info
+
+    def process_start_time(pid: int) -> float | None:
+        """Epoch 启动时刻（tvsec + tvusec/1e6）：进程退出后仍稳定。"""
+        info = _bsd_info(pid)
+        if info is None:
+            return None
+        return float(info.pbi_start_tvsec) + float(info.pbi_start_tvusec) / 1e6
+
+    def process_alive(pid: int) -> bool | None:
+        if pid <= 0:
+            return None
+        info = _bsd_info(pid)
+        if info is not None:
+            # SZOMB：已退出未收尸。macOS 没有 /proc，libproc 状态是唯一
+            # 可靠的僵尸判据——否则 kill(pid, 0) 会把僵尸当活进程。
+            return info.pbi_status != _SZOMB
+        # proc_pidinfo 拿不到（EPERM 或库缺失）：回退 kill 三态
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return None
+        except OSError:
+            return None
+        return True
+
+    def terminate_pid(pid: int) -> bool:
+        if pid <= 0:
+            return False
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError:
+            return False
+        return True
+
+else:  # pragma: no cover - exercised on Linux CI
     import signal
     from pathlib import Path
 
