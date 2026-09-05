@@ -235,10 +235,10 @@ def test_request_with_exhausted_verification_budget_refused(tmp_path: Path) -> N
     _root, conn, cid, _reg = _setup(tmp_path, reserved=1, state=ContractState.ACTIVE)
     try:
         conn.execute(
-            "INSERT INTO attempts (attempt_id, goal_id, contract_revision, role,"
-            " executor_id, model_id, state, lease_generation, admitted_at, updated_at)"
-            " VALUES ('ver-old', ?, 1, 'verifier', 'exec-b', '*', 'failed', 1, ?, ?)",
-            (cid, NOW.isoformat(), NOW.isoformat()),
+                "INSERT INTO attempts (attempt_id, goal_id, contract_id, contract_revision, role,"
+                " executor_id, model_id, state, lease_generation, admitted_at, updated_at)"
+                " VALUES ('ver-old', ?, ?, 1, 'verifier', 'exec-b', '*', 'failed', 1, ?, ?)",
+                (cid, cid, NOW.isoformat(), NOW.isoformat()),
         )
         conn.commit()
         with pytest.raises(RpcError) as excinfo:

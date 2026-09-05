@@ -241,6 +241,10 @@ def set_attempt_state(
         """
         UPDATE attempts
         SET state = ?,
+            started_at = CASE
+                WHEN ? = 'running' THEN COALESCE(started_at, ?)
+                ELSE started_at
+            END,
             terminal_at = ?,
             error_class = COALESCE(?, error_class),
             return_code = COALESCE(?, return_code),
@@ -250,6 +254,8 @@ def set_attempt_state(
         """,
         (
             state,
+            state,
+            now.isoformat(),
             now.isoformat() if terminal else None,
             error_class,
             return_code,

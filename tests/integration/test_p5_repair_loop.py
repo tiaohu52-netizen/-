@@ -116,9 +116,9 @@ class TestVerificationBudget:
             conn.execute(
                 """
                 INSERT INTO attempts (
-                    attempt_id, goal_id, contract_revision, role, executor_id,
+                    attempt_id, goal_id, contract_id, contract_revision, role, executor_id,
                     state, admitted_at, terminal_at, payload_json, updated_at
-                ) VALUES ('ver-used1', 'lt-p5b', 2, 'verifier', 'exec-2',
+                ) VALUES ('ver-used1', 'lt-p5b', 'lt-p5b', 2, 'verifier', 'exec-2',
                           'failed', ?, ?, '{}', ?)
                 """,
                 (
@@ -147,6 +147,36 @@ class TestVerificationBudget:
 
             payload = _json.loads(handover[-1].payload_json or "{}")
             assert "verification budget exhausted" in payload["reason"]
+        finally:
+            conn.close()
+
+    def test_verification_budget_is_scoped_to_contract_not_goal(self, tmp_path: Path) -> None:
+        """不同阶段合同不得消耗彼此的 verifier 配额。"""
+        from longtask.promoter.records import _count_verifier_attempts
+
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        setup_contract(data_dir, "lt-p5-budget-a", verification_reserved=1)
+        setup_contract(data_dir, "lt-p5-budget-b", verification_reserved=1)
+        conn = connect(StoreConfig(db_path=data_dir / "state.db"))
+        try:
+            conn.execute(
+                "UPDATE contracts SET goal_id = 'shared-goal' WHERE contract_id IN (?, ?)",
+                ("lt-p5-budget-a", "lt-p5-budget-b"),
+            )
+            conn.execute(
+                """
+                INSERT INTO attempts (
+                    attempt_id, goal_id, contract_id, contract_revision, role,
+                    executor_id, state, admitted_at, terminal_at, payload_json, updated_at
+                ) VALUES ('ver-a', 'shared-goal', 'lt-p5-budget-a', 2, 'verifier',
+                          'exec-2', 'failed', ?, ?, '{}', ?)
+                """,
+                (NOW.isoformat(), NOW.isoformat(), NOW.isoformat()),
+            )
+            conn.commit()
+            assert _count_verifier_attempts(conn, "lt-p5-budget-a") == 1
+            assert _count_verifier_attempts(conn, "lt-p5-budget-b") == 0
         finally:
             conn.close()
 

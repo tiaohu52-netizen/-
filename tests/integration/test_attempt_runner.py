@@ -79,7 +79,9 @@ def make_registry(*, argv: tuple[str, ...]) -> ExecutorRegistry:
     return reg
 
 
-def make_contract(data_dir: Path, cid: str, *, max_dispatches: int = 5) -> None:
+def make_contract(
+    data_dir: Path, cid: str, *, max_dispatches: int = 5, max_attempt_minutes: int = 60
+) -> None:
     conn = connect(StoreConfig(db_path=data_dir / "state.db"))
     ensure_schema(conn)
     draft = ContractDraft(
@@ -98,7 +100,7 @@ def make_contract(data_dir: Path, cid: str, *, max_dispatches: int = 5) -> None:
             max_dispatches=max_dispatches,
             max_escalations=2,
             max_concurrent_attempts=1,
-            max_attempt_minutes=60,
+            max_attempt_minutes=max_attempt_minutes,
             max_output_bytes=1048576,
         ),
     )
@@ -200,6 +202,41 @@ def test_runner_failed_attempt_releases_lease_and_redispatches(tmp_path: Path) -
         # 失败释放后下一轮可再派工（预算 5 未触顶）
         res2 = run_daemon_tick(data_dir, conn, registry, now=NOW + timedelta(minutes=1))
         assert res2["dispatched"] == 1
+    finally:
+        conn.close()  # type: ignore[attr-defined]
+
+
+def test_running_attempt_is_terminated_at_contract_timeout(tmp_path: Path) -> None:
+    """max_attempt_minutes 是硬上限，不应因心跳续租而无限运行。"""
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "ws").mkdir()
+    cid = "lt-20260901-timeout"
+    make_registry(argv=(sys.executable, "-c", "import time; time.sleep(120)")).save_to_file(
+        data_dir / "registry.json"
+    )
+    make_contract(data_dir, cid, max_attempt_minutes=1)
+
+    conn = open_store(data_dir)
+    try:
+        registry = ExecutorRegistry.load_from_file(data_dir / "registry.json")
+        runner = AttemptRunner(data_dir, conn, registry)
+        res = run_daemon_tick(data_dir, conn, registry, now=NOW)
+        started = res["attempts_started"][0]
+        assert runner.start_attempt(
+            NOW,
+            contract_id=cid,
+            attempt_id=started["attempt_id"],
+            executor_id="exec-1",
+        )
+
+        runner.poll_attempts(NOW + timedelta(minutes=2))
+        row = conn.execute(
+            "SELECT state, error_class FROM attempts WHERE attempt_id = ?",
+            (started["attempt_id"],),
+        ).fetchone()
+        assert row == ("failed", "attempt-timeout")
+        assert get_lease(conn, cid) is None
     finally:
         conn.close()  # type: ignore[attr-defined]
 

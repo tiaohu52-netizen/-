@@ -107,11 +107,10 @@ def _goal_id_for_contract(conn: sqlite3.Connection, contract_id: str) -> str:
 
 
 def _count_verifier_attempts(conn: sqlite3.Connection, contract_id: str) -> int:
-    goal_id = _goal_id_for_contract(conn, contract_id)
     row = conn.execute(
-        """SELECT COUNT(*) FROM attempts WHERE goal_id = ?
+        """SELECT COUNT(*) FROM attempts WHERE contract_id = ?
         AND role = 'verifier' AND state IN ('succeeded','failed','cancelled','stale','orphaned')""",
-        (goal_id,),
+        (contract_id,),
     ).fetchone()
     return int(row[0]) if row else 0
 
