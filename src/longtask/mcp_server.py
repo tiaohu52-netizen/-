@@ -1044,6 +1044,9 @@ def serve_stdio(root: Path) -> None:
 def main(argv: list[str] | None = None) -> int:
     import argparse
 
+    from longtask.console import harden_stdio
+
+    harden_stdio()
     if _server_name() == "longtask-mcp":
         print(
             "warning: 'longtask-mcp' is deprecated; use 'lhgp-mcp' instead",

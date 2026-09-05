@@ -46,6 +46,13 @@ follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
 
 ### Fixed
 
+- CLI and MCP `--help` no longer crash with `UnicodeEncodeError` on non-UTF-8
+  consoles (e.g. cp1252); unencodable help characters are replaced.
+- The `executor/health` integration test no longer depends on a
+  machine-installed `codex` CLI (hermetic fixture uses the interpreter).
+- mypy analysis is pinned to the Windows platform (the authoritative
+  typecheck platform) so the three-OS CI matrix typechecks identically, and an
+  unused Rust cache step was removed from CI.
 - Timeout cancellation failures now orphan the attempt and retain its lease for
   reconcile grace/fencing instead of releasing execution control before the
   external process is known to have stopped.
