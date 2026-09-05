@@ -33,6 +33,7 @@ runtime/
 # 本地 dogfood、规划与工作记忆（可能包含凭证、会话内容和状态数据库）
 .dogfood/
 .dogfood-v5/
+.dogfood-v5.archive-*/
 .planning/
 .workbuddy/
 runtime-mcp/
