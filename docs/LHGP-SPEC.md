@@ -14,8 +14,8 @@
 
 ## 0. 核心定义
 
-**LHGP 的参考实现是独立于会话和模型的多 Agent 任务合同运行时，支持远期目标的持续推进与证据化验收。**
-Long-Horizon Goal Protocol（远期目标协议）继续作为协议名称；“任务合同运行时”说明当前产品类别。
+**LHGP 的参考实现（产品名「限期合同中枢」，Deadline Contract Hub）是独立于会话和模型的多 Agent 任务合同运行时，支持远期目标的持续推进与证据化验收。**
+Long-Horizon Goal Protocol（远期目标协议）继续作为协议名称；“任务合同运行时”描述系统类别，“限期合同中枢”是产品名称。
 用户通过 CLI、程序或 Agent 客户端建立合同，声明期望结果、验收、Deadline、权限、预算及允许使用的执行者。
 运行时持有多份合同，在后台保存证据化进度、选择或更换获授权的执行者、编译接力上下文、管理 Deadline 风险，
 并根据验收证据推进合同及关联目标。该定义依据 [ADR-004](decisions/0004-contract-runtime-and-release-scope.md)。
@@ -1179,7 +1179,7 @@ uv run python -m pytest tests/conformance -q
 README 首屏应说明当前产品类别、主要场景和边界，不承诺无人监管下必然交付。按 ADR-004 推荐：
 
 ```markdown
-# LHGP — Multi-Agent Task Contract Runtime
+# LHGP — Deadline Contract Hub
 
 A multi-agent task contract runtime, independent of sessions and models,
 for sustained progress and evidence-based acceptance of long-horizon goals.

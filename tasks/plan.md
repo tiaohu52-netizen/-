@@ -1,6 +1,6 @@
 # 当前工作计划
 
-当前目标：统一“多 Agent 任务合同运行时”定位，修复已承诺能力的发布阻断项，优先发布 Developer Preview。
+当前目标：统一“限期合同中枢”产品定位，修复已承诺能力的发布阻断项，优先发布 Developer Preview。
 
 - 定位权威：[ADR-004](../docs/decisions/0004-contract-runtime-and-release-scope.md) 与 [SPEC](../docs/LHGP-SPEC.md)。
 - 执行顺序、任务卡、验收条件：[RELEASE-PLAN.md](../docs/RELEASE-PLAN.md)。
