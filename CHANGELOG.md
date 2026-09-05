@@ -4,6 +4,27 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version numbers
 follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
 
+## [0.1.0a2] - 2026-09-05
+
+Deadline 可靠性与合同防篡改（PR #10，分支 hardening/deadline-contract-guards，
+GitHub CI 三平台实测通过）。
+
+### Security
+
+- `contract/patch` 现在要求 Principal（user）——模型客户端修订合同一律
+  AUTH_FAILED（RPC-C1 审查的遗漏面）。
+- `budget` 加入 FROZEN_FIELDS：patch 试图改预算从静默忽略升级为显式拒绝。
+
+### Fixed
+
+- 过期的 `next_decision_at` 原样返回（调用方钳 0 立即唤醒）：一个 blocked
+  合同的过期决策点不再让 daemon 回退整周期休眠、吞掉 active 合同的未来
+  唤醒点——deadline 唤醒稳定性。
+- 档 3（steer）无活租约时立即重派（DESIGN §6.2）：deadline 剩余窗口不再
+  浪费在无会话可干预的空提醒上——deadline 灵活性；预算不足如实交用户。
+- 验证预算耗尽 → 合同转 `blocked(need-user)`：daemon 不再把不可验收的
+  合同一轮轮重派烧光执行预算（防破坏性跟进）。
+
 ## [0.1.0a1] - 2026-09-05
 
 安全加固补丁：发布后四域深度审查（进程/租约、持久化、RPC/MCP 边界、调度
