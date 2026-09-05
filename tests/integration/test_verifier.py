@@ -212,9 +212,10 @@ class TestVerifierOutcome:
         conn, cid = _active_contract(root)
         try:
             self._record_verifier(conn, cid, "succeeded")
-            run_daemon_tick(
+            result = run_daemon_tick(
                 root, conn, ExecutorRegistry.load_from_file(root / "registry.json"), now=NOW
             )
+            assert result["dispatched"] == 0
             c_view = get_contract(conn, cid)
             assert c_view is not None
             assert c_view.state == ContractState.COMPLETE

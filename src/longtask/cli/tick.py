@@ -104,6 +104,12 @@ def run_daemon_tick(
             "attempts_started": [],
         }
 
+    # Resolve verifier terminal evidence before computing dispatch decisions.
+    # Otherwise a verifier that finished between ticks can leave the contract
+    # looking active for one pass, causing an extra executor spawn before the
+    # completion hook runs.
+    _judge_verifier_outcomes(root, conn, now)
+
     # 2. 查询所有合同
     all_contracts = list_contracts(conn, limit=1000)
     clocks: list[ClockEntry] = []
@@ -464,10 +470,6 @@ def run_daemon_tick(
                         role="promoter",
                     )
                     rebuild_projection(root, cid, conn)
-
-    # verifier 裁决（DESIGN §5.2）：verifier succeeded -> 合同 complete；
-    # failed -> 退回 active（重新派工）；其他等待。
-    _judge_verifier_outcomes(root, conn, now)
 
     return {
         "ok": True,
