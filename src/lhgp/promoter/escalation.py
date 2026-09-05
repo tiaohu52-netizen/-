@@ -37,7 +37,24 @@ def decide(
         return _free(
             capped, f"lease alive: cap at remind (§7), u-tier {int(tier)} -> {int(capped)}"
         )
-    if tier in (UrgencyTier.QUEUED, UrgencyTier.REMIND, UrgencyTier.STEER):
+    if tier is UrgencyTier.STEER:
+        # DESIGN §6.2 档 3：u >= 1.0，或「无活跃租约且 u >= 0.5」→ 重派。
+        # 没有活会话可干预时，steer 是空动作，deadline 剩余窗口不能浪费在
+        # 等待上——立即重派新 attempt（灵活性），预算不足则如实交用户。
+        if budget_dispatches_left < 1:
+            return EscalationDecision(
+                UrgencyTier.HAND_TO_USER,
+                "steer with no live lease but dispatch budget exhausted: hand to user (§6.2/§6.3)",
+                False,
+                False,
+            )
+        return EscalationDecision(
+            UrgencyTier.RESPAWN,
+            "steer tier with no live lease: nothing to steer, respawn now (§6.2)",
+            True,
+            False,
+        )
+    if tier in (UrgencyTier.QUEUED, UrgencyTier.REMIND):
         return _free(tier, f"u-tier {int(tier)}: free action, no budget consumed")
     if budget_dispatches_left < 1:
         return EscalationDecision(

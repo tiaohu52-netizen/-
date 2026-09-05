@@ -70,7 +70,6 @@ class TestFreeTiers:
         [
             (UrgencyTier.QUEUED, UrgencyTier.QUEUED),
             (UrgencyTier.REMIND, UrgencyTier.REMIND),
-            (UrgencyTier.STEER, UrgencyTier.STEER),
         ],
     )
     def test_free_tiers_consume_nothing(self, tier: UrgencyTier, expected: UrgencyTier) -> None:
@@ -80,9 +79,22 @@ class TestFreeTiers:
         assert not d.consumes_escalation
 
     def test_free_tiers_survive_exhausted_budget(self) -> None:
-        # 档 0/1/2 免费动作：预算耗尽不阻止它们，也不升档 5
-        d = decide_with(UrgencyTier.STEER, budget_dispatches_left=0, budget_escalations_left=0)
-        assert d.tier == UrgencyTier.STEER
+        # 档 0/1 免费动作：预算耗尽不阻止它们，也不升档 5
+        d = decide_with(UrgencyTier.REMIND, budget_dispatches_left=0, budget_escalations_left=0)
+        assert d.tier == UrgencyTier.REMIND
+        assert not d.consumes_dispatch
+
+
+class TestSteerNoLease:
+    def test_steer_with_dead_lease_respawns(self) -> None:
+        # DESIGN §6.2 档 3：无活跃租约且 u >= 0.5 → 重派，不浪费 deadline 窗口
+        d = decide_with(UrgencyTier.STEER, lease_alive=False)
+        assert d.tier == UrgencyTier.RESPAWN
+        assert d.consumes_dispatch
+
+    def test_steer_with_dead_lease_and_no_budget_hands_to_user(self) -> None:
+        d = decide_with(UrgencyTier.STEER, lease_alive=False, budget_dispatches_left=0)
+        assert d.tier == UrgencyTier.HAND_TO_USER
         assert not d.consumes_dispatch
 
 

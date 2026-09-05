@@ -60,7 +60,10 @@ def earliest_next_decision_at(
     if row is None or row[0] is None:
         return None
     value = datetime.fromisoformat(row[0])
-    return value if value > now else None
+    # 过期的决策点必须原样返回（调用方钳到 0 立即唤醒），而不是返回
+    # None——None 会让 daemon 回退到整周期休眠，deadline 决策反而被
+    # 一个早已过期的 blocked 合同拖到下个周期才处理（审查 R1）。
+    return value
 
 
 def list_decisions(

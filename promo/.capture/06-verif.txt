@@ -1,0 +1,5 @@
+{
+  "contract_id": "lt-20260905-demo",
+  "verification_requested": true,
+  "note": "daemon will dispatch an independent verifier on its next tick"
+}
