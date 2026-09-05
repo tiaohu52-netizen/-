@@ -250,16 +250,18 @@ def run_daemon_loop(
                 break
             if interval_seconds > 0:
                 # P4：按最早决策点自适应休眠（SPEC §9 next_decision_at）。
-                # 有活 attempt 时保底心跳节奏（续约/回收观察不能停）；
-                # 全部空闲时睡到「下一个必须回头看」的时刻，不做 60s 盲轮询。
+                # 有活 attempt 时仍要保底心跳节奏（续约/回收观察不能停），
+                # 但不能因此跳过更早的 deadline 决策点；两者取较小值。
                 # 用本轮已取的 now_val 计算时长，不二次调用 clock()（可注入
                 # 有限迭代器，多调一次就 StopIteration）。
                 sleep_seconds = interval_seconds
-                if runner.is_idle():
-                    next_at = earliest_next_decision_at(conn, now=now_val)
-                    if next_at is not None:
-                        until = (next_at - now_val).total_seconds()
-                        sleep_seconds = min(interval_seconds, max(0.5, until))
+                next_at = earliest_next_decision_at(conn, now=now_val)
+                if next_at is not None:
+                    until = (next_at - now_val).total_seconds()
+                    # A due decision must be handled immediately; a positive
+                    # point is capped by the heartbeat interval even when a
+                    # subprocess is currently active.
+                    sleep_seconds = min(interval_seconds, max(0.0, until))
                 if sleep_fn is time.sleep:
                     # 真实 daemon 用可被 daemon/wake 唤醒的等待；测试注入的
                     # sleep_fn 保持原有确定性语义，不触碰线程事件。

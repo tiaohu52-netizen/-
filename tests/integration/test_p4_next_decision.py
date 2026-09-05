@@ -411,6 +411,23 @@ class TestDaemonLoopSleepsUntilDecisionPoint:
         # 决策点 = deadline - 1s = 29s < interval 60s → 睡 29s
         assert sleeps == [29.0, 29.0]
 
+    def test_active_attempt_still_wakes_for_earlier_deadline_decision(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A live attempt must not hide an imminent deadline decision.
+
+        Heartbeat renewal still happens on the next cycle, but sleeping the
+        full interval here could cross the contract's hard deadline cap.
+        """
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        setup_contract(data_dir, "lt-p4-active", NOW + timedelta(seconds=30))
+        monkeypatch.setattr(
+            "longtask.cli.daemon_loop.AttemptRunner.is_idle", lambda _runner: False
+        )
+        _result, sleeps = self._run(data_dir, NOW + timedelta(seconds=30))
+        assert sleeps == [29.0, 29.0]
+
     def test_far_decision_point_caps_at_interval(self, tmp_path: Path) -> None:
         """决策点很远（deadline 4h，QUEUED/远期）：不睡超过 interval。"""
         data_dir = tmp_path / "data"
