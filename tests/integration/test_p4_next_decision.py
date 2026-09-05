@@ -248,17 +248,22 @@ class TestEarliestAcrossContracts:
         finally:
             conn.close()
 
-    def test_past_points_are_ignored(self, tmp_path: Path) -> None:
-        """已过期的决策点不算（取未来最早的）。"""
+    def test_past_points_are_returned_for_immediate_wake(self, tmp_path: Path) -> None:
+        """过期决策点原样返回（调用方钳 0 立即唤醒）。
+
+        曾返回 None 导致 daemon 回退整周期休眠：一个 blocked 合同的过期
+        点会吞掉 active 合同的未来决策点，deadline 唤醒迟到整周期
+        （分支 hardening/deadline-contract-guards，审查 R1）。
+        """
         data_dir = tmp_path / "data"
         data_dir.mkdir()
         setup_contract(data_dir, "lt-p4g", NOW + timedelta(hours=2))
         conn = connect(StoreConfig(db_path=data_dir / "state.db"))
         try:
-            set_next_decision_at(
-                conn, contract_id="lt-p4g", when=NOW - timedelta(minutes=5), now=NOW, reason="past"
-            )
-            assert earliest_next_decision_at(conn, now=NOW) is None
+            past = NOW - timedelta(minutes=5)
+            set_next_decision_at(conn, contract_id="lt-p4g", when=past, now=NOW, reason="past")
+            got = earliest_next_decision_at(conn, now=NOW)
+            assert got is not None and got <= NOW
         finally:
             conn.close()
 

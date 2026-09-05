@@ -102,7 +102,7 @@ class EventActor(StrEnum):
 
 
 FROZEN_FIELDS: frozenset[str] = frozenset(
-    {"objective", "deadline_at", "hard_constraints", "authority"}
+    {"objective", "deadline_at", "hard_constraints", "authority", "budget"}
 )
 
 

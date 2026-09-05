@@ -102,8 +102,10 @@ class TestFrozenFields:
     def test_frozen_set_matches_design(self) -> None:
         # SPEC §4 / §6.4 冻结区：objective / deadline_at / hard_constraints / authority
         # authority 进入冻结区是 P2（§6.4 明确授权修订必须 Principal 批准）。
+        # budget 进入冻结区：patch 应用面本就不含预算，显式拒绝优于静默忽略
+        # （防 agent 误传/试探预算改写——branch hardening/deadline-contract-guards）。
         assert (
-            frozenset({"objective", "deadline_at", "hard_constraints", "authority"})
+            frozenset({"objective", "deadline_at", "hard_constraints", "authority", "budget"})
             == FROZEN_FIELDS
         )
 

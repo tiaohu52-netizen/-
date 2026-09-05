@@ -29,7 +29,14 @@ from longtask.adapters.base import (
 )
 from longtask.adapters.factory import build_adapter
 from longtask.adapters.registry import ExecutorRegistry, RegistryEntry
-from longtask.contracts.schema import AttemptRole, AttemptState, ContractDraft, ContractView
+from longtask.contracts.schema import (
+    AttemptRole,
+    AttemptState,
+    BlockReason,
+    ContractDraft,
+    ContractState,
+    ContractView,
+)
 from longtask.persistence.attempts import (
     list_reconcilable_attempts,
     mark_attempt_orphaned,
@@ -41,6 +48,7 @@ from longtask.persistence.context import (
     compile_context_snapshot,
     handover_prompt_addendum,
 )
+from longtask.persistence.errors import StoreError
 from longtask.persistence.events import EventType
 from longtask.persistence.projections import (
     HANDOVER_FILE,
@@ -57,6 +65,7 @@ from longtask.persistence.store import (
     get_lease,
     release_lease,
     renew_lease,
+    update_contract_state,
 )
 from longtask.promoter.killswitch import is_kill_switch_active
 from longtask.promoter.records import _count_verifier_attempts
@@ -743,7 +752,6 @@ class AttemptRunner:
         acceptance.checks 后写回 attempt/succeeded|failed，由上层
         据此转 complete 或退回 active。
         """
-        from longtask.contracts.schema import ContractState
 
         # Kill switch 激活时不得派生任何外部进程（安全审查 调度-C2）：
         # tick 有拦截，但本方法还有 daemon_loop 的两条旁路调用。
@@ -822,6 +830,32 @@ class AttemptRunner:
                 now=now,
                 actor="daemon",
             )
+            # 防破坏性跟进（审查 调度-R4）：只落事件不落状态时，daemon
+            # 下一轮会把不可验收的合同再派一轮 executor，白白烧光
+            # dispatch 预算。转 blocked(need-user) 交给用户裁决。
+            if contract.state == ContractState.ACTIVE:
+                with contextlib.suppress(StoreError):
+                    update_contract_state(
+                        self._conn,
+                        contract_id=contract_id,
+                        new_state=ContractState.BLOCKED,
+                        now=now,
+                        blocked_reason=BlockReason.NEED_USER,
+                        actor="daemon",
+                    )
+                    append_event(
+                        self._conn,
+                        contract_id=contract_id,
+                        event_type=EventType.CONTRACT_BLOCKED,
+                        payload={
+                            "reason": "verification budget exhausted (§12.4)",
+                            "blocked_reason": BlockReason.NEED_USER.value,
+                        },
+                        now=now,
+                        actor="daemon",
+                        goal_id=contract.goal_id,
+                        contract_revision=contract.revision,
+                    )
             return False
         # 选择候选：排除执行者本身，按执行器匹配规则排序；
         # requested_role='verifier' → 合同 authority 设了绑定时，

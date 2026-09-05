@@ -326,6 +326,10 @@ def handle_contract_patch(
     """
     params = envelope.params
     contract_id = require_contract_id(params)
+    # 合同修订是 Principal 决定权（安全审查 RPC-C1 的遗漏面）：模型客户端
+    # 不得改写任何合同字段——即使冻结区有 blocklist，软区字段（如验收
+    # standard）被模型单方面改写同样破坏「合同共同维护」语义。
+    require_principal(envelope, params, action="contract/patch")
 
     if (replay := idempotent_replay(conn, envelope, contract_id)) is not None:
         return replay

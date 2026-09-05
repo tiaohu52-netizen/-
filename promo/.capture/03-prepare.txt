@@ -1,0 +1,63 @@
+{
+  "schema_version": 2,
+  "contract_id": "lt-20260905-demo",
+  "goal_id": "lt-20260905-demo",
+  "revision": 1,
+  "state": "drafted",
+  "deadline_status": "not_due",
+  "acceptance_status": "pending",
+  "blocked_reason": null,
+  "created_at": "2026-09-05T10:51:32.107243+00:00",
+  "updated_at": "2026-09-05T10:51:32.107243+00:00",
+  "next_wakeup_at": null,
+  "next_decision_at": null,
+  "title": "Quarterly report",
+  "objective": "Publish Q3 quarterly report with reviewed financials",
+  "deadline_at": "2026-10-05T18:00:00+08:00",
+  "hard_constraints": {
+    "file_effects": {
+      "mode": "workspace-write"
+    }
+  },
+  "acceptance": {
+    "standard": "验收标准通过",
+    "checks": [
+      "核对项 1"
+    ],
+    "verifier": "cross_check"
+  },
+  "workload_estimate": {
+    "initial_hours": 12.0
+  },
+  "workload_initial_hours": 12.0,
+  "budget": {
+    "max_dispatches": 5,
+    "max_escalations": 2,
+    "max_concurrent_attempts": 1,
+    "max_attempt_minutes": 60,
+    "max_output_bytes": 1048576,
+    "verification_attempts_reserved": 2
+  },
+  "authority": {
+    "executor_policy": "closed",
+    "executors": [],
+    "required_capabilities": [],
+    "allowed_controls": [],
+    "allow_parallel": false
+  },
+  "attention": {
+    "notify_on": [],
+    "quiet_hours": null,
+    "bypass_quiet_hours_on": []
+  },
+  "continuity": {
+    "checkpoint_max_age_minutes": 20,
+    "checkpoint_on_material_change": true,
+    "recovery_grace_minutes": 5,
+    "capsule_max_tokens": 12000
+  },
+  "soft_guidance": {},
+  "context": {},
+  "execution": {},
+  "client_meta": {}
+}
