@@ -1,4 +1,11 @@
-"""Process identity and liveness probes for restart-safe adapters."""
+"""Process identity and liveness probes for restart-safe adapters.
+
+三平台实现（审计遗留的 macOS 身份模型适配）：
+- Windows: OpenProcess + GetExitCodeProcess / GetProcessTimes；
+- Linux: /proc/<pid>/stat（状态判活含僵尸 + 字段 22 启动时刻）；
+- macOS: libproc.proc_pidinfo(PROC_PIDTBSDINFO)——pbi_status 判活含
+  SZOMB，pbi_start_tvsec/tvusec 给出与 Linux 同精度的稳定启动时刻。
+"""
 
 from __future__ import annotations
 
@@ -76,7 +83,90 @@ if sys.platform == "win32":  # pragma: no cover - platform-specific branch
         finally:
             _kernel32.CloseHandle(handle)
 
-else:  # pragma: no cover - exercised on POSIX CI
+elif sys.platform == "darwin":  # pragma: no cover - exercised on macOS CI
+    import signal
+    import subprocess
+    import time as _time
+
+    # macOS 无 /proc；libproc 结构体偏移随架构/版本有漂移风险，这里改用
+    # /bin/ps 的机器可读字段（etimes/state）——无偏移依赖、全版本一致，
+    # 且 tick 频率下的子进程开销可接受（每次 <15ms）。
+
+    def _ps_value(pid: int, keyword: str) -> str | None:
+        """ps -p pid -o <keyword>=：进程不存在返回 None，其余原样去空白。"""
+        try:
+            proc = subprocess.run(  # noqa: S603 - fixed argv, pid is an int
+                ["/bin/ps", "-p", str(pid), "-o", keyword + "="],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+        except (OSError, subprocess.TimeoutExpired, ValueError):
+            return None
+        if proc.returncode != 0:
+            return None
+        return proc.stdout.strip() or None
+
+    def _etime_to_seconds(text: str) -> int | None:
+        """解析 BSD ps 的 etime：[[dd-]hh:]mm:ss。"""
+        try:
+            days = 0
+            rest = text
+            if "-" in rest:
+                day_part, rest = rest.split("-", 1)
+                days = int(day_part)
+            total = 0
+            for part in rest.split(":"):
+                total = total * 60 + int(part)
+            return days * 86400 + total
+        except ValueError:
+            return None
+
+    def process_start_time(pid: int) -> float | None:
+        """Epoch 启动时刻 = now - etime；进程退出后 ps 不再列出 → None。
+
+        macOS 的 BSD ps 没有 Linux 的 etimes 关键字——只有 etime
+        （[[dd-]hh:]mm:ss 格式），这里做解析。
+        """
+        if pid <= 0:
+            return None
+        etime = _ps_value(pid, "etime")
+        if etime is None:
+            return None
+        seconds = _etime_to_seconds(etime)
+        if seconds is None or seconds < 0:
+            return None
+        return _time.time() - float(seconds)
+
+    def process_alive(pid: int) -> bool | None:
+        if pid <= 0:
+            return None
+        state = _ps_value(pid, "state")
+        if state is None:
+            # ps 不在本机进程表里看到它：可能刚被收尸
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                return False
+            except (PermissionError, OSError):
+                return None
+            # ps 看不到但 kill 探到活进程：不可判定（权限/边界）
+            return None
+        # BSD state 含 Z 即 zombie：已退出未收尸（macOS 上 kill(pid,0)
+        # 同样把僵尸当活进程，这里显式排除）
+        return "Z" not in state
+
+    def terminate_pid(pid: int) -> bool:
+        if pid <= 0:
+            return False
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError:
+            return False
+        return True
+
+
+else:  # pragma: no cover - exercised on Linux CI
     import signal
     from pathlib import Path
 

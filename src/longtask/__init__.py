@@ -3,5 +3,5 @@
 设计本体见 DESIGN.md；本包只实现该文档定义的行为，不引入文档外的概念。
 """
 
-__version__ = "0.1.0a4"
+__version__ = "0.1.0a5"
 PROTOCOL_VERSION = 1  # DESIGN §11：线协议版本，独立于包版本演进

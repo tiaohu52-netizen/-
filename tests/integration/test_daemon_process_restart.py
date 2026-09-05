@@ -32,7 +32,7 @@ pytestmark = pytest.mark.integration
 def _registry() -> ExecutorRegistry:
     registry = ExecutorRegistry()
     code = (
-        "import pathlib,time; time.sleep(8); "
+        "import pathlib,time; time.sleep(30); "
         "pathlib.Path('restart-survived.txt').write_text('ok', encoding='utf-8')"
     )
     registry.register(
