@@ -195,3 +195,37 @@ dogfood v5 展示了一个三阶段目标完成，不等于三个独立真实目
 - 远端仅有 GitHub 自动初始化提交 `903988a`（README.md + LICENSE），
   经检查无可保留内容后 force push 覆盖：`903988a...6606197 (forced update)`。
 - `main` 现跟踪 `origin/main`，两端一致于 `6606197`。仍不构成发布、打 tag 或 Release。
+
+## v0.1.0a0 公开发布记录（2026-09-05，总控）
+
+**发布已完成**：https://github.com/tiaohu52-netizen/-/releases/tag/v0.1.0a0
+
+- **产品定名**：限期合同中枢 / Deadline Contract Hub（ADR-004 修订记录），
+  双语 README、SPEC 首屏、发布计划、一页纸统一；协议名 LHGP 与包标识不变。
+- **发布提交与 tag**：`v0.1.0a0` → `f2af524`（与 main 一致）；tag 初建于
+  `aad8fdd`，CI 修复后移动到最终提交，Release 对象重新发布绑定。
+- **CI 首跑暴露并修复的真实缺陷**（此前 CI 从未真正运行过）：
+  1. `--help` 中文文本在 cp1252 控制台 UnicodeEncodeError 崩溃（新入口
+     `longtask.console.harden_stdio` + cp1252 回归测试；默认 Windows 用户可复现）。
+  2. `executor/health` 集成测试依赖机器安装的 codex CLI（fixture 改用解释器）。
+  3. Linux mypy 把 `ctypes.windll` 分支报错（mypy 平台钉死 win32，POSIX 行为由三平台测试矩阵覆盖）。
+  4. Linux 僵尸进程被 `kill(pid,0)` 误判存活：分离 run 永远 running、
+     daemon 停止总被升级强杀（`/proc` 状态字段 + `waitpid(WNOHANG)` 收尸判定）。
+  5. `/proc` st_ctime 在进程退出时变化导致身份比对失败（改用 stat 字段 22 稳定启动时间）。
+  6. 已收尸的死 run 被 reattach 拒绝绑定，违反文档声明的分支 2 语义
+     （pid 必然已终止时按终止绑定；活的 pid 复用者仍拒绝）。
+  7. CI 中无用 Rust cache 步骤（删除）。
+- **平台口径（诚实声明）**：Windows 全面验证；Linux CI 全量门+测试绿；
+  macOS 为已知缺口平台（无 /proc 身份等价物、AF_UNIX 路径限制），
+  CI `continue-on-error` 非阻断跟踪，发布说明与 CHANGELOG 同步标注。
+- **最终 CI**：`ci=success`、`quality=success`（`f2af524`；windows/ubuntu 阻断绿，
+  macos 非阻断）。
+- **制品**（由 `f2af524` 构建，`scripts/check_artifacts.py` 两项 OK）：
+  - `longtask_protocol-0.1.0a0-py3-none-any.whl`
+    SHA-256 `f9b0aa3be5bfc256f386c397f8516d4e6a0c2dfd3b1cff5b5eb238daa8b2fb27`
+  - `longtask_protocol-0.1.0a0.tar.gz`
+    SHA-256 `69e893b1c0b19aa88fb0eda85e501a9bda5fec4b577bc4e89c83261824a0f27a`
+- **仓库状态**：公开（发布时由总控经用户授权的 API 调用转 public）；
+  未经外部漏洞数据库审计（运行时依赖为 0、开发依赖全锁定白名单），
+  此项按 R6 口径保留为后续工作。
+- 本地七道门：7/7（637 tests / 82.15% coverage）多次复验通过。
