@@ -179,7 +179,7 @@ dogfood v5 展示了一个三阶段目标完成，不等于三个独立真实目
 ## 追记：remote 配置与推送尝试（2026-09-05，总控）
 
 - 上述「无 Git remote」记录之后，用户提供了发布仓库地址并配置 remote：
-  `origin = https://github.com/tiaohu52-netizen/-.git`。
+  `origin = https://github.com/tiaohu52-netizen/lhgp.git`。
 - 总控于 2026-09-05 执行推送前复查：跟踪文件与全历史新增文件名无凭证模式；
   归档示例内容无密钥值命中（与上方敏感扫描结论一致）。
 - 推送 `main → origin/main` **失败**：GitHub 拒绝密码认证（不支持 password auth），
@@ -198,7 +198,7 @@ dogfood v5 展示了一个三阶段目标完成，不等于三个独立真实目
 
 ## v0.1.0a0 公开发布记录（2026-09-05，总控）
 
-**发布已完成**：https://github.com/tiaohu52-netizen/-/releases/tag/v0.1.0a0
+**发布已完成**：https://github.com/tiaohu52-netizen/lhgp/releases/tag/v0.1.0a0
 
 - **产品定名**：限期合同中枢 / Deadline Contract Hub（ADR-004 修订记录），
   双语 README、SPEC 首屏、发布计划、一页纸统一；协议名 LHGP 与包标识不变。
