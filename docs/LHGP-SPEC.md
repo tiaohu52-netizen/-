@@ -672,7 +672,7 @@ executor candidate
     → undetermined → human arbitration
 ```
 
-每次 verifier failure 必须生成结构化 repair brief：失败 check、证据、最小修复范围、是否影响既有通过项。历史 verifier 的存在不得阻止新的 verifier。每次验证消耗保留预算；当验证预算不足时，合同必须 blocked，而不是跳过验收。
+每次 verifier failure 必须生成结构化 repair brief：失败 check、证据、最小修复范围、是否影响既有通过项。历史 verifier 的存在不得阻止新的 verifier。每次验证消耗保留预算；该预算按 `contract_id` 隔离统计（同一 Goal 下不同阶段合同不得互相消耗）；当验证预算不足时，合同必须 blocked，而不是跳过验收。
 
 `Goal satisfied` 的唯一合法推导是：当前 contract revision 的所有 mandatory checks 已有未过期 evidence，并由允许的验收路径产生 `acceptance.passed` 事件。
 
