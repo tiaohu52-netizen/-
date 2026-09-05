@@ -11,8 +11,6 @@ from __future__ import annotations
 
 import os
 import sys
-import typing
-from typing import Any
 
 IDENTITY_TOLERANCE_SECONDS = 2.0
 
@@ -86,99 +84,55 @@ if sys.platform == "win32":  # pragma: no cover - platform-specific branch
             _kernel32.CloseHandle(handle)
 
 elif sys.platform == "darwin":  # pragma: no cover - exercised on macOS CI
-    import ctypes
     import signal
-    from pathlib import Path
+    import subprocess
+    import time as _time
 
-    # libproc 的 PROC_PIDTBSDINFO 让 macOS 拿到与 Linux /proc 等价的两个
-    # 事实：进程状态（SZOMB 判僵尸）与稳定的启动时刻（身份比对）。
-    _PROC_PIDTBSDINFO = 3
-    _SZOMB = 6  # BSD 进程状态常量：zombie
+    # macOS 无 /proc；libproc 结构体偏移随架构/版本有漂移风险，这里改用
+    # /bin/ps 的机器可读字段（etimes/state）——无偏移依赖、全版本一致，
+    # 且 tick 频率下的子进程开销可接受（每次 <15ms）。
 
-    class _ProcBsdInfo(ctypes.Structure):
-        """struct proc_bsdinfo（64 位 darwin 布局，总长 152 字节）。"""
-
-        _fields_: typing.ClassVar[list[Any]] = [
-            ("pbi_flags", ctypes.c_uint32),
-            ("pbi_status", ctypes.c_uint32),
-            ("pbi_xstatus", ctypes.c_uint32),
-            ("pbi_pid", ctypes.c_uint32),
-            ("pbi_uid", ctypes.c_uint32),
-            ("pbi_ruid", ctypes.c_uint32),
-            ("pbi_svuid", ctypes.c_uint32),
-            ("pbi_gid", ctypes.c_uint32),
-            ("pbi_rgid", ctypes.c_uint32),
-            ("pbi_svgid", ctypes.c_uint32),
-            ("rfu_1", ctypes.c_uint32),
-            ("pbi_comm", ctypes.c_char * 17),
-            ("pbi_name", ctypes.c_char * 33),
-            ("pbi_nfiles", ctypes.c_uint32),
-            ("pbi_pgid", ctypes.c_uint32),
-            ("pbi_ppid", ctypes.c_uint32),
-            ("pbi_tdev", ctypes.c_uint32),
-            ("eflags", ctypes.c_uint32),
-            ("pbi_ruid2", ctypes.c_uint32),
-            ("pbi_svuid2", ctypes.c_uint32),
-            ("pbi_gid2", ctypes.c_uint32),
-            ("pbi_rgid2", ctypes.c_uint32),
-            ("pbi_svgid2", ctypes.c_uint32),
-            ("pbi_start_tvsec", ctypes.c_uint64),
-            ("pbi_start_tvusec", ctypes.c_uint64),
-        ]
-
-    def _load_libproc() -> ctypes.CDLL | None:
+    def _ps_value(pid: int, keyword: str) -> str | None:
+        """ps -p pid -o <keyword>=：进程不存在返回 None，其余原样去空白。"""
         try:
-            lib = ctypes.CDLL("/usr/lib/libproc.dylib")
-        except OSError:
+            proc = subprocess.run(  # noqa: S603 - fixed argv, pid is an int
+                ["/bin/ps", "-p", str(pid), "-o", keyword + "="],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+        except (OSError, subprocess.TimeoutExpired, ValueError):
             return None
-        lib.proc_pidinfo.restype = ctypes.c_int
-        lib.proc_pidinfo.argtypes = [
-            ctypes.c_int,
-            ctypes.c_int,
-            ctypes.c_uint64,
-            ctypes.c_void_p,
-            ctypes.c_int,
-        ]
-        return lib
-
-    _LIBPROC = _load_libproc()
-
-    def _bsd_info(pid: int) -> _ProcBsdInfo | None:
-        if _LIBPROC is None or pid <= 0:
+        if proc.returncode != 0:
             return None
-        info = _ProcBsdInfo()
-        ret = _LIBPROC.proc_pidinfo(
-            pid, _PROC_PIDTBSDINFO, 0, ctypes.byref(info), ctypes.sizeof(info)
-        )
-        if ret <= 0:
-            return None
-        return info
+        return proc.stdout.strip() or None
 
     def process_start_time(pid: int) -> float | None:
-        """Epoch 启动时刻（tvsec + tvusec/1e6）：进程退出后仍稳定。"""
-        info = _bsd_info(pid)
-        if info is None:
+        """Epoch 启动时刻 = now - etimes（整数秒）；退出后 ps 不再列出 → None。"""
+        if pid <= 0:
             return None
-        return float(info.pbi_start_tvsec) + float(info.pbi_start_tvusec) / 1e6
+        etimes = _ps_value(pid, "etimes")
+        if etimes is None or not etimes.lstrip("-").isdigit():
+            return None
+        return _time.time() - float(etimes)
 
     def process_alive(pid: int) -> bool | None:
         if pid <= 0:
             return None
-        info = _bsd_info(pid)
-        if info is not None:
-            # SZOMB：已退出未收尸。macOS 没有 /proc，libproc 状态是唯一
-            # 可靠的僵尸判据——否则 kill(pid, 0) 会把僵尸当活进程。
-            return info.pbi_status != _SZOMB
-        # proc_pidinfo 拿不到（EPERM 或库缺失）：回退 kill 三态
-        try:
-            os.kill(pid, 0)
-        except ProcessLookupError:
-            return False
-        except PermissionError:
+        state = _ps_value(pid, "state")
+        if state is None:
+            # ps 不在本机进程表里看到它：可能刚被收尸
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                return False
+            except (PermissionError, OSError):
+                return None
+            # ps 看不到但 kill 探到活进程：不可判定（权限/边界）
             return None
-        except OSError:
-            return None
-        return True
+        # BSD state 含 Z 即 zombie：已退出未收尸（macOS 上 kill(pid,0)
+        # 同样把僵尸当活进程，这里显式排除）
+        return "Z" not in state
 
     def terminate_pid(pid: int) -> bool:
         if pid <= 0:
@@ -188,6 +142,7 @@ elif sys.platform == "darwin":  # pragma: no cover - exercised on macOS CI
         except OSError:
             return False
         return True
+
 
 else:  # pragma: no cover - exercised on Linux CI
     import signal
