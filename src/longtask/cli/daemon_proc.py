@@ -186,7 +186,13 @@ def spawn_daemon(
         (root / PID_FILE).unlink(missing_ok=True)
         (root / TOKEN_FILE).unlink(missing_ok=True)
         token = secrets.token_hex(16)
-        (root / TOKEN_FILE).write_text(f"{token}\n", encoding="utf-8")
+        # 审计 RPC-R6：token 是本地信任边界，权限收紧到 0600（Windows 无
+        # POSIX 权限语义，no-op 但不报错）
+        fd = os.open(str(root / TOKEN_FILE), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        try:
+            os.write(fd, f"{token}\n".encode())
+        finally:
+            os.close(fd)
 
         log_path = root / DAEMON_LOG_FILE
         log_fh = log_path.open("ab")

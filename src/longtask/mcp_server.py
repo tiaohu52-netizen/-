@@ -584,8 +584,15 @@ def tool_attach_to_executor(args: dict[str, Any], ctx: dict[str, Any]) -> dict[s
     return out
 
 
+_SNAPSHOT_TEXT_LIMIT = 20000
+
+
 def _read_snapshot(ctx: dict[str, Any], status: dict[str, Any]) -> dict[str, Any]:
-    """从 attempt/status 的 result 找 contract，再读 context/attempts/<id>/active.md。"""
+    """从 attempt/status 的 result 找 contract，再读 context/attempts/<id>/active.md。
+
+    审计 RPC-R9：handover 可能很大，无上限会把模型上下文撑爆——
+    超限截断并显式标注。
+    """
     contract_id = status.get("contract_id")
     if not contract_id:
         return {}
@@ -604,19 +611,26 @@ def _read_snapshot(ctx: dict[str, Any], status: dict[str, Any]) -> dict[str, Any
     attempts = sorted(context_dir.iterdir(), key=lambda d: d.stat().st_mtime, reverse=True)
     if not attempts:
         return {"handover_path": str(contract_dir / "handover.md")}
-    active = attempts[0] / "active.md"
-    return {
-        "active_path": str(active),
-        "active_content": active.read_text(encoding="utf-8", errors="replace")
-        if active.is_file()
-        else None,
+
+    def _capped(path: Path) -> tuple[str | None, bool]:
+        if not path.is_file():
+            return None, False
+        text = path.read_text(encoding="utf-8", errors="replace")
+        if len(text) > _SNAPSHOT_TEXT_LIMIT:
+            return text[:_SNAPSHOT_TEXT_LIMIT] + "\n...[truncated]", True
+        return text, False
+
+    active_content, active_truncated = _capped(attempts[0] / "active.md")
+    handover_content, handover_truncated = _capped(contract_dir / "handover.md")
+    out: dict[str, Any] = {
+        "active_path": str(attempts[0] / "active.md"),
+        "active_content": active_content,
         "handover_path": str(contract_dir / "handover.md"),
-        "handover_content": (contract_dir / "handover.md").read_text(
-            encoding="utf-8", errors="replace"
-        )
-        if (contract_dir / "handover.md").is_file()
-        else None,
+        "handover_content": handover_content,
     }
+    if active_truncated or handover_truncated:
+        out["truncated"] = True
+    return out
 
 
 TOOLS: dict[
@@ -990,7 +1004,6 @@ TOOLS: dict[
                     "revision": {"type": "integer"},
                     "plan": {"type": "object"},
                     "progress": {"type": "object"},
-                    "request_id": {"type": "string", "description": "幂等重试键；重试时复用"},
                 },
             },
         },
@@ -1011,7 +1024,6 @@ TOOLS: dict[
                     "goal_id": {"type": "string"},
                     "stage_id": {"type": "string"},
                     "revision": {"type": "integer"},
-                    "request_id": {"type": "string", "description": "幂等重试键；重试时复用"},
                 },
             },
         },
@@ -1308,6 +1320,12 @@ def _validate_arguments(args: dict[str, Any], schema: dict[str, Any]) -> str | N
     for key, value in args.items():
         prop = properties.get(key)
         if prop is None:
+            # request_id 是 §11.3 的协议级幂等键，任何工具都可携带
+            # （重试纪律），不要求每个 schema 单独声明。
+            if key == "request_id":
+                if not isinstance(value, str):
+                    return "request_id must be a string"
+                continue
             return f"unknown parameter: {key}"
         expected = prop.get("type")
         checker = type_checkers.get(expected) if expected else None

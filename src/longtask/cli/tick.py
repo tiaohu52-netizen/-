@@ -281,6 +281,14 @@ def run_daemon_tick(
         # 但仍给出保守 p50/p90、slack 和下一决策点，供 UI/恢复流程使用。
         remaining_minutes = remaining_hours * 60.0
         successful_minutes = _completed_attempt_durations(conn, c.goal_id, successful_only=True)
+        # E1 校准：合同内主导执行器（成功样本 ≥2）的个人节奏优先于 goal
+        # 池化——不同执行器速度不同，谁跑下一棒就用谁的先验；样本不足
+        # 自动回退池化，再回退初始估计（低样本降级链不变）。
+        grouped = _successful_durations_by_executor(conn, cid)
+        if grouped:
+            _dominant, dominant_samples = max(grouped.items(), key=lambda kv: len(kv[1]))
+            if len(dominant_samples) >= 2:
+                successful_minutes = dominant_samples
         if successful_minutes:
             ordered = sorted(successful_minutes)
             # nearest-rank：小样本时 p90 必须保守地落到更慢的样本，不能
@@ -671,6 +679,33 @@ def _safe_json(text: str) -> dict[str, Any]:
     if isinstance(result, dict):
         return result
     return {}
+
+
+def _successful_durations_by_executor(
+    conn: sqlite3.Connection, contract_id: str
+) -> dict[str, list[float]]:
+    """成功 executor attempt 的实际时长按执行器分组（E1 校准采样）。
+
+    校准的粒度是「谁来跑」：同一合同由不同执行器接力时，各自的历史节奏
+    才是下次 forecast 该用的先验。样本不足的执行器自动回退池化/初始估计。
+    """
+    rows = conn.execute(
+        "SELECT executor_id, started_at, terminal_at FROM attempts"
+        " WHERE contract_id = ? AND role = 'executor' AND state = 'succeeded'"
+        " AND started_at IS NOT NULL AND terminal_at IS NOT NULL",
+        (contract_id,),
+    ).fetchall()
+    grouped: dict[str, list[float]] = {}
+    for executor_id, started_at, terminal_at in rows:
+        try:
+            seconds = (
+                datetime.fromisoformat(str(terminal_at)) - datetime.fromisoformat(str(started_at))
+            ).total_seconds()
+        except (TypeError, ValueError):
+            continue
+        if seconds >= 0:
+            grouped.setdefault(executor_id or "unknown", []).append(seconds / 60.0)
+    return grouped
 
 
 def _completed_attempt_durations(

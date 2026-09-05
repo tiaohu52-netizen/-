@@ -375,11 +375,19 @@ def handle_contract_patch(
     acceptance: Acceptance | None = None
     if "acceptance" in patch_data:
         acc_raw = patch_data["acceptance"]
-        acceptance = Acceptance(
-            standard=str(acc_raw["standard"]),
-            checks=tuple(str(c) for c in acc_raw["checks"]),
-            verifier=str(acc_raw.get("verifier", "cross_check")),
-        )
+        try:
+            acceptance = Acceptance(
+                standard=str(acc_raw["standard"]),
+                checks=tuple(str(c) for c in acc_raw["checks"]),
+                verifier=str(acc_raw.get("verifier", "cross_check")),
+            )
+        except (KeyError, TypeError) as exc:
+            # 审计 RPC-R7：畸形 acceptance 之前裸抛 KeyError → INTERNAL，
+            # 现在映射为可处理的校验错误。
+            raise RpcError(
+                code=ErrorCode.VALIDATION_FAILED,
+                message=f"malformed acceptance patch: {exc}",
+            ) from exc
         acc_errors = acceptance.validate()
         if acc_errors:
             raise RpcError(
