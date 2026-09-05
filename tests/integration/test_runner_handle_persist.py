@@ -188,7 +188,10 @@ def test_spawn_persists_real_subprocess_handle(tmp_path: Path) -> None:
     )
     adapter = SubprocessAdapter(
         manifest,
-        launch=LaunchSpec(argv=(sys.executable, "-c"), env_allowlist=("PATH", "SYSTEMROOT")),
+        launch=LaunchSpec(
+            argv=(sys.executable, "-c", "import time; time.sleep(30)"),
+            env_allowlist=("PATH", "SYSTEMROOT"),
+        ),
     )
     conn = connect(StoreConfig(db_path=data_dir / "state.db"))
     try:
@@ -310,7 +313,10 @@ def test_daemon_loop_reattach_after_restart(tmp_path: Path) -> None:
             acceptance_evidence=True,
         ),
     )
-    launch = LaunchSpec(argv=(sys.executable, "-c"), env_allowlist=("PATH", "SYSTEMROOT"))
+    launch = LaunchSpec(
+        argv=(sys.executable, "-c", "import time; time.sleep(30)"),
+        env_allowlist=("PATH", "SYSTEMROOT"),
+    )
     old_adapter = SubprocessAdapter(manifest, launch=launch)
 
     conn = connect(StoreConfig(db_path=data_dir / "state.db"))
