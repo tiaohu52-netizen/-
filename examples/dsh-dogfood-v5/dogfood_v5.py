@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from datetime import UTC, datetime, timedelta
@@ -46,19 +47,19 @@ from longtask.persistence.events_query import get_events  # noqa: E402
 from longtask.persistence.store import (  # noqa: E402
     StoreConfig,
     connect,
-    get_contract,
     ensure_schema,
+    get_contract,
     get_goal,
+)
+from longtask.rpc.errors import RpcError  # noqa: E402
+from longtask.rpc.handlers.contract import (  # noqa: E402
+    handle_contract_request_verification,
 )
 from longtask.rpc.handlers.goal import (  # noqa: E402
     handle_goal_prepare,
     handle_goal_update,
 )
-from longtask.rpc.handlers.contract import (  # noqa: E402
-    handle_contract_request_verification,
-)
 from longtask.rpc.methods import Method  # noqa: E402
-from longtask.rpc.errors import RpcError  # noqa: E402
 from longtask.rpc.server import RequestEnvelope  # noqa: E402
 
 ROOT = REPO / ".dogfood-v5"
@@ -107,6 +108,23 @@ def _conn():
     c = connect(StoreConfig(db_path=ROOT / "state.db"))
     ensure_schema(c)
     return c
+
+
+def reset() -> None:
+    """Archive the previous run so ``setup`` starts from a clean ledger.
+
+    The archive is recoverable and deliberately requires an explicit command;
+    a normal ``setup`` must never erase evidence from an earlier dogfood run.
+    """
+    status = get_daemon_status(ROOT)
+    if status.get("running"):
+        raise RuntimeError("stop the dogfood daemon before reset")
+    if ROOT.exists():
+        archive = ROOT.with_name(f"{ROOT.name}.archive-{datetime.now().strftime('%Y%m%d-%H%M%S')}")
+        shutil.move(str(ROOT), str(archive))
+        print(f"[v5] archived previous run -> {archive}")
+    ROOT.mkdir(parents=True, exist_ok=True)
+    print(f"[v5] ready for a fresh run -> {ROOT}")
 
 
 def _envelope(method: Method, request_id: str, params: dict) -> RequestEnvelope:
@@ -864,6 +882,8 @@ if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "status"
     if cmd == "setup":
         setup()
+    elif cmd == "reset":
+        reset()
     elif cmd == "status":
         status()
     elif cmd == "stage1":

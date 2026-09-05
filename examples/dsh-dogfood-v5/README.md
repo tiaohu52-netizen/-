@@ -72,6 +72,7 @@ contract blocked(need-user)                 ← 如实升级，不假装
 ## 复现
 
 ```bash
+python examples/dsh-dogfood-v5/dogfood_v5.py reset  # 归档旧运行，安全开始新一轮
 python examples/dsh-dogfood-v5/dogfood_v5.py setup    # 建 Goal + 3 阶段 + 绑定合同
 python examples/dsh-dogfood-v5/dogfood_v5.py stage1   # 真实 daemon + 断裂①注入 + 恢复观察
 python examples/dsh-dogfood-v5/dogfood_v5.py stage1-verify  # 验收 stage-1 并记录修复/重验结果
