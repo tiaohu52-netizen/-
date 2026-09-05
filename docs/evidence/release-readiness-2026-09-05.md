@@ -186,3 +186,12 @@ dogfood v5 展示了一个三阶段目标完成，不等于三个独立真实目
   用户提供的凭据为账号密码格式；本机 `~/.ssh/id_rsa.pub` 未绑定 GitHub 账号。
   需要用户提供 PAT（repo 写权限）或绑定 SSH 公钥后重试。
 - 本记录只代表源码推送尝试，不构成发布、打 tag 或 Release。
+
+### 追记二：SSH 通道打通并完成推送（2026-09-05，总控）
+
+- 远端改为 SSH（`git@github.com:tiaohu52-netizen/-.git`）。本机新生成
+  ed25519 密钥（`~/.ssh/gh_lhgp_key`，指纹见 `ssh-keygen -lf`），由用户在
+  GitHub → Settings → SSH keys 手动上传后认证通过。
+- 远端仅有 GitHub 自动初始化提交 `903988a`（README.md + LICENSE），
+  经检查无可保留内容后 force push 覆盖：`903988a...6606197 (forced update)`。
+- `main` 现跟踪 `origin/main`，两端一致于 `6606197`。仍不构成发布、打 tag 或 Release。
