@@ -258,6 +258,62 @@ def tool_list_contracts(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, 
     return route(envelope, conn=ctx["conn"], now=_now(), registry=ctx["registry"])
 
 
+def tool_prepare_goal(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
+    """goal/prepare：立合同并返回 7 类 admission offer（§6.3）。
+
+    与 prepare_contract 的区别：可关联 goal_id / stage_id（激活
+    advance_goal 与 goal_contract_draft 的前提），响应含 admission
+    offer（解释为什么被允许/拒接）。
+    """
+    draft = {
+        "title": args["title"],
+        "objective": args["objective"],
+        "deadline_at": args["deadline_at"],
+        "hard_constraints": args.get("hard_constraints", {}),
+        "acceptance": {
+            "standard": args["acceptance_standard"],
+            "checks": _validate_checks_argument(args["acceptance_checks"]),
+            # goal/prepare 的 validate_draft 不默认 verifier（与 contract
+            # 路径不同），工具面补齐同一默认，避免最小载荷被拒。
+            "verifier": args.get("acceptance_verifier", "cross_check"),
+        },
+        "workload_estimate": {"initial_hours": args.get("workload_initial_hours", 1.0)},
+        "budget": args.get(
+            "budget",
+            {
+                "max_dispatches": 5,
+                "max_escalations": 1,
+                "max_concurrent_attempts": 1,
+                "max_attempt_minutes": 60,
+                "max_output_bytes": 1048576,
+            },
+        ),
+        "authority": args.get("authority", {}),
+        "attention": args.get("attention", {}),
+        "continuity": args.get("continuity", {}),
+        "context": args.get("context", {}),
+        "execution": args.get("execution", {}),
+        "client_meta": args.get("client_meta", {}),
+    }
+    params: dict[str, Any] = {"draft": draft}
+    if args.get("contract_id"):
+        params["contract_id"] = args["contract_id"]
+    if args.get("goal_id"):
+        params["goal_id"] = args["goal_id"]
+    if args.get("stage_id"):
+        params["stage_id"] = args["stage_id"]
+    envelope = parse_envelope(
+        {
+            "method": Method.GOAL_PREPARE.value,
+            "request_id": _mcp_request_id(Method.GOAL_PREPARE, args),
+            "client_id": "mcp",
+            "protocol_version": PROTOCOL_VERSION,
+            "params": params,
+        }
+    )
+    return route(envelope, conn=ctx["conn"], now=_now(), registry=ctx["registry"])
+
+
 def tool_get_goal(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
     """Read a stable Goal aggregate, independent of a contract revision."""
     return _mcp_route(Method.GOAL_GET, args, ctx)
@@ -584,6 +640,7 @@ TOOLS: dict[
                     "continuity": {"type": "object"},
                     "context": {"type": "object"},
                     "execution": {"type": "object"},
+                    "client_meta": {"type": "object"},
                     "contract_id": {"type": "string", "description": "可选自定义 ID"},
                     "request_id": {
                         "type": "string",
@@ -682,6 +739,10 @@ TOOLS: dict[
                         "default": 20,
                         "description": "最多返回 200 份合同，避免一次读取过大上下文",
                     },
+                    "cursor": {
+                        "type": "string",
+                        "description": "上一页响应的 next_cursor；has_more=true 时传入即可翻页",
+                    },
                 },
             },
         },
@@ -694,6 +755,60 @@ TOOLS: dict[
                 "type": "object",
                 "required": ["goal_id"],
                 "properties": {"goal_id": {"type": "string"}},
+            },
+        },
+    ),
+    "longtask_prepare_goal": (
+        tool_prepare_goal,
+        {
+            "description": (
+                "立合同（goal/prepare 路径）：返回合同 + 7 类 admission offer，"
+                "并可关联 goal_id/stage_id（这是 advance_goal 与 "
+                "goal_contract_draft 可用的前提）。批准仍需用户在 CLI 执行。"
+            ),
+            "inputSchema": {
+                "type": "object",
+                "required": [
+                    "title",
+                    "objective",
+                    "deadline_at",
+                    "acceptance_standard",
+                    "acceptance_checks",
+                ],
+                "properties": {
+                    "title": {"type": "string"},
+                    "objective": {"type": "string"},
+                    "deadline_at": {"type": "string", "description": "ISO8601 必须带时区"},
+                    "acceptance_standard": {"type": "string"},
+                    "acceptance_checks": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "验收检查逐条数组；typed check 传对象数组（file-exists 等）"
+                        ),
+                    },
+                    "acceptance_verifier": {
+                        "type": "string",
+                        "enum": ["cross_check", "none"],
+                        "default": "cross_check",
+                        "description": "验收者模式：cross_check=独立 verifier 复核（默认）",
+                    },
+                    "workload_initial_hours": {"type": "number"},
+                    "hard_constraints": {"type": "object"},
+                    "budget": {"type": "object"},
+                    "authority": {"type": "object"},
+                    "attention": {"type": "object"},
+                    "continuity": {"type": "object"},
+                    "context": {"type": "object"},
+                    "execution": {"type": "object"},
+                    "client_meta": {"type": "object"},
+                    "contract_id": {"type": "string"},
+                    "goal_id": {"type": "string", "description": "关联已有 Goal（stages 机制）"},
+                    "stage_id": {
+                        "type": "string",
+                        "description": "绑定 Goal 阶段（acceptance 绑定校验）",
+                    },
+                },
             },
         },
     ),
@@ -805,7 +920,6 @@ _RENAMED_TOOLS = {
     "lhgp_health": "longtask_health",
     "lhgp_doctor": "longtask_doctor",
     "lhgp_list_executors": "longtask_list_executors",
-    "lhgp_prepare_goal": "longtask_prepare_contract",
     "lhgp_approve_goal": "longtask_approve_contract",
     "lhgp_get_goal": "longtask_get_goal",
     "lhgp_list_goals": "longtask_list_goals",
@@ -826,6 +940,10 @@ for _new_name, _legacy_name in _RENAMED_TOOLS.items():
         _handler,
         {**_metadata, "description": f"[LHGP] {_metadata['description']}"},
     )
+
+# lhgp_prepare_goal 是独立工具（goal/prepare 路径，返回 admission offer），
+# 不是 longtask_prepare_contract 的改名——直注册别名，不走改名表。
+TOOLS["lhgp_prepare_goal"] = TOOLS["longtask_prepare_goal"]
 
 TOOLS.update(
     {
@@ -905,13 +1023,13 @@ _DESTRUCTIVE_TOOLS = {
     # any persistent state change, not only process termination: MCP hosts need
     # to request confirmation before a model edits the durable commitment.
     "longtask_prepare_contract",
+    "longtask_prepare_goal",
     "longtask_approve_contract",
     "longtask_request_verification",
     "longtask_update_goal",
     "longtask_advance_goal",
     "longtask_attach_to_executor",
     "lhgp_approve_goal",
-    "lhgp_prepare_goal",
     "lhgp_update_goal",
     "lhgp_advance_goal",
     "lhgp_attach_executor",
@@ -972,6 +1090,39 @@ def _server_name() -> str:
     return "lhgp-mcp" if Path(sys.argv[0]).stem == "lhgp-mcp" else "longtask-mcp"
 
 
+def _validate_arguments(args: dict[str, Any], schema: dict[str, Any]) -> str | None:
+    """按工具 inputSchema 校验 arguments（required / 类型 / 未知键）。
+
+    只实现 MCP schema 实际用到的子集（object/string/integer/boolean/
+    number/array），未知键默认拒绝——fail-closed 与协议其他边界一致。
+    返回错误信息字符串，None 表示通过。
+    """
+    properties: dict[str, Any] = schema.get("properties", {})
+    if schema.get("type") != "object" and not properties:
+        return None
+    required = schema.get("required", [])
+    for key in required:
+        if key not in args:
+            return f"missing required parameter: {key}"
+    type_checkers: dict[str, Any] = {
+        "string": lambda v: isinstance(v, str),
+        "integer": lambda v: isinstance(v, int) and not isinstance(v, bool),
+        "boolean": lambda v: isinstance(v, bool),
+        "number": lambda v: isinstance(v, (int, float)) and not isinstance(v, bool),
+        "array": lambda v: isinstance(v, list),
+        "object": lambda v: isinstance(v, dict),
+    }
+    for key, value in args.items():
+        prop = properties.get(key)
+        if prop is None:
+            return f"unknown parameter: {key}"
+        expected = prop.get("type")
+        checker = type_checkers.get(expected) if expected else None
+        if checker and not checker(value):
+            return f"parameter {key!r} must be of type {expected}"
+    return None
+
+
 def _dispatch(ctx: dict[str, Any], method: str, params: Any, req_id: Any) -> dict[str, Any]:
     if method == "initialize":
         return _make_response(
@@ -999,7 +1150,15 @@ def _dispatch(ctx: dict[str, Any], method: str, params: Any, req_id: Any) -> dic
         if tool_name not in TOOLS:
             return _make_error(req_id, -32602, f"unknown tool: {tool_name}")
         try:
-            fn, _schema = TOOLS[tool_name]
+            fn, schema = TOOLS[tool_name]
+            # R1（工具面审计）：inputSchema 在服务端强制执行——schema 只给
+            # host 看而不校验时，未知键静默忽略、类型不查，是「字符串验收
+            # 检查逐字符入库」一类问题的根因。required / 类型 / 未知键三查。
+            # schema 是 {description, inputSchema, annotations} 元数据，
+            # 校验器吃的是内层 inputSchema——传外层会让 type 检查永远放行。
+            validation_error = _validate_arguments(args, schema.get("inputSchema", {}))
+            if validation_error is not None:
+                return _make_error(req_id, -32602, f"invalid arguments: {validation_error}")
             result = fn(args, ctx)
             # MCP 要求 content 数组里至少一个 item
             return _make_response(

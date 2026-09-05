@@ -237,7 +237,7 @@ class TestMCPDiscovery:
                 "lhgp_request_verification",
             }.issubset(names)
             assert {"longtask_doctor", "lhgp_doctor"}.issubset(names)
-            assert len(names) == 34
+            assert len(names) == 35
             by_name = {item["name"]: item for item in tools["result"]["tools"]}
             assert by_name["lhgp_notifications"]["annotations"] == {
                 "readOnlyHint": True,
@@ -404,7 +404,9 @@ class TestMCPHealth:
                 },
             )
             assert response["error"]["code"] == -32602
-            assert "enabled_only must be a boolean" in response["error"]["message"]
+            # R1：dispatch 层 schema 校验先行，错误信息标准化
+            msg = response["error"]["message"]
+            assert "enabled_only" in msg and "boolean" in msg
         finally:
             _stop_mcp(proc)
 
@@ -618,7 +620,9 @@ class TestMCPErrors:
                 {"name": "lhgp_notifications", "arguments": {"limit": True}},
             )
             assert resp["error"]["code"] == -32602
-            assert "limit must be an integer" in resp["error"]["message"]
+            # R1：dispatch 层 schema 校验先行
+            msg = resp["error"]["message"]
+            assert "limit" in msg and "integer" in msg
         finally:
             _stop_mcp(proc)
 
@@ -635,7 +639,10 @@ class TestMCPErrors:
                 },
             )
             assert resp["error"]["code"] == -32602
-            assert "include_payload must be a boolean" in resp["error"]["message"]
+            assert (
+                "include_payload" in resp["error"]["message"]
+                and "boolean" in resp["error"]["message"]
+            )
         finally:
             _stop_mcp(proc)
 
@@ -643,8 +650,8 @@ class TestMCPErrors:
         proc = _spawn_mcp(data_dir)
         try:
             for arguments, expected in (
-                ({"status": ["pending"]}, "status must be a string"),
-                ({"goal_id": 42}, "goal_id must be a string"),
+                ({"status": ["pending"]}, "status"),
+                ({"goal_id": 42}, "goal_id"),
             ):
                 resp = _roundtrip(
                     proc,
