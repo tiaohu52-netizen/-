@@ -666,7 +666,7 @@ class TestRealSubprocessReconcile:
                 acceptance_evidence=True,
             ),
         )
-        adapter = SubprocessAdapter(manifest, launch=LaunchSpec(argv=(_sys.executable,)))
+        adapter = SubprocessAdapter(manifest, launch=LaunchSpec(argv=(_sys.executable, "-c")))
         input_ = AttemptInput(
             attempt_id=attempt_id,
             contract_id=cid,
@@ -760,7 +760,7 @@ class TestRealSubprocessReconcile:
                     acceptance_evidence=True,
                 ),
             ),
-            launch=LaunchSpec(argv=(_sys.executable,)),
+            launch=LaunchSpec(argv=(_sys.executable, "-c")),
         )
         conn = connect(StoreConfig(db_path=data_dir / "state.db"))
         try:
@@ -816,7 +816,7 @@ class TestRealSubprocessReconcile:
                 acceptance_evidence=True,
             ),
         )
-        old_adapter = SubprocessAdapter(manifest, launch=LaunchSpec(argv=(_sys.executable,)))
+        old_adapter = SubprocessAdapter(manifest, launch=LaunchSpec(argv=(_sys.executable, "-c")))
         from longtask.adapters.base import AttemptInput
 
         input_ = AttemptInput(
@@ -854,7 +854,7 @@ class TestRealSubprocessReconcile:
             conn.commit()
         finally:
             conn.close()
-        reborn = SubprocessAdapter(manifest, launch=LaunchSpec(argv=(_sys.executable,)))
+        reborn = SubprocessAdapter(manifest, launch=LaunchSpec(argv=(_sys.executable, "-c")))
         conn = connect(StoreConfig(db_path=data_dir / "state.db"))
         try:
             later = NOW + timedelta(minutes=1)
@@ -1027,7 +1027,7 @@ class TestPostReapSettlement:
                         acceptance_evidence=True,
                     ),
                 ),
-                launch=LaunchSpec(argv=(_sys.executable,)),
+                launch=LaunchSpec(argv=(_sys.executable, "-c")),
             )
             # pid 死活探测是分支语义的决定因素（真实世界两种都可能）：
             # - False（确认消失）→ 分支 2 立即结算，退出码不可得不猜；

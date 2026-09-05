@@ -55,7 +55,7 @@ def make_adapter() -> SubprocessAdapter:
             acceptance_evidence=True,
         ),
     )
-    return SubprocessAdapter(manifest, launch=LaunchSpec(argv=(sys.executable,)))
+    return SubprocessAdapter(manifest, launch=LaunchSpec(argv=(sys.executable, "-c")))
 
 
 def spawn_sleeping(adapter: SubprocessAdapter, attempt_id: str, workspace: Path) -> None:
