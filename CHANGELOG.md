@@ -4,10 +4,15 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version numbers
 follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
 
-## [Unreleased]
+## [0.1.0a0] - 2026-09-05
+
+首次公开发布（Developer Preview）。内部开发者预览切割于 2026-09-01；
+2026-09-05 完成产品定位统一、发布阻断项修复（B1/B2）与候选制品验证后发布。
 
 ### Changed
 
+- Product name set to **限期合同中枢 / Deadline Contract Hub** (ADR-004 revision);
+  "multi-agent task contract runtime" is retained as the category description only.
 - Position LHGP as a multi-agent task contract runtime with an LLM-independent
   scheduling core; retain protocol names, package identity and compatibility.
 - Align English/Chinese README and specification framing; distinguish multiple
@@ -83,9 +88,7 @@ follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
   deadline-safety point; a later safety margin can no longer postpone an
   earlier `next_decision_at`.
 
-## [0.1.0a0] - 2026-09-01
-
-### Added — Developer Preview release
+### Developer Preview release (2026-09-01 cut)
 
 The reference implementation is now feature-complete for the scope declared
 in [DESIGN.md v0.7](DESIGN.md). All 7 quality gates (`format / lint / arch /

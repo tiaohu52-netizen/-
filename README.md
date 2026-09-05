@@ -1,4 +1,4 @@
-# LHGP — Multi-Agent Task Contract Runtime
+# LHGP — Deadline Contract Hub
 
 > [中文说明](./README.zh-CN.md) · Protocol name: Long-Horizon Goal Protocol
 
@@ -10,7 +10,8 @@ contract outcomes from acceptance results. Workers may be agent CLIs or ordinary
 
 The scheduling core does not require an LLM. Models can draft plans, perform work or supply
 semantic verification; contract persistence and scheduling do not depend on a model staying online.
-Long-horizon goals are the main use case. A task contract runtime is the current product category.
+Long-horizon goals are the main use case. Deadline Contract Hub is the product
+name; it is implemented as a local task contract runtime.
 
 This is a **Developer Preview**, not a production-stable release.
 The [release audit](docs/evidence/release-readiness-2026-09-05.md) records reproduced release blockers;

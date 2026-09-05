@@ -4,6 +4,9 @@
 
 已接受。细化并部分取代 [ADR-003](0003-long-horizon-goal-protocol.md) 的产品叙事；
 保留 LHGP 协议名、标识、兼容窗口及规范／运行时／插件分层决策。
+**2026-09-05 修订**：用户定下产品名——中文**「限期合同中枢」**、英文
+**Deadline Contract Hub**；原文的「多 Agent 任务合同运行时 / Multi-Agent Task
+Contract Runtime」降为系统类别描述。协议名、包名、CLI、数据格式仍不变。
 
 ## 日期
 
@@ -22,8 +25,9 @@ daemon 通过确定性规则处理风险、预算、候选和租约。现有 Goa
 
 ## 决定
 
-1. 中文产品定义：**独立于会话和模型的多 Agent 任务合同运行时，支持远期目标的持续推进与证据化验收。**
-2. 英文产品类别：**Multi-Agent Task Contract Runtime**。协议名继续使用
+1. 中文产品名：**限期合同中枢**。中文产品定义：**独立于会话和模型的多 Agent 任务合同运行时，支持远期目标的持续推进与证据化验收。**
+2. 英文产品名：**Deadline Contract Hub**；multi-agent task contract runtime 保留为
+   类别描述。协议名继续使用
    **Long-Horizon Goal Protocol（LHGP，远期目标协议）**，不新增缩写，不更改包名、
    CLI、MCP 工具名、数据目录或数据库格式。
 3. “运行时”涵盖合同授权、持久化、调度、执行监督、恢复及验收，不能缩成单纯定时器。
