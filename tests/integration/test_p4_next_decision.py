@@ -422,9 +422,7 @@ class TestDaemonLoopSleepsUntilDecisionPoint:
         data_dir = tmp_path / "data"
         data_dir.mkdir()
         setup_contract(data_dir, "lt-p4-active", NOW + timedelta(seconds=30))
-        monkeypatch.setattr(
-            "longtask.cli.daemon_loop.AttemptRunner.is_idle", lambda _runner: False
-        )
+        monkeypatch.setattr("longtask.cli.daemon_loop.AttemptRunner.is_idle", lambda _runner: False)
         _result, sleeps = self._run(data_dir, NOW + timedelta(seconds=30))
         assert sleeps == [29.0, 29.0]
 
