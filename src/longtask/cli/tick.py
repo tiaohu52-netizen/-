@@ -324,9 +324,7 @@ def run_daemon_tick(
         # 刷屏；其余字段变化（尤其 risk/slack/next_decision_at）才是
         # 需要留下新证据的事实变化。
         previous_semantic = (
-            _forecast_semantic_payload(previous_snapshot)
-            if previous_snapshot is not None
-            else None
+            _forecast_semantic_payload(previous_snapshot) if previous_snapshot is not None else None
         )
         current_semantic = _forecast_semantic_payload(snapshot_payload)
         if previous_semantic != current_semantic:
