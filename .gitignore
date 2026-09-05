@@ -38,3 +38,9 @@ runtime/
 .workbuddy/
 runtime-mcp/
 .history-backup/
+
+# 宣传视频渲染产物（tape 脚本入库，媒体不入库）
+promo/*.mp4
+promo/*.gif
+promo/*.webm
+promo/demo-data/
