@@ -12,6 +12,7 @@ dsh 家目录（不同默认模型）时，注册表 argv 无法表达 per-entry
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 DSH_BIN = (
     "C:\\Users\\17464\\AppData\\Roaming\\com.kimi.shell\\dsh\\current"
@@ -25,6 +26,14 @@ def main() -> int:
     env = dict(os.environ)
     env["DSH_HOME"] = os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "dsh-home-verifier"
+    )
+    # The daemon intentionally exposes only its inherited PATH.  Make the
+    # dogfood verifier's declared command checks reproducible by explicitly
+    # placing this repository's isolated interpreter first; do not rely on a
+    # developer shell having activated the venv.
+    venv_bin = Path(__file__).resolve().parents[2] / ".venv" / "Scripts"
+    env["PATH"] = os.pathsep.join(
+        [str(venv_bin), env.get("PATH", "")] if env.get("PATH") else [str(venv_bin)]
     )
     proc = subprocess.run(  # noqa: S603 —— 固定 argv，prompt 是合同文本
         ["node", DSH_BIN, "--profile", "headless", prompt],

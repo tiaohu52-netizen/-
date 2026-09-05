@@ -11,6 +11,7 @@ per-entry 覆盖，executor 尝试经本包装器固定 DSH_HOME=.dogfood/dsh-ho
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 DSH_BIN = (
     "C:\\Users\\17464\\AppData\\Roaming\\com.kimi.shell\\dsh\\current"
@@ -24,6 +25,10 @@ def main() -> int:
     env = dict(os.environ)
     env["DSH_HOME"] = os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "dsh-home"
+    )
+    venv_bin = Path(__file__).resolve().parents[2] / ".venv" / "Scripts"
+    env["PATH"] = os.pathsep.join(
+        [str(venv_bin), env.get("PATH", "")] if env.get("PATH") else [str(venv_bin)]
     )
     proc = subprocess.run(  # noqa: S603 —— 固定 argv，prompt 是合同文本
         ["node", DSH_BIN, "--profile", "headless", prompt],
