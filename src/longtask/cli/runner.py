@@ -32,6 +32,7 @@ from longtask.adapters.registry import ExecutorRegistry, RegistryEntry
 from longtask.contracts.schema import AttemptRole, AttemptState, ContractDraft, ContractView
 from longtask.persistence.attempts import (
     list_reconcilable_attempts,
+    mark_attempt_orphaned,
     register_attempt_handle,
     set_attempt_state,
 )
@@ -378,8 +379,39 @@ class AttemptRunner:
                 )
                 timeout = timedelta(minutes=contract.draft.budget.max_attempt_minutes)
                 if started_at is not None and now - started_at >= timeout:
-                    with contextlib.suppress(Exception):
+                    cancel_error: Exception | None = None
+                    try:
                         adapter.cancel(attempt_id, "attempt timeout exceeded")
+                    except Exception as exc:
+                        cancel_error = exc
+                    if cancel_error is not None:
+                        # 取消失败时外部进程的状态未知：保留 attempt 和租约，
+                        # 交给 reconcile 的 orphan grace/fencing 路径处理，
+                        # 绝不能把“请求取消”当作“进程已退出”。
+                        mark_attempt_orphaned(
+                            self._conn,
+                            attempt_id=attempt_id,
+                            now=now,
+                        )
+                        append_event(
+                            self._conn,
+                            contract_id=contract_id,
+                            attempt_id=attempt_id,
+                            event_type=EventType.ATTEMPT_ORPHANED,
+                            payload={
+                                "reason": f"timeout cancellation failed: {cancel_error}",
+                                "timeout_seconds": timeout.total_seconds(),
+                            },
+                            now=now,
+                            actor="daemon",
+                            goal_id=contract.goal_id,
+                            contract_revision=contract.revision,
+                            role=str(info.get("role", AttemptRole.EXECUTOR.value)),
+                        )
+                        rebuild_projection(self._root, contract_id, self._conn)
+                        self._running.pop(attempt_id, None)
+                        self._emit(f"runner/attempt-orphaned:{contract_id}:{attempt_id}")
+                        continue
                     self._fail_attempt(
                         now,
                         contract_id,

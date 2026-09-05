@@ -230,10 +230,14 @@ def run_daemon_tick(
         lease_alive = active_lease.is_alive(now) if active_lease else False
 
         # 预算硬边界（DESIGN §6.3）：已消耗 dispatch = 事件流中 attempt/started 数
+        # verifier 使用独立 verification_attempts_reserved 记账；不能把
+        # 验收 attempt 计入 executor 的 max_dispatches，否则一次验收会
+        # 吃掉修复机会（SPEC §12.4）。历史事件没有 role 时按 executor
+        # 兼容，只有明确标记 verifier 的事件排除。
         started_events = sum(
             1
             for e in get_events(conn, contract_id=cid)
-            if e.event_type == EventType.ATTEMPT_STARTED
+            if e.event_type == EventType.ATTEMPT_STARTED and e.role != "verifier"
         )
         budget_dispatches_left = max(0, c.draft.budget.max_dispatches - started_events)
 

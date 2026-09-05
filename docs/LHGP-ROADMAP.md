@@ -3,11 +3,11 @@
 > 版本：1.0
 > 日期：2026-09-01
 > 上游：[LHGP-SPEC.md](./LHGP-SPEC.md)（语义权威）、[ADR-003](./decisions/0003-long-horizon-goal-protocol.md)（命名权威）
-> 状态：**执行计划基线（持续更新）**；P1–P5 已有大量实现，P6 双轨插件包已落地，
-> wheel 安装与基础 quickstart 已有隔离环境证据；非玩具 dogfood 与模块路径迁移仍在收尾
+> 状态：**长期里程碑与历史基线**；2026-09-05 起，本轮首发及完善执行顺序委托给
+> [RELEASE-PLAN.md](RELEASE-PLAN.md)，产品定位依据 [ADR-004](decisions/0004-contract-runtime-and-release-scope.md)。
 
 本文档只回答两个问题：**做到什么算完成**，以及**按什么顺序做**。
-语义冲突以 LHGP-SPEC.md 为准；执行顺序与范围以本文档为准。
+语义冲突以 LHGP-SPEC.md 为准；长期里程碑以本文档为准，本轮执行顺序与范围以 RELEASE-PLAN.md 为准。
 当前能力只能由代码、测试和 `quality/claims.json` 证明，本文档写了目标不代表已经实现。
 
 ---
@@ -65,15 +65,16 @@ daemon + 本机认证 Unix-socket RPC、Goal Capsule/handover、L0/L1 唤醒、
 
 ### 2.2 发布审计快照（2026-09-05）
 
-当前 Developer Preview 发布基线已完成一次全量复验：质量门 7/7 全部通过，634
-个测试通过，覆盖率 82.13%；claims 43 条（42 条已验证）全部可追溯，完整套件无 ResourceWarning；wheel 与 sdist 的 companion metadata
-一致；官方插件 manifest validator 与两个 Skill validator 均通过。最新可复验
-证据见 [`docs/evidence/P6-fresh-machine-smoke-2026-09-05.md`](evidence/P6-fresh-machine-smoke-2026-09-05.md)
-以及 `quality/claims.json` 的 `pinned_sha`。
+此前复验记录为 634 个测试、82.13% 覆盖率；本轮在 `b4b301d` 上再次运行七道质量门，
+结果为 634 个测试、82.17% 覆盖率、7/7 通过。附加故障注入仍复现了取消失败后释放租约、
+验收挤占执行预算两个问题。**全绿基线不能据此标为已具备发布条件。**
 
-这只证明 Developer Preview 的单机发布基线，不改变 Alpha 完成判据：跨主机
-relay、L2/L3 外部唤醒、严格墙钟交付保证，以及完整 Python 模块路径迁移仍是
-后续明确工作项。
+本轮范围、复现及检查缺口见[发布检查](evidence/release-readiness-2026-09-05.md)。
+历史 [P6 安装证据](evidence/P6-fresh-machine-smoke-2026-09-05.md) 和 claims 的
+`pinned_sha` 各自只证明其锚定版本，最终候选必须重新构建、安装及验收。
+
+Developer Preview 与 §1.1 的 Alpha 判据分别管理。跨主机／跨网络、L2/L3 中继明确
+不进入本轮发布及完善计划；严格墙钟结果担保不是待补功能。兼容命名空间迁移不阻塞首发。
 
 ### 2.3 四个必须先纠正的冲突项（历史基线）
 

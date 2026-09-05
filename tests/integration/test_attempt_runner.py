@@ -29,6 +29,7 @@ from longtask.persistence.events import EventType
 from longtask.persistence.store import (
     StoreConfig,
     acquire_lease,
+    append_event,
     connect,
     ensure_schema,
     get_contract,
@@ -315,3 +316,97 @@ def test_budget_exhaustion_by_event_count_blocks_contract(tmp_path: Path) -> Non
         assert EventType.ESCALATION_HANDED_TO_USER.value in types or "contract/blocked" in types
     finally:
         conn.close()  # type: ignore[attr-defined]
+
+
+def test_timeout_cancel_failure_orphans_attempt_and_retains_lease(tmp_path: Path) -> None:
+    """取消超时失败时不能释放租约或允许冲突重派。"""
+    from unittest.mock import Mock
+
+    from longtask.persistence.attempts import set_attempt_state
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    cid = "lt-20260901-r05"
+    make_contract(data_dir, cid, max_attempt_minutes=1)
+    registry = make_registry(argv=(sys.executable, "-c", "pass"))
+
+    conn = open_store(data_dir)
+    try:
+        started = run_daemon_tick(data_dir, conn, registry, now=NOW)["attempts_started"][0]
+        attempt_id = started["attempt_id"]
+        set_attempt_state(conn, attempt_id=attempt_id, state="running", now=NOW)
+
+        adapter = Mock()
+        adapter.cancel.side_effect = OSError("cancel unavailable")
+        adapter.observe.return_value = {"state": "running"}
+        runner = AttemptRunner(data_dir, conn, registry)
+        runner._adapters["exec-1"] = adapter
+        lease = get_lease(conn, cid)
+        assert lease is not None
+        runner._running[attempt_id] = {
+            "contract_id": cid,
+            "executor_id": "exec-1",
+            "model": "*",
+            "role": "executor",
+            "contract_revision": 1,
+            "session_ref": "cancel-failure",
+            "generation": lease.generation,
+        }
+
+        runner.poll_attempts(NOW + timedelta(minutes=2))
+
+        row = conn.execute(
+            "SELECT state FROM attempts WHERE attempt_id = ?", (attempt_id,)
+        ).fetchone()
+        assert row[0] == "orphaned"
+        retained = get_lease(conn, cid)
+        assert retained is not None
+        assert retained.holder_attempt_id == attempt_id
+        assert attempt_id not in runner._running
+        assert any(
+            event.event_type == EventType.ATTEMPT_ORPHANED
+            for event in get_events(conn, contract_id=cid)
+        )
+    finally:
+        conn.close()
+
+
+def test_verifier_started_does_not_consume_executor_dispatch_budget(tmp_path: Path) -> None:
+    """verifier attempt 独立计账后，executor 仍保留 max_dispatches 配额。"""
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    cid = "lt-20260901-r06"
+    make_contract(data_dir, cid, max_dispatches=2)
+    registry = make_registry(argv=("definitely-not-a-real-executable-xyz",))
+
+    conn = open_store(data_dir)
+    try:
+        append_event(
+            conn,
+            contract_id=cid,
+            attempt_id="att-executor-old",
+            event_type=EventType.ATTEMPT_STARTED,
+            payload={"role": "executor"},
+            now=NOW,
+            actor="daemon",
+            role="executor",
+        )
+        append_event(
+            conn,
+            contract_id=cid,
+            attempt_id="att-verifier-old",
+            event_type=EventType.ATTEMPT_STARTED,
+            payload={"role": "verifier"},
+            now=NOW,
+            actor="daemon",
+            role="verifier",
+        )
+
+        result = run_daemon_tick(data_dir, conn, registry, now=NOW + timedelta(seconds=1))
+
+        assert result["dispatched"] == 1
+        contract = get_contract(conn, cid)
+        assert contract is not None
+        assert contract.state == ContractState.ACTIVE
+    finally:
+        conn.close()

@@ -14,7 +14,19 @@
 
 ## 0. 核心定义
 
-**远期目标协议是一种与会话、模型和 Agent 应用解耦的目标承诺协议。** 用户与 AI 共同立下一份合同，声明期望结果、验收、Deadline、权限、预算及允许使用的执行者；协议持有这份承诺，在后台保存证据化进度、选择或更换 Agent、编译接力上下文、管理 Deadline 风险，并由独立验收决定目标是否满足。
+**LHGP 的参考实现是独立于会话和模型的多 Agent 任务合同运行时，支持远期目标的持续推进与证据化验收。**
+Long-Horizon Goal Protocol（远期目标协议）继续作为协议名称；“任务合同运行时”说明当前产品类别。
+用户通过 CLI、程序或 Agent 客户端建立合同，声明期望结果、验收、Deadline、权限、预算及允许使用的执行者。
+运行时持有多份合同，在后台保存证据化进度、选择或更换获授权的执行者、编译接力上下文、管理 Deadline 风险，
+并根据验收证据推进合同及关联目标。该定义依据 [ADR-004](decisions/0004-contract-runtime-and-release-scope.md)。
+
+调度内核 MUST 能在没有 LLM 参与决策时工作。LLM MAY 用于起草计划、执行任务或语义验收，
+但模型会话 MUST NOT 成为合同存续的必要条件。未来可选规划器只能通过受校验的计划／修订入口提交建议，
+MUST NOT 绕过合同授权、预算、审批或验收来直接改写权威状态。
+
+当前应分别理解三个层次：运行时管理多份合同；Goal 消费外部提交的阶段计划并推进关联合同；
+规划器自主提出或重写计划。前两者已有实现路径，第三者是后续可选增强，不得混称为已实现的自主目标规划。
+多合同持久化也不构成全局最优调度或任意共享工作区并行写入安全的保证。
 
 > **会话持有一次尝试，LHGP 持有长期承诺。**  
 > **A session owns an attempt. LHGP owns the commitment.**
@@ -1164,31 +1176,29 @@ uv run python -m pytest tests/conformance -q
 
 ## 23. README 的权威叙事顺序
 
-README 不应从“Give a task a Deadline. Walk away.”开头。推荐首屏：
+README 首屏应说明当前产品类别、主要场景和边界，不承诺无人监管下必然交付。按 ADR-004 推荐：
 
 ```markdown
-# Long-Horizon Goal Protocol (LHGP)
+# LHGP — Multi-Agent Task Contract Runtime
 
-Your goal should not die with the chat.
+A multi-agent task contract runtime, independent of sessions and models,
+for sustained progress and evidence-based acceptance of long-horizon goals.
 
-LHGP lets you place a goal under an independent, local contract: define the
-outcome, acceptance checks, deadline, budget, and which agent CLIs and models
-may work on it. Sessions may end and agents may change; the commitment,
-evidence, and handoff state remain.
-
-Session owns an attempt. LHGP owns the commitment.
+The scheduling core does not require an LLM. Models may draft plans,
+perform work or supply semantic verification. LHGP holds multiple contracts;
+long-horizon goals are the main use case.
 ```
 
 随后按以下顺序展开：
 
-1. 一个跨会话接力的真实故事；
-2. Goal / Contract / Attempt 三层图；
-3. 它与 Goal mode、cron、workflow、memory 的差异；
-4. 当前确实能做什么；
-5. 5 分钟可验证 quickstart；
-6. 安全、Deadline 与不保证事项；
-7. 架构和开发入口；
-8. maturity 与已知缺口。
+1. 运行时职责、无需 LLM 的调度内核与模型可选参与的位置；
+2. Goal / Contract / Attempt 的持久化关系及多合同边界；
+3. 当前能力、证据入口和未实现内容；
+4. 可复验的控制面 quickstart，以及真实执行所需的额外配置；
+5. 安全、Deadline 与不保证事项；
+6. 架构、开发入口、成熟度和已知发布阻断项。
+
+不得用未经核实的“其他系统做不到”支持产品定位，也不得把仅建立合同的示例称为执行验收端到端成功。
 
 README MUST 清楚写出：机器离线时不会工作；Deadline 不是结果担保；插件与协议不是同一层；Developer Preview 尚不代表生产可用。
 
