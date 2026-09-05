@@ -250,6 +250,22 @@ def handle_attempt_write_back(
                 code=ErrorCode.VALIDATION_FAILED,
                 message=f"unknown contract_state: {raw_state}",
             ) from None
+        # 完成态是验收结论，只能由 verifier 裁决路径写入（tick
+        # _judge_verifier_outcomes）；执行者自报 complete = 伪造工作量
+        # （安全审查 RPC-C3），明确拒接而非交给状态机碰运气。
+        attempt_for_role = get_attempt(conn, attempt_id)
+        writer_role = attempt_for_role.role if attempt_for_role is not None else "executor"
+        if (
+            contract_state in (ContractState.COMPLETE, ContractState.SATISFIED)
+            and writer_role != "verifier"
+        ):
+            raise RpcError(
+                code=ErrorCode.STATE_FORBIDDEN,
+                message=(
+                    "attempt/write-back cannot set a contract to a completion state; "
+                    "report attempt_state and let the verifier decide acceptance"
+                ),
+            )
 
     events: list[EventInput] = []
     actual_model = str(params.get("model_id", "")).strip()

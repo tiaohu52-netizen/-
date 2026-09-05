@@ -144,13 +144,11 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
         )
         """
     )
-    conn.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_events_request_id
-        ON events(request_id)
-        WHERE request_id IS NOT NULL
-        """
-    )
+    # 注：v1→v2 迁移会 ALTER TABLE events 补 goal_id / request_id / role /
+    # contract_revision 等列；引用这些列的索引（request_id、goal_id）必须
+    # 在 _migrate_v1_to_v2 之后建（见下），否则真实 v1 库在 ensure_schema
+    # 阶段直接 OperationalError（安全审查 持久化-C1）。contract_id 自建表
+    # 起就存在，相关索引可以立即建。
     conn.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_events_contract_id
@@ -163,15 +161,6 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
         ON events(contract_id, event_type, event_id)
         """
     )
-    conn.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_events_goal_id
-        ON events(goal_id, event_id)
-        WHERE goal_id IS NOT NULL
-        """
-    )
-    # 注：v1→v2 迁移会 ALTER TABLE events 加 goal_id 列；若 events 表已存在但
-    # 是 v1 schema，goal_id index 必须放到 _migrate_v1_to_v2 之后再建。
 
     # ── P1：合同修订不可变表（替换 v1 就地 CAS UPDATE）──
     conn.execute(
@@ -249,20 +238,6 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
         ON attempts(goal_id, admitted_at)
         """
     )
-    conn.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_attempts_role_state
-        ON attempts(role, state)
-        """
-    )
-    conn.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_attempts_orphaned
-        ON attempts(state)
-        WHERE state = 'orphaned'
-        """
-    )
-
     # ── P1：decisions 实体表（§6 escalation 轴历史）──
     conn.execute(
         """
@@ -329,12 +304,45 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
     # ── 迁移：v1 → v2 ──
     _migrate_v1_to_v2(conn)
 
+    # events(goal_id / request_id) 列由上面的迁移物化（v1 库 ALTER TABLE
+    # 后才存在），因此这两个 partial index 只能在迁移之后建——否则真实
+    # v1 库在 ensure_schema 阶段直接 OperationalError（安全审查 持久化-C1）。
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_events_goal_id
+        ON events(goal_id, event_id)
+        WHERE goal_id IS NOT NULL
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_events_request_id
+        ON events(request_id)
+        WHERE request_id IS NOT NULL
+        """
+    )
+
     # contract_id is additive for old attempts tables, so build its index only
     # after the migration has materialized the column.
     conn.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_attempts_contract
         ON attempts(contract_id, admitted_at)
+        """
+    )
+    # attempts(role) / attempts(state) 列在 v1 库上由上面的迁移补齐，
+    # 相关索引必须在迁移之后建（同 idx_events_goal_id 理由）。
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_attempts_role_state
+        ON attempts(role, state)
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_attempts_orphaned
+        ON attempts(state)
+        WHERE state = 'orphaned'
         """
     )
     conn.execute(
@@ -372,7 +380,16 @@ def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
     - 给既有 contracts 行回填 goal_id = contract_id（§7 命名迁移）。
     - 给既有 contracts 行回填 next_wakeup_at（v1 已有，直接保留）。
     - 不重建既有事件数据。
+
+    一次性数据改写（枚举改名 complete→satisfied、on_track→not_due）只在
+    user_version < 2 时执行：这些不是幂等结构调整，而是历史语义迁移；
+    无条件执行会在每次 ensure_schema（即每个 CLI 命令/每个 RPC 连接）时
+    静默改写 daemon 刚写入的合法终态，绕过事件流与 revision CAS
+    （安全审查 持久化-C2）。
     """
+    version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+    is_fresh_v1 = version < 2
+
     # ``user_version`` tracks the logical schema, but early Developer Preview
     # builds shipped P3 columns after setting it to 2.  Always reconcile the
     # additive columns so an interrupted or partially upgraded database can be
@@ -385,11 +402,6 @@ def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
 
     _add_column_if_missing("contracts", "goal_id TEXT")
     _add_column_if_missing("contracts", "deadline_status TEXT NOT NULL DEFAULT 'not_due'")
-    # 早期预发布版本曾写入不存在的 on_track 枚举；迁移时统一到协议
-    # 当前语义的 not_due，避免旧库在读取 ContractView 时崩溃。
-    conn.execute(
-        "UPDATE contracts SET deadline_status = 'not_due' WHERE deadline_status = 'on_track'"
-    )
     _add_column_if_missing("contracts", "acceptance_status TEXT NOT NULL DEFAULT 'pending'")
     _add_column_if_missing("contracts", "authority_json TEXT NOT NULL DEFAULT '{}'")
     _add_column_if_missing("contracts", "attention_json TEXT NOT NULL DEFAULT '{}'")
@@ -397,9 +409,13 @@ def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
     _add_column_if_missing("contracts", "next_decision_at TEXT")
 
     _add_column_if_missing("events", "goal_id TEXT")
+    _add_column_if_missing("events", "request_id TEXT")
+    _add_column_if_missing("events", "lease_generation INTEGER")
     _add_column_if_missing("events", "contract_revision INTEGER")
     _add_column_if_missing("events", "role TEXT")
+    _add_column_if_missing("events", "actor TEXT")
     _add_column_if_missing("events", "payload_schema_version INTEGER NOT NULL DEFAULT 1")
+    _add_column_if_missing("events", "schema_version INTEGER NOT NULL DEFAULT 1")
 
     # P3：attempts 表外部句柄列（SPEC §11.3）——v2 早期 attempts 表无这些列
     _add_column_if_missing("attempts", "external_run_id TEXT")
@@ -413,7 +429,7 @@ def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
     _add_column_if_missing("attempts", "handle_registered_at TEXT")
     _add_column_if_missing("attempts", "orphaned_at TEXT")
 
-    # 回填 goal_id
+    # 回填 goal_id（幂等：WHERE 条件本身防重复改写）
     conn.execute("UPDATE contracts SET goal_id = contract_id WHERE goal_id IS NULL OR goal_id = ''")
     # 旧库只有 goal_id；对历史默认的一合同一 Goal 身份做无歧义回填。
     # 若一个 Goal 曾绑定多个合同则不猜，保留 NULL，由 reconcile 的兼容
@@ -435,9 +451,16 @@ def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
         "WHERE payload_schema_version IS NULL"
     )
 
-    # 合同状态名迁移：complete → satisfied（acceptance_status 轴的终态），
-    # 但只在 v1 行明确为 complete 时改；其它状态保留。
-    conn.execute("UPDATE contracts SET state = 'satisfied' WHERE state = 'complete'")
+    if is_fresh_v1:
+        # 一次性历史语义迁移（只在真正的 v1 库上执行一次）。
+        # 合同状态名迁移：complete → satisfied（acceptance_status 轴的终态），
+        # 但只在 v1 行明确为 complete 时改；其它状态保留。
+        conn.execute("UPDATE contracts SET state = 'satisfied' WHERE state = 'complete'")
+        # 早期预发布版本曾写入不存在的 on_track 枚举；迁移时统一到协议
+        # 当前语义的 not_due，避免旧库在读取 ContractView 时崩溃。
+        conn.execute(
+            "UPDATE contracts SET deadline_status = 'not_due' WHERE deadline_status = 'on_track'"
+        )
     # expired 状态保留作 commitment lifecycle 中的非终态；deadline_status 由
     # 应用层据 deadline_at 派生为 past_deadline。
 

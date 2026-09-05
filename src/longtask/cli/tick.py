@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sqlite3
 from collections.abc import Callable
 from datetime import datetime, timedelta
@@ -26,6 +27,7 @@ from longtask.contracts.schema import (
     ContractState,
     DeadlineStatus,
 )
+from longtask.contracts.state_machine import TERMINAL_STATES
 from longtask.forecast.model import Forecast, build_deadline_snapshot
 from longtask.persistence.decisions import set_next_decision_at
 from longtask.persistence.events import EventType
@@ -115,7 +117,7 @@ def run_daemon_tick(
     clocks: list[ClockEntry] = []
 
     for c in all_contracts:
-        if c.state in (ContractState.COMPLETE, ContractState.CANCELLED, ContractState.ARCHIVED):
+        if c.state in TERMINAL_STATES:
             continue
         deadline = c.draft.deadline_at
         wakeup = c.next_wakeup_at or (now + timedelta(seconds=60))
@@ -152,11 +154,7 @@ def run_daemon_tick(
     # 预扫一遍以建立两个映射
     for c in all_contracts:
         cid = c.contract_id
-        if (
-            c.state == ContractState.COMPLETE
-            or c.state == ContractState.CANCELLED
-            or c.state == ContractState.ARCHIVED
-        ):
+        if c.state in TERMINAL_STATES:
             continue
         verifier_count = _count_verifier_attempts(conn, cid)
         steer_count = sum(
@@ -548,11 +546,20 @@ def _contract_workspace(contract: Any) -> str:
 
 
 def _norm_workspace(workspace: str) -> str:
-    """workspace 归一化比较键：小写盘符 + 正斜杠，忽略尾部分隔符差异。"""
+    """workspace 归一化比较键：真实物理路径 + 大小写折叠 + 正斜杠。
+
+    安全审查 调度-C3：只小写盘符挡不住 Windows 大小写不敏感路径
+    （D:/Data 与 d:/data 同一目录），junction/符号链接指向同一物理目录
+    的两个 workspace 也能绕过排他。路径存在时解析 realpath（大小写按
+    真实卷形态返回），整个键再 casefold；不存在时退回字符串归一化。
+    """
     text = workspace.strip().replace("\\", "/").rstrip("/")
-    if len(text) >= 2 and text[1] == ":":
-        text = text[0].lower() + text[1:]
-    return text
+    try:
+        resolved = os.path.realpath(text)
+        text = resolved.replace("\\", "/").rstrip("/")
+    except OSError:
+        pass
+    return text.casefold()
 
 
 def _judge_verifier_outcomes(root: Path, conn: sqlite3.Connection, now: datetime) -> None:

@@ -15,7 +15,6 @@
 from __future__ import annotations
 
 import json
-import re
 import sqlite3
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
@@ -52,17 +51,16 @@ from longtask.persistence.store import (
 )
 from longtask.rpc.errors import ErrorCode, RpcError
 from longtask.rpc.handlers._common import (
+    _CONTRACT_ID_RE,
     idempotent_replay,
     parse_contract_draft,
     require_contract_id,
+    require_principal,
     resolve_actor,
 )
 
 if TYPE_CHECKING:
     from longtask.rpc.server import RequestEnvelope
-
-
-_CONTRACT_ID_RE = re.compile(r"^lt-[0-9]{8}-[0-9a-zA-Z_-]+$")
 
 
 def handle_contract_prepare(
@@ -116,6 +114,7 @@ def handle_contract_approve(
     """用户批准合同：drafted → active（DESIGN §5、§11.2）。"""
     params = envelope.params
     contract_id = require_contract_id(params)
+    require_principal(envelope, params, action="contract/approve")
 
     if (replay := idempotent_replay(conn, envelope, contract_id)) is not None:
         return replay
@@ -566,6 +565,8 @@ def handle_contract_pause(
     """用户主动暂停：active → paused（DESIGN §5、§11.2）。"""
     params = envelope.params
     contract_id = require_contract_id(params)
+    require_principal(envelope, params, action="contract/pause")
+
     if (replay := idempotent_replay(conn, envelope, contract_id)) is not None:
         return replay
 
@@ -618,6 +619,8 @@ def handle_contract_resume(
     """恢复执行：paused / blocked → active（DESIGN §5、§11.2）。"""
     params = envelope.params
     contract_id = require_contract_id(params)
+    require_principal(envelope, params, action="contract/resume")
+
     if (replay := idempotent_replay(conn, envelope, contract_id)) is not None:
         return replay
 
@@ -669,6 +672,8 @@ def handle_contract_cancel(
     """用户主动终止：任意非终态 → cancelled（DESIGN §5、§11.2）。"""
     params = envelope.params
     contract_id = require_contract_id(params)
+    require_principal(envelope, params, action="contract/cancel")
+
     if (replay := idempotent_replay(conn, envelope, contract_id)) is not None:
         return replay
 
@@ -737,6 +742,8 @@ def handle_contract_arbitrate(
     """
     params = envelope.params
     contract_id = require_contract_id(params)
+    require_principal(envelope, params, action="contract/arbitrate")
+
     if (replay := idempotent_replay(conn, envelope, contract_id)) is not None:
         return replay
 

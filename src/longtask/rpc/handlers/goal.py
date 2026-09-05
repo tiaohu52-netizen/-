@@ -53,6 +53,7 @@ from longtask.persistence.store import (
 )
 from longtask.rpc.errors import ErrorCode, RpcError
 from longtask.rpc.handlers._common import (
+    _is_safe_contract_id,
     _parse_iso,
     resolve_actor,
 )
@@ -215,6 +216,16 @@ def handle_goal_prepare(
     if not contract_id:
         date_prefix = now.strftime("%Y%m%d")
         contract_id = f"lt-{date_prefix}-{now.strftime('%H%M%S%f')[:8]}"
+    elif not _is_safe_contract_id(contract_id):
+        # 用户自报 ID 与 contract/prepare 同一安全约束：projections 以
+        # contract_id 拼目录，任何路径片段都会写到数据根之外（安全审查 C2）。
+        raise RpcError(
+            code=ErrorCode.VALIDATION_FAILED,
+            message=(
+                f"contract_id '{contract_id}' must be a path-free slug "
+                "(letters, digits, '_', '-', '.'; no separators, no '..')"
+            ),
+        )
 
     draft = from_dict(draft_data)
     actor = resolve_actor(envelope, params)
@@ -435,7 +446,12 @@ def handle_goal_advance(
     now: datetime,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    """Complete the current staged step using revision CAS."""
+    """Complete the current staged step using revision CAS.
+
+    阶段完成依赖合同验收绑定（stage acceptance binding）背书，不是任意
+    自批——与 contract/approve 的 Principal 决定权性质不同，不设 actor
+    门禁（模型客户端可通过 MCP 正常推进已验收阶段）。
+    """
     params = envelope.params
     goal_id = str(params.get("goal_id", "")).strip()
     stage_id = str(params.get("stage_id", "")).strip()

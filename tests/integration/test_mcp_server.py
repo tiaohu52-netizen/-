@@ -451,7 +451,9 @@ class TestMCPLifecycle:
             view = prepared.get("result", prepared)
             assert view.get("contract_id") == cid
 
-            # 2. 批准
+            # 2. 批准是 Principal 决定权（安全审查 RPC-C1）：模型客户端
+            # 必须收到 AUTH_FAILED 指引（引导用户在 CLI 执行 approve），
+            # 而不是自批准。
             resp = _roundtrip(
                 proc,
                 "tools/call",
@@ -461,8 +463,30 @@ class TestMCPLifecycle:
                 },
                 _id=11,
             )
-            approved = _result_text(resp)
-            assert approved.get("result", {}).get("ok") is True or "state" in str(approved)
+            approved_text = str(resp)  # 错误响应在 resp["error"]，不走 _result_text
+            assert "AUTH_FAILED" in approved_text or "Principal" in approved_text, (
+                f"model self-approval was not rejected: {approved_text}"
+            )
+
+            # 用户从 CLI 批准（actor=user 的受信通道）
+            from longtask import PROTOCOL_VERSION as _PV
+            from longtask.persistence.store import StoreConfig, connect, ensure_schema
+            from longtask.rpc.handlers.contract import handle_contract_approve
+            from longtask.rpc.methods import Method
+            from longtask.rpc.server import RequestEnvelope
+
+            conn_u = connect(StoreConfig(db_path=data_dir / "state.db"))
+            ensure_schema(conn_u)
+            env_u = RequestEnvelope(
+                method=Method.CONTRACT_APPROVE,
+                request_id="req-user-approve",
+                client_id="longtask-cli",
+                protocol_version=_PV,
+                params={"contract_id": cid},
+            )
+            approved = handle_contract_approve(env_u, conn=conn_u, now=now)
+            conn_u.close()
+            assert approved["ok"] is True
 
             # 3. 查询状态
             resp = _roundtrip(

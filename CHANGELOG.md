@@ -4,6 +4,37 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version numbers
 follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
 
+## [0.1.0a1] - 2026-09-05
+
+安全加固补丁：发布后四域深度审查（进程/租约、持久化、RPC/MCP 边界、调度
+预算）发现的 9 项 Critical 修复，全部附回归测试。详见
+[security-hardening-2026-09-05](docs/evidence/security-hardening-2026-09-05.md)。
+
+### Security
+
+- `contract/approve|pause|resume|cancel|arbitrate` 现在要求 Principal
+  （actor=user）——模型客户端自批准合同返回 AUTH_FAILED 并指引 CLI 通道
+  （SPEC §4.2）；此前模型可起草+自批准+指定验收命令形成任意命令执行链。
+- `goal/prepare` 与所有入口的 contract_id 统一为安全 slug 校验（拒绝路径
+  分隔符/`..`），堵住投影写到数据根之外的路径穿越。
+- 执行者 `attempt/write-back` 不得把合同直推完成态（STATE_FORBIDDEN）；
+  完成结论只能由 verifier 裁决路径写入。
+
+### Fixed
+
+- `ensure_schema` 的一次性历史改写（complete→satisfied 等）加版本门控，
+  不再每次启动改写 daemon 刚写入的合法终态；tick 终态跳过集合改用
+  `TERMINAL_STATES`，已完成合同不再被重新仲裁成 EXPIRED。
+- 真实 v1 结构库的平滑升级（迁移列索引移到补列之后 + events 缺列兜底）。
+- `write_back(events=())` 形态补 request_id 簿记事件，幂等重放不再二次
+  执行状态迁移。
+- verifier 派发不再抢夺在跑 executor 的活租约（dispatch/deferred 推迟），
+  且纳入 kill switch 管辖。
+- workspace 排他归一化升级为 realpath + casefold，大小写/符号链接别名
+  不再绕过。
+- `poll_attempts` 对 fenced 租约/缺失 generation 防护，单个 attempt 的
+  租约异常不再击穿 daemon 进程。
+
 ## [0.1.0a0] - 2026-09-05
 
 首次公开发布（Developer Preview）。内部开发者预览切割于 2026-09-01；

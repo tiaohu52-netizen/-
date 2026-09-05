@@ -1257,6 +1257,35 @@ def write_back(
             )
             appended_ids.append(evt.event_id)
 
+        # 空 events 且带 request_id 的写回曾没有可探测的幂等锚点：重放同一
+        # request_id 会二次执行状态迁移（安全审查 持久化-C3）。落一条
+        # 簿记事件，让 get_events_by_request_id 在重放时命中早退。
+        if request_id and not appended_ids:
+            bookkeeping = append_event(
+                conn,
+                contract_id=contract_id,
+                event_type=EventType.ATTEMPT_WRITE_BACK,
+                payload={
+                    "attempt_id": attempt_id,
+                    "write_generation": write_generation,
+                    "contract_state": (
+                        contract_state.value if contract_state is not None else None
+                    ),
+                    "bookkeeping": True,
+                },
+                now=now,
+                attempt_id=attempt_id,
+                lease_generation=write_generation,
+                request_id=request_id,
+                actor=actor,
+                schema_version=schema_version,
+                goal_id=goal_id or contract_id,
+                contract_revision=contract_revision,
+                role=role or actor,
+                payload_schema_version=schema_version,
+            )
+            appended_ids.append(bookkeeping.event_id)
+
     return WriteBackResult(
         contract_id=contract_id,
         attempt_id=attempt_id,

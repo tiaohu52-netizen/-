@@ -804,13 +804,14 @@ class TestHandlerValidationBranches:
             assert res["ok"] is True
             assert res["result"]["contract_id"].startswith("lt-20260831-")
 
-            # 2. 非法 contract_id 格式
+            # 2. 非法 contract_id：含路径成分（安全审查 RPC-C2 后 slug
+            # 校验拦路径穿越，命名风格不再强制 lt- 前缀）
             with pytest.raises(RpcError) as exc:
                 route(
                     make_env(
                         Method.CONTRACT_PREPARE,
                         "r2",
-                        {"contract_id": "invalid-id", "draft": make_valid_draft_payload()},
+                        {"contract_id": "lt-x/../escape", "draft": make_valid_draft_payload()},
                     ),
                     conn=conn,
                     now=NOW,

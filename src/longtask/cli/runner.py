@@ -58,6 +58,7 @@ from longtask.persistence.store import (
     release_lease,
     renew_lease,
 )
+from longtask.promoter.killswitch import is_kill_switch_active
 from longtask.promoter.records import _count_verifier_attempts
 
 # 事件 payload 内 stdout/stderr 截断上限：审计够用，不撑爆 log.jsonl
@@ -438,19 +439,32 @@ class AttemptRunner:
             if str(observation.get("state")) == AttemptState.RUNNING.value:
                 # spawn 后短窗内子进程可能尚未退出（observe 只是瞬时快照）。
                 # 存活且持有当前租约：代发心跳续约；下一轮 poll 再看是否收尾。
-                # generation 为 None 表示租约已被释放（attempt 已收尾路径）——
-                # 但 state=RUNNING 时不太可能；如果走到这里就 fallback 到入参。
-                lease_gen = generation if generation is not None else int(info["generation"])
-                if contract is not None:
-                    renew_lease(
-                        self._conn,
-                        contract_id=contract_id,
-                        holder_attempt_id=attempt_id,
-                        lease_generation=lease_gen,
-                        heartbeat_at=now,
-                        timeout=timedelta(minutes=contract.draft.budget.max_attempt_minutes),
-                        actor="daemon",
-                    )
+                # 安全审查 进程-C2：租约中途消失/换代时 renew_lease 会抛
+                # LeaseFencedError、info["generation"] 为 None 时 int() 会抛
+                # TypeError——任何一条都会击穿 poll_attempts 顶层，杀死整个
+                # daemon（其余合同调度全部停摆）。fenced/stale 是 attempt 级
+                # 事件，绝不允许升级为进程级崩溃。
+                lease_gen: int | None = None
+                if generation is not None:
+                    lease_gen = generation
+                elif isinstance(info.get("generation"), int):
+                    lease_gen = int(info["generation"])
+                if lease_gen is not None and contract is not None:
+                    try:
+                        renew_lease(
+                            self._conn,
+                            contract_id=contract_id,
+                            holder_attempt_id=attempt_id,
+                            lease_generation=lease_gen,
+                            heartbeat_at=now,
+                            timeout=timedelta(minutes=contract.draft.budget.max_attempt_minutes),
+                            actor="daemon",
+                        )
+                    except LeaseFencedError:
+                        # 租约已被释放或被新持有者 fence：本 attempt 失去
+                        # 写权，按 stale 收尾，下一轮由 reconcile 接管。
+                        self._mark_stale(now, attempt_id, info, "lease fenced during renew")
+                        continue
                 continue
 
             self._finish_attempt(now, attempt_id, info, adapter, str(observation.get("state")))
@@ -731,9 +745,47 @@ class AttemptRunner:
         """
         from longtask.contracts.schema import ContractState
 
+        # Kill switch 激活时不得派生任何外部进程（安全审查 调度-C2）：
+        # tick 有拦截，但本方法还有 daemon_loop 的两条旁路调用。
+        if is_kill_switch_active(self._root):
+            return False
+
         contract = get_contract(self._conn, contract_id)
         if contract is None or contract.state != ContractState.ACTIVE:
             return False
+        # 不抢活租约（安全审查 调度-C1）：verifier 派发曾直接 CAS 覆盖
+        # 在跑 executor 的租约，导致 executor 被误判 stale、外部进程
+        # 失管、同 workspace 出现双写者。租约仍存活且持有者是非终态
+        # attempt 时推迟派生（记 verification/deferred，下轮重试）。
+        active_lease = get_lease(self._conn, contract_id)
+        if active_lease is not None and active_lease.is_alive(now):
+            holder_state = self._conn.execute(
+                "SELECT state FROM attempts WHERE attempt_id = ? LIMIT 1",
+                (active_lease.holder_attempt_id,),
+            ).fetchone()
+            holder_terminal = holder_state is not None and holder_state[0] in (
+                "succeeded",
+                "failed",
+                "cancelled",
+                "stale",
+                "orphaned",
+            )
+            if not holder_terminal:
+                append_event(
+                    self._conn,
+                    contract_id=contract_id,
+                    event_type=EventType.DISPATCH_DEFERRED,
+                    payload={
+                        "reason": (
+                            "verifier dispatch deferred: live lease held by "
+                            f"running attempt {active_lease.holder_attempt_id}"
+                        ),
+                        "lease_generation": active_lease.generation,
+                    },
+                    now=now,
+                    actor="daemon",
+                )
+                return False
         # C1 修复（P1）：用 attempts 实体表的 role='verifier' 判定已派生，
         # 不再用 payload_json 字符串匹配（会误判子串）。
         # SPEC §12.3 明确「历史 verifier 不得阻止新的 verifier 派生」——

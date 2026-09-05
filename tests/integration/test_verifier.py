@@ -32,7 +32,6 @@ from longtask.contracts.schema import (
 from longtask.persistence.events import EventType
 from longtask.persistence.store import (
     StoreConfig,
-    acquire_lease,
     append_event,
     connect,
     ensure_schema,
@@ -128,21 +127,15 @@ class TestVerifierDispatch:
         conn, cid = _active_contract(root)
         try:
             runner = AttemptRunner(root, conn, reg)
-            # 模拟执行者成功：手动 acquire + 记 succeeded → runner 内部派生 verifier
-            acquire_lease(
-                conn,
-                contract_id=cid,
-                holder_attempt_id="att-1",
-                expected_generation=0,
-                heartbeat_at=NOW,
-                timeout=timedelta(minutes=30),
+            # 模拟执行者成功收尾：租约已释放（真实路径 _finish_attempt 释放
+            # 后才派 verifier）；attempts 行标 succeeded，不挡活租约守卫。
+            conn.execute(
+                "INSERT INTO attempts (attempt_id, contract_id, goal_id, role, executor_id,"
+                " state, admitted_at, contract_revision, updated_at)"
+                " VALUES ('att-1', ?, ?, 'executor', 'exec-a', 'succeeded', ?, 1, ?)",
+                (cid, cid, NOW.isoformat(), NOW.isoformat()),
             )
-            runner._running["att-1"] = {
-                "contract_id": cid,
-                "executor_id": "exec-a",
-                "session_ref": "fake:att-1",
-                "generation": 1,
-            }
+            conn.commit()
             ok = runner._dispatch_verifier(NOW, contract_id=cid, executor_id="exec-a")
             assert ok is True
             starts = [
@@ -168,20 +161,14 @@ class TestVerifierDispatch:
         conn, cid = _active_contract(root)
         try:
             runner = AttemptRunner(root, conn, reg)
-            acquire_lease(
-                conn,
-                contract_id=cid,
-                holder_attempt_id="att-1",
-                expected_generation=0,
-                heartbeat_at=NOW,
-                timeout=timedelta(minutes=30),
+            # 同上：executor 已 succeeded、租约已释放的收尾后路径。
+            conn.execute(
+                "INSERT INTO attempts (attempt_id, contract_id, goal_id, role, executor_id,"
+                " state, admitted_at, contract_revision, updated_at)"
+                " VALUES ('att-1', ?, ?, 'executor', 'only-exec', 'succeeded', ?, 1, ?)",
+                (cid, cid, NOW.isoformat(), NOW.isoformat()),
             )
-            runner._running["att-1"] = {
-                "contract_id": cid,
-                "executor_id": "only-exec",
-                "session_ref": "fake:att-1",
-                "generation": 1,
-            }
+            conn.commit()
             ok = runner._dispatch_verifier(NOW, contract_id=cid, executor_id="only-exec")
             assert ok is False
             types = [str(e.event_type) for e in get_events(conn, contract_id=cid)]

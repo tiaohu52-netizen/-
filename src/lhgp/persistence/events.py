@@ -24,6 +24,7 @@ class EventType(StrEnum):
     ATTEMPT_CANCELLED = "attempt/cancelled"
     ATTEMPT_STALE = "attempt/stale"
     ATTEMPT_ORPHANED = "attempt/orphaned"
+    ATTEMPT_WRITE_BACK = "attempt/write-back"
     DEADLINE_STATUS_CHANGED = "deadline/status-changed"
     ACCEPTANCE_STATUS_CHANGED = "acceptance/status-changed"
     DECISION_RECORDED = "decision/recorded"

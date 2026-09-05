@@ -369,6 +369,38 @@ class TestWorkspaceExclusivity:
         finally:
             conn.close()
 
+    def test_workspace_case_only_variant_is_same_directory(self, tmp_path: Path) -> None:
+        """安全审查 调度-C3：全路径大小写不同的同一物理目录不得绕过排他。
+
+        旧归一化只小写盘符，D:/Data/WS 与 d:/data/ws 归一化后仍不相等。
+        """
+        from longtask.cli.tick import _norm_workspace
+
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        ws = tmp_path / "SharedWs"
+        ws.mkdir()
+        ws_str = str(ws)
+        # 大小写翻转变体（目录真实存在，realpath 可解析）
+        variant = "".join(c.swapcase() if not c.isspace() else c for c in ws_str)
+        assert variant != ws_str
+        assert _norm_workspace(ws_str) == _norm_workspace(variant)
+
+    def test_workspace_junction_like_alias_normalizes_to_target(self, tmp_path: Path) -> None:
+        """符号链接/别名路径应归一化到真实目标（realpath）。"""
+        import os as _os
+
+        from longtask.cli.tick import _norm_workspace
+
+        real = tmp_path / "real-ws"
+        real.mkdir()
+        link = tmp_path / "alias-ws"
+        try:
+            _os.symlink(real, link, target_is_directory=True)
+        except OSError:
+            pytest.skip("symlink not permitted on this platform")
+        assert _norm_workspace(str(link)) == _norm_workspace(str(real))
+
     def test_tick_defers_second_contract_and_emits_event(self, tmp_path: Path) -> None:
         """run_daemon_tick 集成：A 活租约 + B 紧迫 → B 被记 dispatch/deferred，
         本轮 attempts_started 不含 B；A 结束（租约消失）后 B 可派。"""

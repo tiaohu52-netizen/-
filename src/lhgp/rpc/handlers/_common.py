@@ -8,6 +8,7 @@ temporarily delegated until their persistence dependencies are migrated.
 from __future__ import annotations
 
 import math
+import re
 import sqlite3
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
@@ -69,11 +70,51 @@ def resolve_actor(envelope: RequestEnvelope, params: dict[str, Any]) -> str:
     return actor
 
 
+def require_principal(envelope: RequestEnvelope, params: dict[str, Any], *, action: str) -> str:
+    """用户专属操作的 actor 门禁（SPEC §4.2：自主执行前 MUST 有 Principal 批准）。
+
+    approve/pause/resume/cancel/arbitrate/goal 推进是 Principal 的决定权，
+    模型客户端（actor="model"）不得自批准或代行——MCP 的 destructiveHint
+    注解只是提示、host 可忽略，强制点必须在服务端。
+    """
+    actor = resolve_actor(envelope, params)
+    if actor != "user":
+        raise RpcError(
+            code=ErrorCode.AUTH_FAILED,
+            message=(
+                f"{action} requires the user (Principal); "
+                "model clients must ask the user to run it via the CLI"
+            ),
+        )
+    return actor
+
+
+# 合同 ID 的安全 slug（projections/contract_dir 直接以它拼目录：任何
+# 路径分隔符/盘符/../ 都会写出数据根之外——安全审查 RPC-C2）。
+# 不强制 lt- 前缀：goal/prepare 的阶段合同沿用自定义 ID（如 stage 合同），
+# 防线是「无路径字符」而非命名风格。
+_CONTRACT_ID_RE = re.compile(r"^[0-9a-zA-Z][0-9a-zA-Z_.-]*$")
+
+
+def _is_safe_contract_id(contract_id: str) -> bool:
+    if not _CONTRACT_ID_RE.match(contract_id):
+        return False
+    return contract_id not in (".", "..") and ".." not in contract_id.split("-")
+
+
 def require_contract_id(params: dict[str, Any]) -> str:
-    """校验 contract_id 必填且 trim 后非空。"""
+    """校验 contract_id 必填、非空且为安全 slug（防路径穿越）。"""
     contract_id = str(params.get("contract_id", "")).strip()
     if not contract_id:
         raise RpcError(code=ErrorCode.VALIDATION_FAILED, message="contract_id is required")
+    if not _is_safe_contract_id(contract_id):
+        raise RpcError(
+            code=ErrorCode.VALIDATION_FAILED,
+            message=(
+                f"contract_id '{contract_id}' must be a path-free slug "
+                "(letters, digits, '_', '-', '.'; no separators, no '..')"
+            ),
+        )
     return contract_id
 
 
@@ -164,5 +205,6 @@ __all__ = [
     "idempotent_replay",
     "parse_contract_draft",
     "require_contract_id",
+    "require_principal",
     "resolve_actor",
 ]
