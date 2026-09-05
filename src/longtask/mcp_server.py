@@ -41,7 +41,7 @@ from longtask.persistence.store import (
     connect,
     ensure_schema,
 )
-from longtask.rpc.errors import RpcError
+from longtask.rpc.errors import ErrorCode, RpcError
 from longtask.rpc.methods import Method
 from longtask.rpc.server import parse_envelope, route
 
@@ -121,6 +121,30 @@ def tool_list_executors(_args: dict[str, Any], ctx: dict[str, Any]) -> dict[str,
     }
 
 
+def _validate_checks_argument(checks: Any) -> Any:
+    """字符串验收检查在 MCP 边界 fail-closed（工具面审计 C1）。
+
+    parse_check 对纯字符串原样放行；若把整个字符串当 list 交给
+    tuple(parse_check(c) for c in ...)，"file-exists" 会变成 11 个单字符
+    垃圾检查冻进合同。schema 虽声明 array，dispatch 层不校验——在边界
+    显式拒绝，错误信息直接告诉模型正确的传法。
+    """
+    if isinstance(checks, str):
+        raise RpcError(
+            code=ErrorCode.VALIDATION_FAILED,
+            message=(
+                "acceptance_checks must be an array of strings; got a single "
+                f'string. Pass ["{checks}"] instead.'
+            ),
+        )
+    if not isinstance(checks, list):
+        raise RpcError(
+            code=ErrorCode.VALIDATION_FAILED,
+            message="acceptance_checks must be an array of strings",
+        )
+    return checks
+
+
 def tool_prepare_contract(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
     """立远期合同。详见 skills/longtask-contract/SKILL.md §4。"""
     payload: dict[str, Any] = {
@@ -130,9 +154,7 @@ def tool_prepare_contract(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str
         "hard_constraints": args.get("hard_constraints", {}),
         "acceptance": {
             "standard": args["acceptance_standard"],
-            # Keep the original value so the runtime validator can reject a
-            # string (``list("check")`` would silently create character checks).
-            "checks": args["acceptance_checks"],
+            "checks": _validate_checks_argument(args["acceptance_checks"]),
         },
         # Preserve the model value for the single runtime validator; coercing
         # here would turn true/false into 1.0/0.0 and bypass fail-closed input
@@ -182,7 +204,7 @@ def tool_approve_contract(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str
             "protocol_version": PROTOCOL_VERSION,
             "params": {
                 "contract_id": args["contract_id"],
-                "revision": args.get("revision"),
+                "expected_revision": args.get("revision"),
             },
         }
     )
@@ -410,7 +432,15 @@ def tool_attach_to_executor(args: dict[str, Any], ctx: dict[str, Any]) -> dict[s
         # 纯进度更新：写 attempt/write-back 但 attempt_state 不传
         # → 由 RPC handler 视作无终态；安全。或不写终态传 progress_note 即可。
         generation = (status.get("lease") or {}).get("generation")
-        if generation is not None:
+        if generation is None:
+            # 无租约 = 无写权：进度从未落库。静默丢弃会让模型以为进度
+            # 已存（工具面审计 R4）——必须显式报告。
+            out["progress_error"] = (
+                "no live lease for this attempt; progress not persisted. "
+                "Report state via report_state once the attempt terminates, "
+                "or ask the user to re-dispatch."
+            )
+        else:
             wb_envelope = parse_envelope(
                 {
                     "method": Method.ATTEMPT_WRITE_BACK.value,
@@ -566,7 +596,10 @@ TOOLS: dict[
     "longtask_approve_contract": (
         tool_approve_contract,
         {
-            "description": "批准合同（drafted → active），协议开始调度。",
+            "description": "批准合同（drafted → active）。仅限用户（Principal）："
+            "模型客户端调用会返回 AUTH_FAILED——请提示用户在 CLI 执行 "
+            "`lhgp approve <contract_id>`。模型可先用 get_contract 阅读"
+            "合同再向用户说明批准影响。",
             "inputSchema": {
                 "type": "object",
                 "required": ["contract_id"],
@@ -677,7 +710,8 @@ TOOLS: dict[
     "longtask_update_goal": (
         tool_update_goal,
         {
-            "description": "更新 Goal 计划或进度（支持 revision CAS）。",
+            "description": "更新 Goal 计划或进度（支持 revision CAS）。仅限用户（Principal）："
+            "模型客户端调用会返回 AUTH_FAILED——请向用户陈述修订建议，由用户在 CLI 执行。",
             "inputSchema": {
                 "type": "object",
                 "required": ["goal_id", "revision"],

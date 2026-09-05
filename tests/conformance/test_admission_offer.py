@@ -64,11 +64,13 @@ def _draft_payload(**overrides: object) -> dict[str, object]:
     return base
 
 
-def _envelope(request_id: str, params: dict[str, object]) -> RequestEnvelope:
+def _envelope(
+    request_id: str, params: dict[str, object], client_id: str = "mcp"
+) -> RequestEnvelope:
     return RequestEnvelope(
         method=Method.GOAL_PREPARE,
         request_id=request_id,
-        client_id="mcp",
+        client_id=client_id,
         protocol_version=2,
         params=params,
     )
@@ -112,6 +114,7 @@ def test_goal_prepare_preserves_stable_goal_identity(tmp_path) -> None:
                 "plan": {"stages": ["implement", "verify"]},
                 "progress": {"completed": ["contract"]},
             },
+            client_id="longtask-cli",
         ),
         conn=conn,
         now=NOW,
@@ -179,6 +182,7 @@ def test_bound_stage_cannot_advance_before_contract_acceptance(tmp_path) -> None
                 "plan": {"stages": [{"id": "build", "contract_id": "contract-bound-1"}]},
                 "progress": {},
             },
+            client_id="longtask-cli",
         ),
         conn=conn,
         now=NOW,

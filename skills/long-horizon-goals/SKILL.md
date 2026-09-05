@@ -32,7 +32,7 @@ description: 将需要跨会话、跨 Agent 推进的用户目标转成 LHGP 合
    修环境或换候选，不要先批准合同消耗预算
 3. `list_executors` — 查可用执行器池（Codex / Claude Code / 任何 CLI 适配器）
 4. `prepare_contract` — 起草合同：objective / acceptance / deadline / budget / authority
-5. `approve_contract` — 用户确认后批准（drafted → active）
+5. `approve_contract` — **仅限用户**：模型调用返回 AUTH_FAILED。向用户说明合同内容与影响，请用户在 CLI 执行 `lhgp approve <id>`；`update_goal` 同理（Goal 计划修订也是 Principal 决定权，ADR-004 规则 6）
 6. `get_contract` — 看运行状态、当前 attempt、leasing，以及该合同隔离的
   `decision_history`（风险档、升级原因、预算余量和下一步依据）；可传
   `decision_limit` 控制决策历史条数，`attempt_limit` 控制 attempt 历史条数。

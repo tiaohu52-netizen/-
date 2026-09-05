@@ -186,16 +186,22 @@ def handle_control_interrupt(
     contract_id = _require(params, "contract_id")
     attempt_id = _require(params, "attempt_id")
     _require_contract(conn, contract_id)
-    reason = str(params.get("reason", "user interrupt"))
+    reason = str(params.get("reason", "interrupt requested"))
+    # 审计归属必须真实：interrupt 可由模型经 MCP 触发，硬编码 actor=user
+    # 曾把模型动作记成用户动作（工具面审计 R3）。
+    # 延迟导入：handlers._common 反向依赖本模块的 facade 链。
+    from longtask.rpc.handlers._common import resolve_actor
+
+    actor = resolve_actor(envelope, params)
 
     append_event(
         conn,
         contract_id=contract_id,
         attempt_id=attempt_id,
         event_type=EventType.ATTEMPT_CANCELLED,
-        payload={"reason": reason, "via": "control/interrupt"},
+        payload={"reason": reason, "via": "control/interrupt", "requested_by": actor},
         now=now,
-        actor="user",
+        actor=actor,
         request_id=envelope.request_id or None,
     )
     return {
