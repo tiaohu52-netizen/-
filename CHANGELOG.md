@@ -4,6 +4,34 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version numbers
 follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
 
+## [0.1.0a3] - 2026-09-05
+
+多 Agent 协作开发扩展 + MCP 工具面加固（PR #11，34 工具全量审计后修复，
+三平台 CI 实测通过）。
+
+### Added
+
+- **多 Agent 协作开发协议**（docs/AGENT-COLLAB.md）：基于本仓库被多个
+  agent 反复改动的真实失败史，把「无验收标准/谎报完成/环境盲区/无证据链/
+  破坏半径失控」五类失败映射到 LHGP 机制，附命令级操作手册。
+- **改动合同模板**（templates/code-change-contract.json）：可直接
+  `lhgp prepare --file` 的代码改动合同，验收命令为 pytest + quality_gate，
+  由独立 verifier 重跑判定。
+
+### Fixed
+
+- MCP `prepare_contract`：字符串 acceptance_checks 在边界 fail-closed
+  （此前 "file-exists" 会被逐字符拆成 11 个垃圾检查冻进合同）。
+- `goal/update` 收归 Principal（ADR-004 规则 6：模型只能提议、不得直写
+  权威计划）；工具描述如实标注。
+- `attach_to_executor` 无活租约时进度显式报 `progress_error`，不再静默
+  丢弃让模型误以为已存。
+- 审计归属修正：verification/interrupt 事件用真实派生 actor，模型动作
+  不再记成用户动作。
+- MCP `approve` 工具转发 `expected_revision`（CAS 键名与 handler 一致）。
+- SKILL 文档：修正跑不通的 arbitrate/patch 命令示例，补 approve/
+  update_goal 的 user-only 指引。
+
 ## [0.1.0a2] - 2026-09-05
 
 Deadline 可靠性与合同防篡改（PR #10，分支 hardening/deadline-contract-guards，
