@@ -4,6 +4,25 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version numbers
 follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
 
+## [0.1.0a5] - 2026-09-06
+
+**macOS 全面支持**：darwin 进程身份模型落地，macOS CI 升级为阻断平台。
+
+### Added
+
+- macOS 进程探测：libproc `proc_pidinfo(PROC_PIDTBSDINFO)` 替代方案改为
+  `/bin/ps`（etimes/state 机器可读字段）——跨版本无偏移依赖，
+  僵尸判活、身份比对、优雅终止在 macOS 与 Linux/Windows 行为一致。
+- 接手包 `lhgp brief`、风险看板 `lhgp board`、成本台账 `lhgp stats`、
+  修订差异 `lhgp diff`、事件清理 `lhgp prune-events`、内置模板库
+  `lhgp template`（39 个 MCP 工具，+4：brief/board/stats/propose_plan）。
+- Goal 计划提案通道：`lhgp_propose_plan` 只落 goal/proposed 事件，
+  模型可提议、不越权直写（ADR-004 规则 6 配套）。
+
+### Changed
+
+- macOS 从「实验性/非阻断」升级为完全支持；CI 三平台全部阻断绿。
+
 ## [0.1.0a4] - 2026-09-05
 
 合并发布版：包含 a1–a3 全部内容 + MCP 工具面收口（PR #12、#13）。
