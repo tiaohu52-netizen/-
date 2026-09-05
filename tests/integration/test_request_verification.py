@@ -13,6 +13,7 @@ from typing import Any
 
 import pytest
 
+from lhgp.rpc.server import route as canonical_route
 from longtask.adapters.fake_executor import FAKE_MANIFEST
 from longtask.adapters.registry import (
     CostHint,
@@ -42,7 +43,6 @@ from longtask.persistence.store import (
 from longtask.rpc.errors import ErrorCode, RpcError
 from longtask.rpc.handlers.contract import handle_contract_get, handle_contract_request_verification
 from longtask.rpc.server import RequestEnvelope
-from lhgp.rpc.server import route as canonical_route
 
 pytestmark = pytest.mark.integration
 
