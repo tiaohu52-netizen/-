@@ -4,6 +4,31 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version numbers
 follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
 
+## [0.1.0a4] - 2026-09-05
+
+合并发布版：包含 a1–a3 全部内容 + MCP 工具面收口（PR #12、#13）。
+此前三个增量 Release 已并入本版本，Releases 页只保留当前完整版；
+细粒度历史见本文件各版本段。
+
+### Added
+
+- MCP 工具面收口（35 个工具）：dispatch 层强制 inputSchema
+  （required/类型/未知键三查，修复「参数静默丢弃」根因）；
+  `list_contracts` 暴露 cursor 翻页；新增 `goal/prepare` 工具
+  （返回 admission offer、支持 goal_id/stage_id——激活
+  advance_goal/goal_contract_draft）；schema↔handler 一致性回归
+  （AST 全量断言，approve CAS 类 bug 进不了主干）。
+
+### Changed
+
+- 16 个工具描述重写为 if-then 场景式（何时用/传什么/返回什么/错误含义）；
+  SKILL 新增「场景 → 工具决策表」。
+
+### Fixed
+
+- `attempt_status` 对不存在的 attempt 返回 UNKNOWN_ATTEMPT（原假 ok）。
+- `contract_id` 非字符串直接 VALIDATION_FAILED（原静默 str 化）。
+
 ## [0.1.0a3] - 2026-09-05
 
 多 Agent 协作开发扩展 + MCP 工具面加固（PR #11，34 工具全量审计后修复，
