@@ -102,6 +102,10 @@ mypy_path = "src"
 packages = ["longtask", "lhgp"]
 strict = true
 warn_unreachable = true
+# 权威 typecheck 平台钉死为 Windows（首要支持平台、本地默认开发环境）。
+# 否则 Linux 上的 mypy 会把 ctypes.windll 分支报成 attr-defined；
+# POSIX 专属分支由 CI 三平台测试矩阵覆盖，不靠 mypy。
+platform = "win32"
 # 骨架期就 strict：新代码没有「先随便写再补类型」的债可欠。
 
 [[tool.mypy.overrides]]

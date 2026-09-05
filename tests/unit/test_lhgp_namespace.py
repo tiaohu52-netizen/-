@@ -1,5 +1,6 @@
 """Canonical LHGP Python namespace compatibility tests (P6)."""
 
+import os
 import subprocess
 import sys
 
@@ -333,6 +334,26 @@ def test_canonical_modules_preserve_module_execution_entrypoints() -> None:
         text=True,
     )
     assert "LHGP" in mcp.stdout
+
+
+def test_entry_help_survives_non_utf8_console() -> None:
+    """--help must not crash on consoles that cannot encode CJK (cp1252).
+
+    Reproduces the GitHub windows-latest failure: argparse help containing
+    Chinese descriptions raised UnicodeEncodeError under a cp1252 stdout.
+    """
+
+    env = {**os.environ, "PYTHONIOENCODING": "cp1252"}
+    for module in ("lhgp.cli.main", "lhgp.mcp_server"):
+        proc = subprocess.run(  # noqa: S603
+            [sys.executable, "-m", module, "--help"],
+            check=True,
+            capture_output=True,
+            text=True,
+            errors="replace",
+            env=env,
+        )
+        assert "usage:" in proc.stdout.lower()
 
 
 def test_legacy_cli_alias_emits_deprecation_warning(monkeypatch, capsys) -> None:

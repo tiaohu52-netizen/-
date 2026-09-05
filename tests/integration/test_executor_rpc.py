@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import sys
 from datetime import UTC, datetime
 from typing import Any
 
@@ -56,7 +57,9 @@ def make_test_registry() -> ExecutorRegistry:
         RegistryEntry(
             id="codex-cli",
             kind="subprocess",
-            launch=LaunchSpec(argv=("codex", "exec"), cwd=None, env_allowlist=()),
+            # health() probes shutil.which(argv[0]); use the interpreter so the
+            # fixture stays hermetic on machines without the codex CLI.
+            launch=LaunchSpec(argv=(sys.executable, "-c", "pass"), cwd=None, env_allowlist=()),
             capabilities=caps,
             limits={"max_concurrent_attempts": 2},
             cost_hint=CostHint.LOW,

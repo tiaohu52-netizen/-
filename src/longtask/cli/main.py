@@ -35,6 +35,7 @@ from longtask.cli.daemon import (
 )
 from longtask.cli.doctor import run_doctor
 from longtask.cli.paths import default_data_root, migrate_data_dir
+from longtask.console import harden_stdio
 from longtask.persistence.projections import rebuild_projection, revert_projection
 from longtask.persistence.store import StoreConfig, connect, ensure_schema
 from longtask.rpc.client import call_unix_socket
@@ -290,6 +291,7 @@ def _dispatch_rpc(
 
 
 def main(argv: list[str] | None = None) -> int:
+    harden_stdio()
     if Path(sys.argv[0]).stem.lower() == "longtask":
         print(
             "warning: 'longtask' is deprecated; use 'lhgp' instead",
