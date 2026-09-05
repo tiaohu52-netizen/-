@@ -30,8 +30,8 @@ def main() -> int:
     env["PATH"] = os.pathsep.join(
         [str(venv_bin), env.get("PATH", "")] if env.get("PATH") else [str(venv_bin)]
     )
-    proc = subprocess.run(  # noqa: S603, S607 —— 固定 argv，node 来自本机 CLI 安装
-        ["node", DSH_BIN, "--profile", "headless", prompt],
+    proc = subprocess.run(  # noqa: S603 —— 固定 argv，node 来自本机 CLI 安装
+        ["node", DSH_BIN, "--profile", "headless", prompt],  # noqa: S607
         shell=False,
         env=env,
     )
