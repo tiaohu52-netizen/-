@@ -366,6 +366,28 @@ class AttemptRunner:
             if adapter is None:
                 self._mark_stale(now, attempt_id, info, "executor no longer available")
                 continue
+            contract = get_contract(self._conn, contract_id)
+            if contract is not None:
+                started_row = self._conn.execute(
+                    "SELECT started_at FROM attempts WHERE attempt_id = ?", (attempt_id,)
+                ).fetchone()
+                started_at = (
+                    datetime.fromisoformat(str(started_row[0]))
+                    if started_row and started_row[0]
+                    else None
+                )
+                timeout = timedelta(minutes=contract.draft.budget.max_attempt_minutes)
+                if started_at is not None and now - started_at >= timeout:
+                    with contextlib.suppress(Exception):
+                        adapter.cancel(attempt_id, "attempt timeout exceeded")
+                    self._fail_attempt(
+                        now,
+                        contract_id,
+                        attempt_id,
+                        f"attempt timeout exceeded ({timeout.total_seconds() / 60:g}m)",
+                        error_class="attempt-timeout",
+                    )
+                    continue
             try:
                 observation = adapter.observe(attempt_id)
             except KeyError:
@@ -387,7 +409,6 @@ class AttemptRunner:
                 # generation 为 None 表示租约已被释放（attempt 已收尾路径）——
                 # 但 state=RUNNING 时不太可能；如果走到这里就 fallback 到入参。
                 lease_gen = generation if generation is not None else int(info["generation"])
-                contract = get_contract(self._conn, contract_id)
                 if contract is not None:
                     renew_lease(
                         self._conn,
@@ -546,7 +567,15 @@ class AttemptRunner:
             # 再递归派生 verifier，否则真实多执行器注册表会形成无限验证链。
             self._dispatch_verifier(now, contract_id=contract_id, executor_id=executor_id)
 
-    def _fail_attempt(self, now: datetime, contract_id: str, attempt_id: str, reason: str) -> None:
+    def _fail_attempt(
+        self,
+        now: datetime,
+        contract_id: str,
+        attempt_id: str,
+        reason: str,
+        *,
+        error_class: str = "attempt-failed",
+    ) -> None:
         append_event(
             self._conn,
             contract_id=contract_id,
@@ -566,10 +595,11 @@ class AttemptRunner:
                 updated_at = ?
             WHERE attempt_id = ?
             """,
-            (now.isoformat(), "attempt-failed", now.isoformat(), attempt_id),
+            (now.isoformat(), error_class, now.isoformat(), attempt_id),
         )
         self._release_lease_if_held(now, contract_id, attempt_id)
         rebuild_projection(self._root, contract_id, self._conn)
+        self._running.pop(attempt_id, None)
         self.finished_count += 1
         self._emit(f"runner/attempt-failed:{contract_id}:{attempt_id}")
 
