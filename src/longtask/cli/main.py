@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import sqlite3
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -37,11 +38,27 @@ from longtask.cli.doctor import run_doctor
 from longtask.cli.paths import default_data_root, migrate_data_dir
 from longtask.console import harden_stdio
 from longtask.persistence.projections import rebuild_projection, revert_projection
-from longtask.persistence.store import StoreConfig, connect, ensure_schema
+from longtask.persistence.store import (
+    StoreConfig,
+    connect,
+    ensure_schema,
+    list_contracts,
+)
 from longtask.rpc.client import call_unix_socket
 from longtask.rpc.errors import RpcError
 from longtask.rpc.methods import Method
 from longtask.rpc.server import RequestEnvelope, route
+
+
+def _open_read_conn(data_dir: str | None) -> sqlite3.Connection:
+    """以只读意图打开默认/指定数据目录的权威库（insights 系命令共用）。"""
+    from lhgp.persistence.types import StoreConfig
+    from longtask.persistence.store import connect, ensure_schema
+
+    root = Path(data_dir).expanduser().resolve() if data_dir else default_data_root()
+    conn = connect(StoreConfig(db_path=root / "state.db"))
+    ensure_schema(conn)
+    return conn
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -226,6 +243,34 @@ def build_parser() -> argparse.ArgumentParser:
     watch_p.add_argument("--kinds", type=str, default=None)
     watch_p.add_argument("--for", type=int, default=None, dest="duration")
     watch_p.add_argument("--follow", action="store_true")
+
+    # templates：内置合同模板
+    tpl_p = sub.add_parser("template", help="内置合同模板（list/show/use）")
+    tpl_sub = tpl_p.add_subparsers(dest="template_cmd")
+    tpl_sub.add_parser("list", help="列出内置模板")
+    tpl_show = tpl_sub.add_parser("show", help="打印模板内容")
+    tpl_show.add_argument("name", type=str)
+    tpl_use = tpl_sub.add_parser("use", help="导出模板为可编辑的 prepare 草稿")
+    tpl_use.add_argument("name", type=str)
+    tpl_use.add_argument("--out", type=str, required=True, help="输出 JSON 路径")
+
+    # insights：接手包 / 看板 / 成本台账
+    brief_p = sub.add_parser("brief", help="接手包：一份合同的状态/风险/最近失败/下一步")
+    brief_p.add_argument("contract_id", type=str)
+    board_p = sub.add_parser("board", help="多合同一屏：按风险排序的状态表")
+    board_p.add_argument("--include-terminal", action="store_true")
+    board_p.add_argument("--limit", type=int, default=200)
+    stats_p = sub.add_parser("stats", help="成本台账：attempt 分布与实际墙钟")
+    stats_p.add_argument("contract_id", type=str, nargs="?")
+    diff_p = sub.add_parser("diff", help="两个修订快照的字段级差异")
+    diff_p.add_argument("contract_id", type=str)
+    diff_p.add_argument("--from", dest="from_rev", type=int, required=True)
+    diff_p.add_argument("--to", dest="to_rev", type=int, required=True)
+    prop_p = sub.add_parser("proposals", help="列出 Goal 的计划修订提案（只读）")
+    prop_p.add_argument("goal_id", type=str)
+    prune_p = sub.add_parser("prune-events", help="清理终态合同的过期事件")
+    prune_p.add_argument("--keep-days", type=int, default=90)
+    prune_p.add_argument("--execute", action="store_true", help="默认 dry-run，加此参数才真删")
 
     # executor
     exec_p = sub.add_parser("executor", help="执行器资源池管理")
@@ -412,6 +457,141 @@ def main(argv: list[str] | None = None) -> int:
         finally:
             conn.close()
 
+    if args.command == "template":
+        from pathlib import Path as _Path
+
+        from lhgp import templates as _tpl
+
+        cmd = getattr(args, "template_cmd", "list")
+        if cmd == "list":
+            for name in _tpl.available():
+                print(name)
+            return 0
+        if cmd == "show":
+            print(_tpl.load(args.name))
+            return 0
+        if cmd == "use":
+            out = _Path(args.out)
+            if out.exists():
+                print(f"refusing to overwrite existing file: {out}", file=sys.stderr)
+                return 1
+            out.write_text(_tpl.load(args.name), encoding="utf-8")
+            print(f"wrote {out} - replace <placeholders>, then: lhgp prepare --file {out}")
+            return 0
+        return 1
+
+    if args.command == "brief":
+        from lhgp.persistence.insights import build_brief
+
+        conn = _open_read_conn(args.data_dir)
+        try:
+            brief = build_brief(conn, contract_id=args.contract_id, now=datetime.now(UTC))
+        finally:
+            conn.close()
+        print(json.dumps(brief, ensure_ascii=False, indent=2, default=str))
+        return 0
+
+    if args.command == "board":
+        from lhgp.persistence.insights import build_board
+
+        conn = _open_read_conn(args.data_dir)
+        try:
+            board_rows = build_board(
+                conn,
+                now=datetime.now(UTC),
+                include_terminal=args.include_terminal,
+                limit=args.limit,
+            )
+        finally:
+            conn.close()
+        if not board_rows:
+            print("(no non-terminal contracts)")
+            return 0
+        header = f"{'CONTRACT':<28} {'STATE':<10} {'RISK':<8} {'DEADLINE_STATUS':<16} TITLE"
+        print(header)
+        for row in board_rows:
+            print(
+                f"{row['contract_id']:<28} {row['state']:<10} {row['risk']!s:<8}"
+                f" {row['deadline_status']:<16} {row['title']}"
+            )
+        return 0
+
+    if args.command == "stats":
+        from lhgp.persistence.insights import build_stats
+
+        conn = _open_read_conn(args.data_dir)
+        try:
+            stats = build_stats(conn, contract_id=args.contract_id or None)
+        finally:
+            conn.close()
+        print(json.dumps(stats, ensure_ascii=False, indent=2))
+        return 0
+
+    if args.command == "diff":
+        from lhgp.persistence.maintenance import diff_revisions
+
+        conn = _open_read_conn(args.data_dir)
+        try:
+            result = diff_revisions(
+                conn,
+                contract_id=args.contract_id,
+                from_revision=args.from_rev,
+                to_revision=args.to_rev,
+            )
+        finally:
+            conn.close()
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
+
+    if args.command == "proposals":
+        from lhgp.persistence.events_query import get_events
+
+        root = Path(args.data_dir).expanduser().resolve() if args.data_dir else default_data_root()
+        conn = connect(StoreConfig(db_path=root / "state.db"))
+        try:
+            proposals = [
+                {
+                    "event_id": e.event_id,
+                    "at": e.created_at.isoformat(),
+                    "payload": json.loads(e.payload_json or "{}"),
+                }
+                for e in get_events(conn, contract_id=args.goal_id)
+                if e.event_type == "goal/proposed"
+            ]
+        finally:
+            conn.close()
+        pending = [p for p in proposals if p["payload"].get("status") == "pending"]
+        print(
+            json.dumps(
+                {
+                    "goal_id": args.goal_id,
+                    "total": len(proposals),
+                    "pending": len(pending),
+                    "proposals": proposals,
+                },
+                ensure_ascii=False,
+                indent=2,
+                default=str,
+            )
+        )
+        return 0
+
+    if args.command == "prune-events":
+        from pathlib import Path as _Path
+
+        from lhgp.persistence.maintenance import prune_terminal_events
+
+        root = Path(args.data_dir).expanduser().resolve() if args.data_dir else default_data_root()
+        conn = connect(StoreConfig(db_path=root / "state.db"))
+        try:
+            result = prune_terminal_events(
+                conn, now=datetime.now(UTC), keep_days=args.keep_days, dry_run=not args.execute
+            )
+        finally:
+            conn.close()
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
+
     if args.command == "watch":
         from longtask.cli.watch import main as _watch_main
 
@@ -495,7 +675,6 @@ def main(argv: list[str] | None = None) -> int:
 
         # 详细版：直读 store + 计算 u/ETA（避免污染协议输出）
         from longtask.cli.formatting import now_utc, render_contract_list_verbose
-        from longtask.persistence.store import list_contracts
 
         conn = connect(StoreConfig(db_path=root / "state.db"))
         ensure_schema(conn)

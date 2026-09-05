@@ -237,7 +237,7 @@ class TestMCPDiscovery:
                 "lhgp_request_verification",
             }.issubset(names)
             assert {"longtask_doctor", "lhgp_doctor"}.issubset(names)
-            assert len(names) == 35
+            assert len(names) == 39
             by_name = {item["name"]: item for item in tools["result"]["tools"]}
             assert by_name["lhgp_notifications"]["annotations"] == {
                 "readOnlyHint": True,

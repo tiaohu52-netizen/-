@@ -314,6 +314,70 @@ def tool_prepare_goal(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, An
     return route(envelope, conn=ctx["conn"], now=_now(), registry=ctx["registry"])
 
 
+def tool_brief(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
+    """接手包：一份合同的状态/风险/预算/最近失败/下一步（只读聚合）。"""
+    from lhgp.persistence.insights import build_brief
+
+    return build_brief(ctx["conn"], contract_id=args["contract_id"], now=_now())
+
+
+def tool_board(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
+    """多合同一屏：风险/状态/预算/下次决策点，按风险排序（只读聚合）。"""
+    from lhgp.persistence.insights import build_board
+
+    rows = build_board(
+        ctx["conn"],
+        now=_now(),
+        include_terminal=bool(args.get("include_terminal", False)),
+        limit=int(args.get("limit", 200)),
+    )
+    return {"board": rows, "count": len(rows)}
+
+
+def tool_stats(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
+    """成本台账：attempt 按角色/执行器/状态分布与实际墙钟时长（只读）。"""
+    from lhgp.persistence.insights import build_stats
+
+    return build_stats(ctx["conn"], contract_id=args.get("contract_id"))
+
+
+def tool_propose_plan(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
+    """提交 Goal 计划修订提案（ADR-004 规则 6）：只落 goal/proposed 事件，"""
+    """不写权威状态；用户批准后由用户经 CLI 执行 goal/update。"""
+    from longtask.persistence.events import EventType
+    from longtask.persistence.store import append_event, get_goal
+
+    goal_id = args["goal_id"]
+    goal = get_goal(ctx["conn"], goal_id)
+    if goal is None:
+        from longtask.rpc.errors import ErrorCode, RpcError
+
+        raise RpcError(code=ErrorCode.UNKNOWN_CONTRACT, message=f"goal {goal_id} not found")
+    proposal = {
+        "goal_id": goal_id,
+        "proposed_by": "model",
+        "reason": str(args.get("reason", "")),
+        "plan": args.get("plan"),
+        "note": str(args.get("note", "")),
+        "status": "pending",
+    }
+    event = append_event(
+        ctx["conn"],
+        contract_id=goal_id,
+        goal_id=goal_id,
+        event_type=EventType.GOAL_PROPOSED,
+        payload=proposal,
+        now=_now(),
+        actor="model",
+    )
+    return {
+        "ok": True,
+        "proposal_event_id": event.event_id,
+        "status": "pending",
+        "hint": "user applies via: lhgp goal update <goal_id> --revision N (plan from proposal)",
+    }
+
+
 def tool_get_goal(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
     """Read a stable Goal aggregate, independent of a contract revision."""
     return _mcp_route(Method.GOAL_GET, args, ctx)
@@ -822,6 +886,81 @@ TOOLS: dict[
                         "description": "绑定 Goal 阶段（acceptance 绑定校验）",
                     },
                 },
+            },
+        },
+    ),
+    "lhgp_brief": (
+        tool_brief,
+        {
+            "description": (
+                "接手包（只读）：一份合同的状态/风险/预算/最近 attempt 与 "
+                "verifier 结论/通知。何时用：接手会话、或想知道某合同现在"
+                "什么情况、下一步该做什么。"
+            ),
+            "inputSchema": {
+                "type": "object",
+                "required": ["contract_id"],
+                "properties": {"contract_id": {"type": "string"}},
+            },
+            "annotations": {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False},
+        },
+    ),
+    "lhgp_board": (
+        tool_board,
+        {
+            "description": (
+                "多合同一屏（只读）：按风险排序的状态/预算/下次决策点表。"
+                "何时用：接手会话盘点、汇报。默认不含终态合同；"
+                "include_terminal=true 时包含。"
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "include_terminal": {"type": "boolean"},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 500},
+                },
+            },
+            "annotations": {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False},
+        },
+    ),
+    "lhgp_stats": (
+        tool_stats,
+        {
+            "description": (
+                "成本台账（只读）：attempt 按角色/执行器/状态分布、实际墙钟"
+                "p50/max、退出码分布。何时用：写预算前看历史消耗；复盘某合同"
+                "或全局执行成本。"
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {"contract_id": {"type": "string"}},
+            },
+            "annotations": {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False},
+        },
+    ),
+    "lhgp_propose_plan": (
+        tool_propose_plan,
+        {
+            "description": (
+                "提交 Goal 计划修订提案（ADR-004 规则 6）：只落 goal/proposed "
+                "事件，不写权威状态。用户批准后由用户在 CLI 执行 goal/update "
+                "落地。何时用：发现计划需要调整且用户不在场——提案留痕，"
+                "不要反复重试。"
+            ),
+            "inputSchema": {
+                "type": "object",
+                "required": ["goal_id"],
+                "properties": {
+                    "goal_id": {"type": "string"},
+                    "plan": {"type": "object", "description": "建议的计划结构"},
+                    "reason": {"type": "string"},
+                    "note": {"type": "string"},
+                },
+            },
+            "annotations": {
+                "readOnlyHint": False,
+                "destructiveHint": False,
+                "openWorldHint": False,
             },
         },
     ),
