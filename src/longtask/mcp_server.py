@@ -561,14 +561,23 @@ TOOLS: dict[
     "longtask_health": (
         tool_health,
         {
-            "description": "探活：返回协议版本、协议方法清单、可用工具名。模型第一步调用。",
+            "description": (
+                "探活：确认 MCP "
+                "入口在线，返回协议版本与可用工具名。会话第一步调用；之后按场景选工具——查现状用 "
+                "get_contract/get_goal，立合同用 "
+                "prepare，批准前或派工异常时用 doctor。本工具只读。"
+            ),
             "inputSchema": {"type": "object", "properties": {}},
         },
     ),
     "longtask_doctor": (
         tool_doctor,
         {
-            "description": "运行本机只读诊断，检查数据库、注册表和已启用 CLI 是否可启动。",
+            "description": (
+                "本机只读诊断：数据库完整性、注册表、已启用 CLI 能否启动。何时用：批准合同之前（缺 "
+                "CLI 先换执行者，省预算）；派工失败之后（原因常在这里）。结果里的 FAIL "
+                "项就是需要处理的问题。"
+            ),
             "inputSchema": {"type": "object", "properties": {}},
         },
     ),
@@ -576,8 +585,10 @@ TOOLS: dict[
         tool_list_executors,
         {
             "description": (
-                "列出可用的执行器（用户框定后），可按 enabled_only 过滤。"
-                "准备合同时选执行器前先看这个。"
+                "列出执行器池及启停状态（可 enabled_only "
+                "过滤）。何时用：起草合同前确认候选；attach/write_back "
+                "前确认目标执行器存在。合同 authority "
+                "显式绑定时，未绑定的执行器即使列出也不会被派工（default-deny）。"
             ),
             "inputSchema": {
                 "type": "object",
@@ -672,10 +683,8 @@ TOOLS: dict[
         tool_request_verification,
         {
             "description": (
-                "用户直接请求验收（§12.4）：不派执行者，只派独立 verifier 核对"
-                "现有交付物。典型场景：执行预算耗尽（blocked）但交付物疑似已"
-                "就绪——先看看现状算不算完成。验证预算耗尽或已有 verifier 在"
-                "跑时如实拒绝。"
+                "请求验收（§12.4）：不派执行者，只派独立 verifier "
+                "核对现有交付物。发起者可以是用户也可以是模型（计入该合同验证预算）。何时用：执行预算耗尽但交付物疑似就绪；或执行者自报成功需要正式验收。预算耗尽返回错误并提示升级——不要重试。"
             ),
             "inputSchema": {
                 "type": "object",
@@ -691,12 +700,10 @@ TOOLS: dict[
         tool_get_contract,
         {
             "description": (
-                "查询单份合同权威视图（§11.6 字段表），并返回该合同隔离的"
-                " decision_history、attempt_history 与 verification_history；可用"
-                " decision_limit / attempt_limit 控制上下文大小。响应还包含最新"
-                " deadline_snapshot（forecast、slack、risk、confidence 与"
-                " next_decision_at），供模型直接判断下一步动作；"
-                " verification_history 展示验收请求、消费和 verifier 启动状态。"
+                "查询单份合同权威视图（§11.6 字段表）+ "
+                "决策/attempt/验收三段历史。何时用：需要知道某份合同现在怎样、为什么 "
+                "blocked、verifier 判了什么。contract_id 从 "
+                "list_contracts 拿。"
             ),
             "inputSchema": {
                 "type": "object",
@@ -725,8 +732,10 @@ TOOLS: dict[
         tool_list_contracts,
         {
             "description": (
-                "按状态过滤列出合同；每项包含最新 deadline_snapshot，模型可先"
-                "据此筛选风险目标，再决定是否读取完整合同历史。"
+                "按状态过滤列出合同，每项含最新 "
+                "deadline_snapshot。何时用：接手会话时盘点；筛选风险合同后再用 "
+                "get_contract 看细节。响应 has_more=true 时把 "
+                "next_cursor 作为 cursor 传入本工具继续翻页。"
             ),
             "inputSchema": {
                 "type": "object",
@@ -750,7 +759,11 @@ TOOLS: dict[
     "longtask_get_goal": (
         tool_get_goal,
         {
-            "description": "查询稳定 Goal 聚合视图（合同历史、状态和 Deadline 风险）。",
+            "description": (
+                "查询 Goal 聚合视图：阶段计划、各阶段合同状态、整体进度与 Deadline "
+                "风险。何时用：多合同（stages）流程中判断现在在哪一步。看单份合同的事件/租约细节用 "
+                "get_contract。"
+            ),
             "inputSchema": {
                 "type": "object",
                 "required": ["goal_id"],
@@ -815,7 +828,10 @@ TOOLS: dict[
     "longtask_list_goals": (
         tool_list_goals,
         {
-            "description": "列出稳定 Goal 聚合视图。",
+            "description": (
+                "列出全部 Goal 聚合视图。何时用：接手会话盘点进行中的目标；确定 goal_id "
+                "后用 get_goal 看阶段细节。"
+            ),
             "inputSchema": {
                 "type": "object",
                 "properties": {"limit": {"type": "integer", "default": 20}},
@@ -843,7 +859,12 @@ TOOLS: dict[
     "longtask_advance_goal": (
         tool_advance_goal,
         {
-            "description": "完成当前 Goal 阶段并推进到下一阶段。",
+            "description": (
+                "完成 Goal 当前阶段并推进到下一阶段（revision "
+                "CAS）。前置：当前阶段绑定合同的验收已通过——返回 STAGE_NOT_PASSED "
+                "时先等 verifier 结果或 "
+                "request_verification，不要重试推进。"
+            ),
             "inputSchema": {
                 "type": "object",
                 "required": ["goal_id", "stage_id", "revision"],
@@ -859,7 +880,11 @@ TOOLS: dict[
     "longtask_next_goal_action": (
         tool_next_goal_action,
         {
-            "description": "读取 Goal 当前阶段的下一步可执行动作（只读）。",
+            "description": (
+                "读取 Goal 当前阶段建议的下一步动作（只读，不执行）。响应的 action "
+                "字段给出具体动作（如 "
+                "approve/resume_contract），按提示调用对应工具，不要凭猜测跳步。"
+            ),
             "inputSchema": {
                 "type": "object",
                 "required": ["goal_id"],
@@ -870,7 +895,11 @@ TOOLS: dict[
     "longtask_goal_contract_draft": (
         tool_goal_contract_draft,
         {
-            "description": "根据 Goal 当前阶段生成合同草案（只读，不创建合同）。",
+            "description": (
+                "根据 Goal 当前阶段生成合同草案（只读预览，不落库）。"
+                "何时用：阶段需要新合同时先取推荐草案交用户审阅；"
+                "确认后用 prepare_contract/prepare_goal 把草案参数正式立约。"
+            ),
             "inputSchema": {
                 "type": "object",
                 "required": ["goal_id"],
@@ -885,9 +914,12 @@ TOOLS: dict[
         tool_attach_to_executor,
         {
             "description": (
-                "执行者侧：认领 attempt + 读上下文快照 + 报告结果（合并的便利工具）。"
-                "执行者被协议拉起时（task_prompt 含 objective+附言）调用："
-                "返回 active.md 全文 + 交接摘要，模型可决定继续干还是上报 succeeded/failed。"
+                "执行者侧便利工具：认领 attempt + 读上下文快照 + "
+                "报告结果。执行者被协议拉起时（task_prompt 含 "
+                "objective+附言）调用；带 report_state 时写回终态，带 "
+                "progress_note 时写回进度（无活租约会显式返回 "
+                "progress_error，进度未被保存）。纯读路径返回 "
+                "status+snapshot。"
             ),
             "inputSchema": {
                 "type": "object",
@@ -950,7 +982,11 @@ TOOLS.update(
         "lhgp_attempt_status": (
             tool_attempt_status,
             {
-                "description": "读取 attempt 当前状态、事件历史和租约信息。",
+                "description": (
+                    "读取 attempt 状态、事件历史与租约（lease.generation 是 "
+                    "write_back 的必带参数）。attempt 不存在返回 "
+                    "UNKNOWN_ATTEMPT——检查拼写，不要拿空结果当作正常。只读。"
+                ),
                 "inputSchema": {
                     "type": "object",
                     "required": ["contract_id", "attempt_id"],
@@ -964,7 +1000,13 @@ TOOLS.update(
         "lhgp_notifications": (
             tool_notifications,
             {
-                "description": "查看通知 outbox 的投递状态（只读）。",
+                "description": (
+                    "查看通知 "
+                    "outbox（只读）：blocked(need-user)、预算耗尽、deadline "
+                    "风险变化都会产生通知。何时用：合同 blocked "
+                    "后了解原因与用户需要做什么。include_payload 默认 "
+                    "false（防上下文泄露），确需完整负载才传 true。"
+                ),
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -979,7 +1021,12 @@ TOOLS.update(
         "lhgp_interrupt_attempt": (
             tool_interrupt_attempt,
             {
-                "description": "请求 daemon 中断指定 attempt。",
+                "description": (
+                    "请求 daemon 优雅中断指定 attempt"
+                    "（落 attempt/cancelled 事件，事件归属真实发起者）。"
+                    "何时用：仅当用户明确要求停止。"
+                    "外部进程的实际终止由 daemon 后续 tick 确认，本工具不保证立即生效。"
+                ),
                 "inputSchema": {
                     "type": "object",
                     "required": ["contract_id", "attempt_id"],
@@ -995,7 +1042,14 @@ TOOLS.update(
         "lhgp_write_back": (
             tool_write_back,
             {
-                "description": "写回进度、终态、验收 evidence 和实际 model_id。",
+                "description": (
+                    "写回 attempt 进度/终态/验收 evidence/实际 "
+                    "model_id。write_generation 取自 attempt_status "
+                    "的 lease.generation。边界：executor "
+                    "不得把合同写成完成态（STATE_FORBIDDEN——完成由 verifier "
+                    "裁决）；verifier 终态必须带 evidence；返回 LEASE_FENCED "
+                    "表示租约已换代，重新取状态再写。"
+                ),
                 "inputSchema": {
                     "type": "object",
                     "required": ["contract_id", "attempt_id", "write_generation"],

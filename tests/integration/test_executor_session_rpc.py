@@ -77,6 +77,13 @@ def store(tmp_path: Path) -> Any:
 
 
 def acquired(conn: Any) -> None:
+    conn.execute(
+        "INSERT INTO attempts (attempt_id, contract_id, goal_id, role, state,"
+        " admitted_at, contract_revision, updated_at)"
+        " VALUES ('att-1', ?, ?, 'executor', 'running', ?, 1, ?)",
+        (CID, CID, NOW.isoformat(), NOW.isoformat()),
+    )
+    conn.commit()
     acquire_lease(
         conn,
         contract_id=CID,
@@ -204,13 +211,9 @@ class TestAttemptWriteBack:
 
     def test_verifier_terminal_write_back_requires_structured_evidence(self, store: Any) -> None:
         acquired(store)
-        store.execute(
-            """INSERT INTO attempts
-               (attempt_id, goal_id, contract_revision, role, state, admitted_at,
-                payload_json, updated_at)
-               VALUES ('att-1', 'goal-execsess01', 1, 'verifier', 'running', ?, '{}', ?)""",
-            (NOW.isoformat(), NOW.isoformat()),
-        )
+        # acquired() 已插入 att-1（executor）；本测试需要 verifier 语义，
+        # 原地改 role 而不是重复 INSERT（UNIQUE 冲突）。
+        store.execute("UPDATE attempts SET role = 'verifier' WHERE attempt_id = 'att-1'")
         with pytest.raises(RpcError) as exc_info:
             route(
                 make_envelope(

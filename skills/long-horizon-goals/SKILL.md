@@ -55,6 +55,23 @@ executor；调用 `lhgp_request_verification`（兼容名
 `verification/requested`，由 daemon 下一次 tick 幂等派生独立 verifier；终态、
 已有 verifier 运行中或验证预算耗尽时必须接受协议拒接并按提示升级。
 
+## 场景 → 工具决策表（if...then）
+
+| 你想做什么 | 调用 | 关键参数 | 响应里看什么 |
+|---|---|---|---|
+| 确认 MCP 在线 | `health` | — | 工具名列表 |
+| 派工前排查环境 | `doctor` | — | FAIL 项 = 待处理问题 |
+| 接手会话盘点工作 | `list_contracts` → `list_goals` | state 过滤 | deadline_snapshot 风险 |
+| 看某合同现状/为什么 blocked | `get_contract` | contract_id | decision_history + verification_history |
+| 看多阶段流程走到哪 | `get_goal` | goal_id | progress + 各阶段合同状态 |
+| 不知道下一步合法动作 | `next_goal_action` | goal_id | action 字段照做 |
+| 阶段需要新合同 | `goal_contract_draft` → 给用户审阅 → `prepare_contract` | goal_id + stage_id | 草案是只读预览 |
+| 交付物疑似完成 | `request_verification` | contract_id | 预算耗尽则停手交用户 |
+| 阶段验收已通过 | `advance_goal` | goal_id + stage_id + revision | STAGE_NOT_PASSED = 还没验收 |
+| 执行者写进度/终态 | `write_back` | fencing 三元组 | LEASE_FENCED = 重新取代次 |
+| 用户要求停止 | `lhgp_interrupt_attempt` | attempt_id | 事件归属真实发起者 |
+| 合同 blocked 想知道原因 | `lhgp_notifications` | goal_id/status | include_payload 默认 false |
+
 ## 运行中审计与控制（扩展工具）
 
 - `lhgp_notifications` 是只读通知 outbox 视图；优先按 `goal_id` 或
