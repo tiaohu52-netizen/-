@@ -85,6 +85,12 @@ STAGES = [
     {
         "id": "stage-2",
         "title": "切换执行器接力实现行数统计工具（跨 CLI 接力 + 修复闭环）",
+        "objective": (
+            "在 workspace_root 下创建 linecount.py 与 test_linecount.py。"
+            "linecount.py 必须提供 count_lines(path) 函数，按换行符统计文本行数；"
+            "test_linecount.py 必须覆盖空文件、单行和多行输入，并可直接用"
+            " python test_linecount.py 运行通过。"
+        ),
         "acceptance_checks": [
             "file-exists:linecount.py",
             "command-exit-zero:python test_linecount.py",
@@ -327,9 +333,10 @@ def _stage_draft(
     """从阶段生成合同草案（阶段模板 → 草案的雏形）。"""
     draft = {
         "title": stage["title"],
-        "objective": (
+        "objective": stage.get(
+            "objective",
             f"在 {WS} 下完成该阶段交付物并通过验收 checks（target 相对"
-            f" {WS} 解析）：" + "；".join(stage["acceptance_checks"])
+            f" {WS} 解析）：" + "；".join(stage["acceptance_checks"]),
         ),
         "deadline_at": _stage_deadline(),
         "hard_constraints": {
@@ -769,8 +776,8 @@ def run_stage2() -> None:
             time.sleep(10)
             rows = conn.execute(
                 "SELECT attempt_id, role, executor_id, state FROM attempts "
-                "WHERE goal_id=? ORDER BY admitted_at",
-                (GOAL_ID,),
+                "WHERE contract_id=? ORDER BY admitted_at",
+                (contract_id,),
             ).fetchall()
             if any(r[1] == "executor" and r[2] == "kimi-code" for r in rows):
                 print(f"[v5][stage-2] kimi attempt observed: {rows}")
