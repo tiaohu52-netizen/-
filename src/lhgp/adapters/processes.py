@@ -107,14 +107,36 @@ elif sys.platform == "darwin":  # pragma: no cover - exercised on macOS CI
             return None
         return proc.stdout.strip() or None
 
+    def _etime_to_seconds(text: str) -> int | None:
+        """解析 BSD ps 的 etime：[[dd-]hh:]mm:ss。"""
+        try:
+            days = 0
+            rest = text
+            if "-" in rest:
+                day_part, rest = rest.split("-", 1)
+                days = int(day_part)
+            total = 0
+            for part in rest.split(":"):
+                total = total * 60 + int(part)
+            return days * 86400 + total
+        except ValueError:
+            return None
+
     def process_start_time(pid: int) -> float | None:
-        """Epoch 启动时刻 = now - etimes（整数秒）；退出后 ps 不再列出 → None。"""
+        """Epoch 启动时刻 = now - etime；进程退出后 ps 不再列出 → None。
+
+        macOS 的 BSD ps 没有 Linux 的 etimes 关键字——只有 etime
+        （[[dd-]hh:]mm:ss 格式），这里做解析。
+        """
         if pid <= 0:
             return None
-        etimes = _ps_value(pid, "etimes")
-        if etimes is None or not etimes.lstrip("-").isdigit():
+        etime = _ps_value(pid, "etime")
+        if etime is None:
             return None
-        return _time.time() - float(etimes)
+        seconds = _etime_to_seconds(etime)
+        if seconds is None or seconds < 0:
+            return None
+        return _time.time() - float(seconds)
 
     def process_alive(pid: int) -> bool | None:
         if pid <= 0:
