@@ -175,7 +175,7 @@ def _format_line(event: Any) -> str:
         if isinstance(event.created_at, datetime)
         else str(event.created_at)
     )
-    cid = event.contract_id
+    cid = event.contract_id or "-"
     aid = event.attempt_id or "-"
     body = _shorten(_summary(event.event_type, json.loads(event.payload_json or "{}")), 160)
     e_colored = f"{color}{e_short}{_RESET}" if _COLOR_ENABLED and color else e_short

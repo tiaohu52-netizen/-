@@ -416,6 +416,9 @@ def main(argv: list[str] | None = None) -> int:
         from longtask.cli.watch import main as _watch_main
 
         argv = []
+        if getattr(args, "data_dir", None):
+            # watch 曾丢弃 --data-dir，静默回退读默认目录（promo 实测发现）
+            argv += ["--data-dir", str(args.data_dir)]
         if args.contract:
             argv += ["--contract", args.contract]
         if args.executor:
