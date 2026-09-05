@@ -88,9 +88,27 @@ else:  # pragma: no cover - exercised on POSIX CI
         except OSError:
             return None
 
+    def _proc_state(pid: int) -> str | None:
+        """First state letter from /proc/<pid>/stat, or None without /proc.
+
+        The comm field may contain spaces and parentheses, so parse after the
+        final ')' rather than splitting the line.
+        """
+        try:
+            stat_line = Path(f"/proc/{pid}/stat").read_text(encoding="ascii", errors="replace")
+        except OSError:
+            return None
+        tail = stat_line.rpartition(")")[2].strip()
+        return tail[:1] or None
+
     def process_alive(pid: int) -> bool | None:
         if pid <= 0:
             return None
+        state = _proc_state(pid)
+        if state is not None:
+            # kill(pid, 0) succeeds on zombies, so without this check an
+            # exited-but-unreaped detached run looks alive forever on Linux.
+            return state != "Z"
         try:
             os.kill(pid, 0)
         except ProcessLookupError:
