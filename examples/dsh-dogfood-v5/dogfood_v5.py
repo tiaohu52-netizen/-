@@ -64,6 +64,8 @@ from longtask.rpc.server import RequestEnvelope  # noqa: E402
 
 ROOT = REPO / ".dogfood-v5"
 WS = ROOT / "ws"
+WRAPPER_SOURCE_DIR = REPO / "examples" / "dsh-dogfood-v5"
+WRAPPER_RUNTIME_DIR = REPO / ".dogfood"
 
 GOAL_ID = "lt-dogfood-v05"
 DSH_BIN = (
@@ -314,6 +316,16 @@ def build_registry() -> None:
     """
     ROOT.mkdir(parents=True, exist_ok=True)
     WS.mkdir(parents=True, exist_ok=True)
+    # Registry entries intentionally point at the stable ``.dogfood`` runtime
+    # directory.  Keep those wrappers synchronized with the versioned sources;
+    # otherwise a fresh setup silently runs stale adapter code and invalidates
+    # the dogfood evidence.
+    WRAPPER_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+    for wrapper_name in ("dsh_executor_wrap.py", "dsh_verifier_wrap.py"):
+        shutil.copy2(
+            WRAPPER_SOURCE_DIR / wrapper_name,
+            WRAPPER_RUNTIME_DIR / wrapper_name,
+        )
     agents = [_dsh_entry(), _kimi_entry(), _kimi_executor_entry()]
     (ROOT / "registry.json").write_text(
         json.dumps({"agents": agents}, indent=2, ensure_ascii=False),

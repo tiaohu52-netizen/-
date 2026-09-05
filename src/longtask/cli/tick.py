@@ -324,11 +324,11 @@ def run_daemon_tick(
         # 刷屏；其余字段变化（尤其 risk/slack/next_decision_at）才是
         # 需要留下新证据的事实变化。
         previous_semantic = (
-            {k: v for k, v in previous_snapshot.items() if k != "computed_at"}
+            _forecast_semantic_payload(previous_snapshot)
             if previous_snapshot is not None
             else None
         )
-        current_semantic = {k: v for k, v in snapshot_payload.items() if k != "computed_at"}
+        current_semantic = _forecast_semantic_payload(snapshot_payload)
         if previous_semantic != current_semantic:
             append_event(
                 conn,
@@ -479,6 +479,23 @@ def run_daemon_tick(
         "expired": expired_count,
         "attempts_started": attempts_started,
     }
+
+
+def _forecast_semantic_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Return stable forecast facts for event deduplication.
+
+    Slack is derived from ``now`` and drifts by fractions of a minute on
+    every heartbeat even when the risk tier and forecast are unchanged.
+    Round numeric observations to one decimal minute (six seconds) for
+    comparison only; emitted snapshots retain full precision.
+    """
+
+    semantic: dict[str, Any] = {}
+    for key, value in payload.items():
+        if key == "computed_at":
+            continue
+        semantic[key] = round(value, 1) if isinstance(value, float) else value
+    return semantic
 
 
 def _workspace_holder_other_than(

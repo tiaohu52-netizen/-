@@ -264,6 +264,24 @@ class TestEarliestAcrossContracts:
 
 
 class TestTickIntegration:
+    def test_forecast_semantics_ignore_subsecond_slack_drift(self) -> None:
+        """Heartbeat-only slack drift must not create a new forecast fact."""
+        from longtask.cli.tick import _forecast_semantic_payload
+
+        first = {
+            "computed_at": "2026-09-05T01:00:00+00:00",
+            "slack_p50_minutes": 12.000,
+            "slack_p90_minutes": -3.001,
+            "risk": "orange",
+        }
+        second = {
+            "computed_at": "2026-09-05T01:00:02+00:00",
+            "slack_p50_minutes": 12.033,
+            "slack_p90_minutes": -3.034,
+            "risk": "orange",
+        }
+        assert _forecast_semantic_payload(first) == _forecast_semantic_payload(second)
+
     def test_forecast_duration_baseline_ignores_failed_attempts(self, tmp_path: Path) -> None:
         """Deadline 快照的历史时长基线只采纳 succeeded executor。"""
         from longtask.adapters.registry import ExecutorRegistry
