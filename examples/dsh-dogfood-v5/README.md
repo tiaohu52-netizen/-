@@ -48,9 +48,10 @@ contract blocked(need-user)                 ← 如实升级，不假装
 2. **（协议缺口）用户没有「直接请求验收」的命令面**：执行者已产出
    有效交付物 + dispatch 预算耗尽时，用户无法说「别再派执行者，
    直接验收」——verifier 只在 executor 报 succeeded 后自动派生。
-3. **（协议张力）verification_attempts_reserved 默认 1 太小**：
-   一轮外部抖动（kimi provider 超时）就耗尽验证预算，repair 闭环
-   饿死。§12.4 独立记账正确，默认值与外部世界稳定性不匹配。
+3. **（已修复）verification budget 必须按合同隔离**：早期实现曾按
+   Goal 统计 verifier，导致 stage-1 的验收消耗 stage-2 的预算；现在按
+   `contract_id` 统计，默认 `verification_attempts_reserved=2`，同一合同
+   的多轮 repair/reverify 仍受明确配额控制。
 4. **（协议缺口，最重要）CLI 型 verifier 的结论进不了证据通道**：
    `attempt/write-back` RPC 完整存在（verifier 终态强制 evidence 列表
    落 attempt/succeeded 事件），但 dsh 这类 headless 一次性子进程
