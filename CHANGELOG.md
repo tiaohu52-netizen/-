@@ -46,6 +46,16 @@ follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
 
 ### Fixed
 
+- POSIX liveness probes now recognize zombie processes via `/proc` state and
+  reap daemon children with `waitpid(WNOHANG)` before escalating a stop to
+  SIGTERM, so daemon shutdown is graceful again on Linux instead of always
+  being reported as forced.
+- Linux process start times now come from `/proc/<pid>/stat` field 22 (stable
+  after exit) instead of `st_ctime` (which changes when a process exits), and
+  `reattach` binds provably-terminated runs whose pid has been fully reaped,
+  per the documented branch-2 settlement semantics.
+- CI runs the gate on macOS as a known-gap, non-blocking platform for this
+  preview (the identity model has no `/proc` equivalent there yet).
 - CLI and MCP `--help` no longer crash with `UnicodeEncodeError` on non-UTF-8
   consoles (e.g. cp1252); unencodable help characters are replaced.
 - The `executor/health` integration test no longer depends on a

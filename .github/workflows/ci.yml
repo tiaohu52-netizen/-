@@ -19,6 +19,10 @@ jobs:
   quality-gate:
     name: 7-gate quality (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    # macOS is a known-gap platform for this preview: the identity model
+    # relies on /proc (no equivalent yet) and AF_UNIX paths hit the
+    # sun_path limit under pytest tmp dirs. Tracked in RELEASE-PLAN.
+    continue-on-error: ${{ matrix.os == 'macos-latest' }}
     strategy:
       fail-fast: false
       matrix:

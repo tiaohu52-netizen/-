@@ -425,7 +425,11 @@ class SubprocessAdapter(ExecutorAdapter):
         if not isinstance(start_time, (int, float)):
             # 只有 pid：规范明令 PID 不得单独作为身份真相，拒绝绑定
             return False
-        if identity_matches(pid, float(start_time)) is not True:
+        if identity_matches(pid, float(start_time)) is not True and process_alive(pid) is not False:
+            # 身份载体已消失（进程退出并被收尸，/proc 条目不复存在）说明
+            # 本 run 必然已终止——我们的进程先退出，pid 才可能被释放，
+            # 此时仍按已终止绑定，交给 observe→分支 2 结算。活着或身份无法
+            # 证明的 pid 复用者不会误入：探活非 False 时在此拒绝绑定。
             return False
         self._procs[handle.session_locator] = _DetachedProcess(pid, float(start_time))
         return True
