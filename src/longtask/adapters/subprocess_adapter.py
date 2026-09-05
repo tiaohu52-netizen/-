@@ -7,7 +7,7 @@ spawn 只收结构化 argv（列表参数、shell=False），模型输出是不�
 
 任务文本位置（dogfood v4 教训：各 CLI 参数语法不同）：
 - 位置参数型（agent-cli headless）：argv 不含占位符 → task_prompt 追加为尾元素；
-- flag 值型（executor-cli -p "<task>"）：argv 含一个 {task} 占位符 → 原位替换。
+- flag 值型（如 `<cli> -p "<task>"`）：argv 含一个 {task} 占位符 → 原位替换。
 「prompt 插在哪」由此成为注册表配置数据，不再需要每个 CLI 手写包装器。
 """
 

@@ -30,7 +30,7 @@ description: 将需要跨会话、跨 Agent 推进的用户目标转成 LHGP 合
 1. `health` — 确认 MCP/daemon 在线
 2. `doctor` — 做本机只读预检，确认数据库和已启用 CLI 可启动；发现缺失命令时先
    修环境或换候选，不要先批准合同消耗预算
-3. `list_executors` — 查可用执行器池（Codex / Claude Code / agent-cli / 任何 CLI 适配器）
+3. `list_executors` — 查可用执行器池（Codex / Claude Code / 任何 CLI 适配器）
 4. `prepare_contract` — 起草合同：objective / acceptance / deadline / budget / authority
 5. `approve_contract` — 用户确认后批准（drafted → active）
 6. `get_contract` — 看运行状态、当前 attempt、leasing，以及该合同隔离的

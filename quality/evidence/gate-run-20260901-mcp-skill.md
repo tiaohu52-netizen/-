@@ -24,7 +24,7 @@
    进入可交付状态。10 节速通：协议定位、CLI 子集、起草合同的四个核心决定
    （objective 写验收不是方法 / checks 逐条可核对 / constraints 声明能力 /
    workload 如实填决定紧迫度）、交接文件、作为执行者被唤起时的协议、别做的事、
-   故障速查。MANIFEST.json 索引让工具链（agentskills / agent-cli 等）可发现。
+   故障速查。MANIFEST.json 索引让工具链（agentskills 等）可发现。
 2. **MCP server 薄层**（`src/longtask/mcp_server.py`）：stdio JSON-RPC 2.0
    包装现有 HANDLERS。**设计选择**：暴露 7 个面向 AI 任务流的工具（不暴露
    24 个 RPC 方法——那是 RPC 隧道而非 AI 接口）。每个工具的 `inputSchema`
@@ -49,7 +49,7 @@
 ```
 
 事件链：`contract/prepared → approved → started → context/snapshot →
-attempt/succeeded`。agent-cli 客户端的 MCP server 注册不在协议范围——每个
+attempt/succeeded`。各 MCP 客户端的 server 注册不在协议范围——每个
 MCP 客户端需独立配置 longtask-mcp 路径（stdio 命令）。
 
 ## 门真实拦下的问题

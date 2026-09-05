@@ -1,9 +1,9 @@
 """{task} 占位符（DESIGN §12.1 任务文本位置）测试。
 
 dogfood v4 教训：各 CLI 参数语法不同——agent-cli 是位置参数（尾元素追加可用），
-executor-cli 是 -p 的值（尾元素被当子命令名报错）。占位符把「prompt 插在哪」
+flag 值型 CLI 是 -p 的值（尾元素被当子命令名报错）。占位符把「prompt 插在哪」
 变成注册表配置数据：argv 含一个 {task} → 原位替换；无占位符 → 尾元素
-追加（向后兼容）。手写包装器（executor-cli_wrap.py）从此不需要。
+追加（向后兼容）。手写包装器从此不需要。
 """
 
 from __future__ import annotations

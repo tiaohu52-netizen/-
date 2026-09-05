@@ -1,6 +1,5 @@
 # 质量门 CI（CONTRIBUTING「质量门」）。
-# 与本地同一命令：scripts/quality_gate.py。本目录尚在workspace大仓内，
-# 独立成仓并推送 GitHub 后本工作流生效。
+# 与本地同一命令：scripts/quality_gate.py。
 name: quality
 
 on:

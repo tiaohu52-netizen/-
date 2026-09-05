@@ -16,8 +16,8 @@ Environment: new CPython 3.13 virtual environment created with `uv venv`
    `drafted` to `active` and the read-only commands returned successfully.
 6. Verified both wheel and sdist with `scripts/check_artifacts.py`; all companion
    plugin and Skill resources were present.
-7. Ran `examples/agent-cli-dogfood-v4/dogfood_v4.py probe` twice on Windows. Both runs
-   selected only `agent-cli-headless` for the executor role and only `executor-cli-code` for the
+7. Ran the registry probe twice on Windows. Both runs
+   selected only the headless CLI for the executor role and only the code CLI for the
    verifier role, rejecting the enabled `codex-cli` interference entry.
 8. Ran the complete `tests/integration/test_reconcile.py` suite: 20 tests passed,
    covering real subprocess handles, restart/reattach, orphan grace, fencing,

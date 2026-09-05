@@ -87,7 +87,7 @@ This requires an eligible verifier and remaining verification budget.
 An enqueued request does not mean verification has started or passed.
 
 See [SPEC §12](docs/LHGP-SPEC.md), the [local subprocess integration tests](tests/integration/test_attempt_runner.py),
-and [dogfood v5 evidence](docs/evidence/dogfood-v5-complete-2026-09-05.md).
+and internal end-to-end runs with real CLI executors and an independent verifier.
 Archived examples retain their original environment assumptions and are not portable configurations.
 
 ### MCP and plugin integration

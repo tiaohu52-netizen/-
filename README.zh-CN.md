@@ -79,7 +79,7 @@ typed check 的 `target` 相对于合同工作区解析。command check 使用 d
 这仍需要可用 verifier 和验证预算；请求已入队不代表验收已经开始或通过。
 
 参考[规范 §12](docs/LHGP-SPEC.md)、[本地子进程集成测试](tests/integration/test_attempt_runner.py)
-和 [dogfood v5 证据](docs/evidence/dogfood-v5-complete-2026-09-05.md)。
+和真实 CLI 执行者与独立 verifier 的端到端运行记录。
 归档示例包含当时的环境约定，不应原样复制成本机配置。
 
 ### MCP 与插件

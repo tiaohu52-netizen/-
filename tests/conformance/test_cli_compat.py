@@ -197,7 +197,7 @@ class TestFinishedEvent:
         assert collected["state"] == "failed"
 
     def test_no_event_falls_back_to_exit_code(self, tmp_path: Path) -> None:
-        """无事件行的 CLI（executor-cli/普通命令）：退出码语义完全不变（零破坏）。"""
+        """无事件行的 CLI（flag 型/普通命令）：退出码语义完全不变（零破坏）。"""
         adapter = make_adapter()
         input_ = make_input(str(tmp_path), "print('plain'); raise SystemExit(0)")
         prepared = adapter.prepare(input_)

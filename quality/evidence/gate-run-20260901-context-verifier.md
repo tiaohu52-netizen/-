@@ -36,8 +36,7 @@
    ESCALATION_HANDED_TO_USER）；daemon._judge_verifier_outcomes
    tick 末钩子按 verifier 终态事件裁决：succeeded→合同 complete
    （actor=verifier，带证据），failed→退回 active。
-4. **端到端真实复验**（examples/agent-cli-model-provider-run-v2/）：
-   agent-cli --profile headless（model-provider-cn / model-provider-M2.7-highspeed）跑通
+4. **端到端真实复验**（内部归档）：headless CLI 执行者走通
    同任务：执行者 attempt 收 active.md 快照（context/snapshot-built），
    90 次 lease/renewed 心跳，succeeded 后派生 exec-b verifier，
    verifier succeeded → contract/completed 合同 complete。事件链
@@ -62,5 +61,5 @@
   integration_real_agent-cli 第三方归档）。
 - README 发布分级同步：Developer Preview 已涵盖 §4.1 / §11.2 / §5.2；
   v1 补 headless harness 生命周期对齐（v2 README 已记）。
-- examples 新增 agent-cli-model-provider-run-v2：v1（无上下文/无 verifier）→ v2
+- examples 归档（预览期私有）：v1（无上下文/无 verifier）→ v2
   （含 §4.1 快照 + §5.2 自动裁决）的演化证据。

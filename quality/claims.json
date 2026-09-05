@@ -451,9 +451,6 @@
         "skills/longtask-contract/MANIFEST.json",
         "tests/integration/test_mcp_server.py",
         "tests/conformance/test_lhgp_tool_namespace.py",
-        "examples/agent-cli-model-provider-run-v2/",
-        "examples/mcp-discovery/README.md",
-        "examples/mcp-discovery/mcp-trace.example.log",
         "docs/evidence/P6-fresh-machine-smoke-2026-09-05.md",
         "README.zh-CN.md"
       ],
@@ -472,18 +469,12 @@
         },
         {
           "kind": "manual_review",
-          "path": "examples/mcp-discovery/mcp-trace.example.log",
-          "recorded_at": "2026-09-01",
-          "summary": "模拟模型侧 e2e（agent-cli 本体未配置 longtask-mcp 客户端，配置 agent-cli 客户端是 agent-cli 侧能力）：归档日志通过 longtask-mcp 8 步走通（initialize → tools.list → health → list_executors → prepare → approve → get → attach），事件链完整；README 与日志明确标注这是 2026-09-01 的七工具历史快照，当前工具清单以运行时 tools/list 为准。"
-        },
-        {
-          "kind": "manual_review",
           "path": "docs/evidence/P6-fresh-machine-smoke-2026-09-05.md",
           "recorded_at": "2026-09-05",
           "summary": "当前提交重新构建并在全新 CPython 3.13 隔离环境安装 wheel；canonical/legacy CLI、空目录 doctor 和 lhgp-mcp tools/list 均成功，响应包含双命名空间及审计/控制扩展。"
         }
       ],
-      "notes": "agent-cli 客户端的 MCP server 注册不在本协议范围——每个 MCP 客户端（Claude Desktop / agent-cli / agent-zero 等）需独立配置 longtask-mcp 路径。stdin/stdout pipe 在 Windows 上透明用系统编码（cp936）转换 utf-8——强制 ensure_ascii=True 让编码无关；模型侧按 UTF-8 解析 JSON 字符串 \\u 转义即可。"
+      "notes": "各 MCP 客户端的 MCP server 注册不在本协议范围——每个 MCP 客户端（Claude Desktop 等）需独立配置 longtask-mcp 路径。stdin/stdout pipe 在 Windows 上透明用系统编码（cp936）转换 utf-8——强制 ensure_ascii=True 让编码无关；模型侧按 UTF-8 解析 JSON 字符串 \\u 转义即可。"
     },
     {
       "id": "ephemeral-context-and-verifier",
@@ -498,9 +489,7 @@
         "tests/unit/test_context.py",
         "tests/unit/test_verdict.py",
         "tests/integration/test_verifier.py",
-        "tests/integration/test_verifier_verdict.py",
-        "examples/agent-cli-model-provider-run-v2/",
-        "examples/agent-cli-dogfood-v5/"
+        "tests/integration/test_verifier_verdict.py"
       ],
       "evidence": [
         {
@@ -522,12 +511,6 @@
           "summary": "4 个集成场景：两个 fake 执行者时按 cost+id 排序派生独立 verifier（exec-a → exec-b，role=verifier）；单候选池记 ESCALATION_HANDED_TO_USER（不静默）；verifier succeeded → 合同 complete（事件 contract/completed 带 verifier 证据）；verifier failed → 合同退回 active（事件 contract/blocked）。"
         },
         {
-          "kind": "manual_review",
-          "path": "examples/agent-cli-model-provider-run-v2/",
-          "recorded_at": "2026-09-01",
-          "summary": "真实 agent-cli --profile headless 第三方归档（人工审阅态：examples/agent-cli-model-provider-run-v2/)；（model-provider-cn / model-provider-M2.7-highspeed）走通：执行者 attempt 收到 active.md 快照（context/snapshot-built 落库），heartbeat 续约 lease/renewed 90 次；succeeded 后 runner 派生独立 verifier（exec-b vs exec-a），verifier succeeded → contract/completed 合同 complete。事件链完整可审计。已知缺口：headless harness 的子进程生命未与 Popen 句柄对齐——已如实记录于 examples/agent-cli-model-provider-run-v2/README.md。"
-        },
-        {
           "kind": "focused_test",
           "path": "tests/unit/test_verdict.py",
           "recorded_at": "2026-09-04",
@@ -540,16 +523,10 @@
           "summary": "4 个集成场景走通端到端裁决链（fake verifier stdout 带判定块 → runner 收尾合成 → tick 裁决）：模型 pass 填补 undetermined 命令 check → verifier succeeded → 合同 complete；模型 fail → verifier failed → 合同退回 active（repair）；无判定块 → 确定性 file check 仍评估（pass）但 model_verdict=None；协议确定性 fail（文件不存在）→ 模型 pass 不覆盖 → 合同退回 active，冲突证据可审计。"
         },
         {
-          "kind": "manual_review",
-          "path": "examples/agent-cli-dogfood-v5/README.md",
-          "recorded_at": "2026-09-04",
-          "summary": "dogfood v5 stage-1（真实 daemon + 真实断裂）发现该缺口的原始记录：deepseek verifier 实际核验通过（激活 venv 跑测试、stdout 结论 succeeded），协议因裸 PATH 无 python 判 undetermined → verifier failed → 验证预算耗尽。发现 4 的原始动机与本修复的验收场景来源。"
-        },
-        {
           "kind": "integration_real_store",
           "path": "tests/integration/test_request_verification.py",
           "recorded_at": "2026-09-04",
-          "summary": "6 个集成场景：blocked→请求→回 active + verification/requested 落库；active 态请求不产生多余 resume；终态拒接；verifier 进行中拒接；验证预算 1/1 耗尽如实拒绝并说明升级路径；daemon 消费链（用户请求事件 → 独立 verifier 派生 exec-b≠exec-a → verification/started 落库；重复消费幂等不派第二个）。——dogfood v5 发现 2 的修复验证。"
+          "summary": "6 个集成场景：blocked→请求→回 active + verification/requested 落库；active 态请求不产生多余 resume；终态拒接；verifier 进行中拒接；验证预算 1/1 耗尽如实拒绝并说明升级路径；daemon 消费链（用户请求事件 → 独立 verifier 派生 exec-b≠exec-a → verification/started 落库；重复消费幂等不派第二个）。——真实运行验证（细节见仓库内部记录）发现 2 的修复验证。"
         }
       ]
     },

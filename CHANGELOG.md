@@ -182,8 +182,7 @@ expands to ubuntu + macOS.
   and persists `context/capacity-refused` before refusing attempt start.
 - Handover digest is auto-merged into `task_prompt` so re-dispatched
   attempts inherit verification-failure context (closes the
-  v1 real-run "second attempt wasted" gap documented in
-  `examples/agent-cli-model-provider-run/`).
+  v1 real-run "second attempt wasted" gap found in internal runs).
 
 #### Persistence, budget, contracts
 
@@ -215,22 +214,17 @@ expands to ubuntu + macOS.
 
 - L2 / L3 wakeup not implemented (cloud + relay, external infra).
 - Headless harness subprocess lifetime vs. `Popen` handle alignment
-  (real-run example in `examples/agent-cli-model-provider-run-v2/`).
+  (observed in internal real runs).
 - `control/spawn` is vocabulary-only; external RPC to `AttemptRunner`
   not yet exposed.
-- agent-cli / Claude Desktop etc. each need their own `longtask-mcp` registration
-  in their MCP client config — out of protocol scope.
+- Agent harnesses (Claude Desktop etc.) each need their own `lhgp-mcp`
+  registration in their MCP client config — out of protocol scope.
 
 ### Documentation & examples
 
-- `examples/agent-cli-model-provider-run/` — v1 real execution: workspace artifacts
-  delivered by `model-provider-M2.7-highspeed`; cross-check caught a wrong
-  unit-test assertion.
-- `examples/agent-cli-model-provider-run-v2/` — same task with §4.1 context + §5.2
-  verifier enabled; full event chain `contract/prepared → approved →
-  started → context/snapshot → attempt/succeeded → contract/completed`.
-- `examples/mcp-discovery/` — MCP e2e trace (8-step contract lifecycle
-  via `longtask-mcp` stdio).
+- Internal real-execution archives (raw event chains, cross-check
+  verifier catching a wrong unit-test assertion, and an 8-step MCP
+  lifecycle trace) were retained privately during the preview period.
 
 ### Internal (commit-level highlights)
 

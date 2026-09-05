@@ -122,7 +122,7 @@ def build_attempt_input(
 
     with_context=True 时（§4.1 临时上下文，Developer Preview 最小闭环）：
     - task_prompt 追加交接摘要附言（跨 attempt 现场——修复「再派 attempt
-      没有验收失败上下文」的缺口，见 examples/agent-cli-model-provider-run）；
+      没有验收失败上下文」的缺口，见内部真实运行记录）；
     - 物化该 attempt 的 context/attempts/<id>/active.md + scratch.md，
       路径填 context_snapshot_path（适配器据此装配，context.required=true
       无快照即拒接，§9）。容量超限抛 CapacityRefusedError（fail-closed）。

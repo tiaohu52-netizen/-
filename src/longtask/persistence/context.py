@@ -13,7 +13,7 @@ scratch.md 可编辑区。attempt 之间互不共享；快照带来源版本与�
 - init_scratch：初始化 scratch.md 可编辑区骨架。
 - build_attempt_context：AttemptRunner 派发前的入口——编译快照并把
   交接摘要融入任务文本（修复「再派 attempt 没有验收失败上下文」的
-  真实缺口，见 examples/agent-cli-model-provider-run）。
+  真实缺口，见内部真实运行记录）。
 
 source 阶段摘要（stages/*.md）与 promotion 流程属 §4.1 完整语义，
 本期不实现（claims 如实记录）；交接文件已是跨 attempt 的权威通道。

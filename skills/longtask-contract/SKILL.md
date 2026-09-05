@@ -27,7 +27,7 @@ prepare` 调用，并把任务交出去。
 
 - **跨会话**：任务在 `state.db`，不依赖任何 AI 进程；A 会话死了 B 接着干
 - **跨 agent**：你（这个模型）不擅长写测试 → 协议派给 Codex；Codex 干
-  完不擅长验证 → 协议派给 agent-cli 当 verifier
+  完不擅长验证 → 协议派给其他 CLI 当 verifier
 - **跨今天**：现在是凌晨三点，deadline 在十二小时后——协议
   `wakeup/rtc-armed` 唤醒自己，到点派工
 
@@ -156,7 +156,7 @@ verifier 机会；若用户明确设置 `verification_attempts_reserved`，以�
 DESIGN §5.2 强调"自己考自己不算数"——协议会派一个 verifier 独立核对，
 你的 checks 要让 verifier 能照着判（不要写"看起来对"）。
 
-**两条硬约定（模型第一次用就踩过的坑，见 `examples/agent-cli-dogfood-v5/`）**：
+**两条硬约定（模型第一次用就踩过的坑，来自真实运行记录）**：
 
 1. **typed check 的 `target` 相对 `workspace_root` 解析**。合同声明了
    `workspace_root=/x/ws`，那么 `file-exists:charfreq.py` 指向
@@ -269,7 +269,7 @@ v2 实现的"交接附言融 task_prompt"是协议自动把 `next_action` 加到
 |---|---|
 | 合同准备了但永不派工 | 算 u = workload/time_left；u<1.0 不派。提高 workload 或缩短 deadline |
 | 派了一轮就停了 | 查 budget.attempt/started 数：超 max_dispatches 自动 blocked(need-user) |
-| 跨进程轮询丢句柄 | daemon 续命依赖持有 Popen；headless harness 见 `examples/agent-cli-model-provider-run-v2/` 已知缺口 |
+| 跨进程轮询丢句柄 | daemon 续命依赖持有 Popen；headless harness 的已知缺口（内部运行记录） |
 | 执行者 succeeded 不被识别 | agent-cli node 主进程是 Popen 持有，但内部 worker turn/end 才会让主进程退——需要总控补录 attempt/succeeded 或 harness 在 stdout 输出结构化 attempt/finished 事件 |
 
 ## 10. 相关文档
@@ -277,6 +277,5 @@ v2 实现的"交接附言融 task_prompt"是协议自动把 `next_action` 加到
 - `DESIGN.md`（协议规范本体，唯一权威）
 - `README.md`（仓库入口）
 - `CONTRIBUTING.md`（代码侧纪律）
-- `examples/agent-cli-model-provider-run/`（v1 真实运行，暴露了上下文/verifier 缺口）
-- `examples/agent-cli-model-provider-run-v2/`（v2 真实运行，缺口补上后）
+（真实运行对比记录在预览期内为私有归档）
 - `quality/claims.json`（治理真相源：哪些设计已通过测试验证）

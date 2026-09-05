@@ -1,7 +1,7 @@
 # pre-commit 钩子：快路径增量门（改动文件级）。
 # 权威全量门是 scripts/quality_gate.py（本地与 CI 同一命令）；
 # 这里的钩子只做「快反馈」，不声称替代全量门。
-# 安装：uv run pre-commit install（需先 git init；本目录尚在workspace大仓内，独立成仓后启用）
+# 安装：uv run pre-commit install
 
 repos:
   - repo: local

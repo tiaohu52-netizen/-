@@ -49,7 +49,7 @@ uv build
 uv run python scripts/check_artifacts.py dist
 
 # 无密钥的多 CLI 授权探针
-uv run python examples/agent-cli-dogfood-v4/dogfood_v4.py probe
+uv run lhgp doctor
 ```
 
 真实外部 CLI/API 的 daemon dogfood 仍需单独准备凭据，并把结果记录在
