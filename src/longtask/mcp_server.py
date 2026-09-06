@@ -353,6 +353,16 @@ def tool_propose_plan(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, An
         from longtask.rpc.errors import ErrorCode, RpcError
 
         raise RpcError(code=ErrorCode.UNKNOWN_CONTRACT, message=f"goal {goal_id} not found")
+    # E3 校验：提案结构必须通过 validate_proposed_plan（含权限字段禁止）
+    from lhgp.promoter.proposals import validate_proposed_plan
+
+    plan = args.get("plan")
+    validation = validate_proposed_plan(plan)
+    if not validation.ok:
+        raise RpcError(
+            code=ErrorCode.VALIDATION_FAILED,
+            message="; ".join(validation.errors),
+        )
     proposal = {
         "goal_id": goal_id,
         "proposed_by": "model",

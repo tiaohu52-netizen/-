@@ -16,6 +16,11 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from lhgp.promoter.fairness import (
+    ContractFairnessState,
+    TickCapacityLedger,
+    apply_fairness_order,
+)
 from longtask.acceptance.checks import RepairBrief
 from longtask.adapters.base import ExecutorAdapter
 from longtask.adapters.factory import build_adapter
@@ -139,6 +144,10 @@ def run_daemon_tick(
     dispatched_count = 0
     expired_count = 0
     attempts_started: list[dict[str, str]] = []
+    # E2 公平性：per-tick 容量记账 + 饥饿检测
+    capacity_ledger = TickCapacityLedger()
+    fairness_states: dict[str, ContractFairnessState] = {}
+    dispatched_this_tick: set[str] = set()
 
     # P1：cross-tick 预算硬边界（C2 修复）——escalations_used 按 contract 累计。
     # 数据源：① 已派生的 verifier attempts（role=verifier 且 terminal）；② ESCALATION_STEERED 事件。
@@ -188,6 +197,15 @@ def run_daemon_tick(
             c.contract_id,
         ),
     )
+
+    # E2 公平性：饥饿合同提到最前（连续 >= starvation_ticks 个 tick 未派工）
+    _fair_ids = apply_fairness_order(
+        [c.contract_id for c in ordered_contracts],
+        urgency_tier_by_contract,
+        fairness_states,
+    )
+    _by_id = {c.contract_id: c for c in ordered_contracts}
+    ordered_contracts = [_by_id[cid] for cid in _fair_ids if cid in _by_id]
 
     for c in ordered_contracts:
         cid = c.contract_id
@@ -414,6 +432,9 @@ def run_daemon_tick(
                 if started is not None:
                     dispatched_count += 1
                     attempts_started.append(started)
+                    # E2 公平性记账
+                    capacity_ledger.record_dispatch(cid)
+                    dispatched_this_tick.add(cid)
                 else:
                     # 无可用执行器或全部拒接 -> 转 blocked(no-executor)
                     update_contract_state(
