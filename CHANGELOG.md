@@ -4,6 +4,36 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version numbers
 follow [SemVer](https://semver.org/spec/v2.0.0.html); dates in ISO 8601.
 
+## [0.1.0a6] - 2026-09-06
+
+审计全部清零 + E1-E4 全部增强（PR #15-#19），合并发布版。
+
+### Added
+
+- **E1 Deadline 校准**：按合同内主导执行器的成功样本（≥2）校准
+  forecast p50/p90；低样本降级链保留。
+- **E2 多合同公平调度**：紧迫档位降序派工 + 饥饿检测（连续 5 tick
+  未派工自动提前）+ per-tick 容量记账（可选上限）。
+- **E3 提案审批闭环**：`lhgp proposal-apply` 命令 + 提案结构校验
+  （stages/id/contract_id/≤20）+ 冻结区强制（executor/model/budget/
+  authority 字段一律拒绝——计划提案不得走私执行权限）。
+- **E4 模板库**：code-change / research / release-check 三内置模板
+  随 wheel 分发。
+- **新工具**（39 个）：brief（接手包）、board（风险看板）、stats
+  （成本台账）、propose_plan（提案通道）；diff / prune-events /
+  template / proposals / proposal-apply CLI 命令。
+- **macOS 完全支持**：进程身份模型（ps etime/state），CI 升阻断。
+
+### Fixed
+
+- 12 项 Required（幂等归属校验 / Goal 身份保护 / 决策事务化 /
+  doctor quick_check / 迁移 WAL checkpoint / 并发限额生效 / verifier
+  作用域统一 / reconcile 补派验收 / stale 释租约 / fence 终止 /
+  PID 身份 / 宽限配置接线）。
+- 6 项深化（投影原子写 / 快照体积上限 / token 0600 / quiet hours
+  验证 / patch 错误语义 / 假 request_id 声明）。
+- pytest 8.4.2 → 9.0.3（PYSEC-2026-1845）。
+
 ## [0.1.0a5] - 2026-09-06
 
 **macOS 全面支持**：darwin 进程身份模型落地，macOS CI 升级为阻断平台。
