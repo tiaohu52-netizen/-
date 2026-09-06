@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from lhgp.persistence.events_query import count_attempts_by_role, count_events
 from lhgp.promoter.fairness import (
     ContractFairnessState,
     TickCapacityLedger,
@@ -179,10 +180,8 @@ def run_daemon_tick(
         if c.state in TERMINAL_STATES:
             continue
         verifier_count = _count_verifier_attempts(conn, cid)
-        steer_count = sum(
-            1
-            for e in get_events(conn, contract_id=cid)
-            if e.event_type == EventType.ESCALATION_STEERED
+        steer_count = count_events(
+            conn, contract_id=cid, event_type=EventType.ESCALATION_STEERED.value
         )
         escalations_used_by_contract[cid] = verifier_count + steer_count
         estimate_stalled_by_contract[cid] = _estimate_stalled_from_attempts(conn, cid)
@@ -274,10 +273,11 @@ def run_daemon_tick(
         # 验收 attempt 计入 executor 的 max_dispatches，否则一次验收会
         # 吃掉修复机会（SPEC §12.4）。历史事件没有 role 时按 executor
         # 兼容，只有明确标记 verifier 的事件排除。
-        started_events = sum(
-            1
-            for e in get_events(conn, contract_id=cid)
-            if e.event_type == EventType.ATTEMPT_STARTED and e.role != "verifier"
+        started_events = count_attempts_by_role(
+            conn,
+            contract_id=cid,
+            role="executor",
+            states=("admitted", "running", "succeeded", "failed", "cancelled", "stale", "orphaned"),
         )
         budget_dispatches_left = max(0, c.draft.budget.max_dispatches - started_events)
 

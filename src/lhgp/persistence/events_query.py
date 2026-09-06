@@ -157,6 +157,35 @@ def get_recent_events(
     return [_row_to_stored_event(row) for row in reversed(rows)]
 
 
+def count_events(
+    conn: sqlite3.Connection,
+    *,
+    contract_id: str,
+    event_type: str,
+) -> int:
+    """按合同+事件类型计数（走 idx_events_contract_type 覆盖索引）。"""
+    row = conn.execute(
+        "SELECT COUNT(*) FROM events WHERE contract_id = ? AND event_type = ?",
+        (contract_id, event_type),
+    ).fetchone()
+    return int(row[0])
+
+
+def count_attempts_by_role(
+    conn: sqlite3.Connection,
+    *,
+    contract_id: str,
+    role: str,
+    states: tuple[str, ...],
+) -> int:
+    """按合同+角色+状态集合计数 attempts（走 idx_attempts_role_state 索引）。"""
+    placeholders = ", ".join("?" for _ in states)
+    base = "SELECT COUNT(*) FROM attempts WHERE contract_id = ? AND role = ?"
+    count_sql = base + f" AND state IN ({placeholders})"
+    row = conn.execute(count_sql, (contract_id, role, *states)).fetchone()
+    return int(row[0])
+
+
 def get_latest_forecast_snapshot(
     conn: sqlite3.Connection,
     *,
