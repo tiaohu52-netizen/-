@@ -52,8 +52,6 @@ from longtask.rpc.server import RequestEnvelope, route
 
 def _open_read_conn(data_dir: str | None) -> sqlite3.Connection:
     """以只读意图打开默认/指定数据目录的权威库（insights 系命令共用）。"""
-    from lhgp.persistence.types import StoreConfig
-    from longtask.persistence.store import connect, ensure_schema
 
     root = Path(data_dir).expanduser().resolve() if data_dir else default_data_root()
     conn = connect(StoreConfig(db_path=root / "state.db"))
@@ -243,6 +241,18 @@ def build_parser() -> argparse.ArgumentParser:
     watch_p.add_argument("--kinds", type=str, default=None)
     watch_p.add_argument("--for", type=int, default=None, dest="duration")
     watch_p.add_argument("--follow", action="store_true")
+
+    # messaging：agent 通信层
+    msg_p = sub.add_parser("message", help="发送结构化消息给合同上的 agent")
+    msg_p.add_argument("contract_id", type=str)
+    msg_p.add_argument("text", type=str, help="消息内容")
+    msg_p.add_argument("--kind", choices=["directive", "context", "question"], default="context")
+    msg_p.add_argument("--to", type=str, default=None, help="指定接收 agent（可选）")
+    inbox_p = sub.add_parser("inbox", help="查看合同的未读消息和用户决策")
+    inbox_p.add_argument("contract_id", type=str)
+    directive_p = sub.add_parser("direct", help="用户向 agent 发送指令（directive 消息）")
+    directive_p.add_argument("contract_id", type=str)
+    directive_p.add_argument("text", type=str, help="指令内容")
 
     # timeline：合同事件时间轴 HTML
     tl_p = sub.add_parser("timeline", help="渲染合同事件时间轴为自包含 HTML")
@@ -474,6 +484,74 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         finally:
             conn.close()
+
+    if args.command == "message":
+        from lhgp.persistence.messages import send_message
+
+        root = Path(args.data_dir).expanduser().resolve() if args.data_dir else default_data_root()
+        conn = connect(StoreConfig(db_path=root / "state.db"))
+        try:
+            event_id = send_message(
+                conn,
+                contract_id=args.contract_id,
+                from_actor="user",
+                kind=args.kind,
+                text=args.text,
+                now=datetime.now(UTC),
+                to_agent=args.to,
+            )
+            print(f"message sent: event_id={event_id} kind={args.kind}")
+        finally:
+            conn.close()
+        return 0
+
+    if args.command == "direct":
+        from lhgp.persistence.messages import send_message
+
+        root = Path(args.data_dir).expanduser().resolve() if args.data_dir else default_data_root()
+        conn = connect(StoreConfig(db_path=root / "state.db"))
+        try:
+            event_id = send_message(
+                conn,
+                contract_id=args.contract_id,
+                from_actor="user",
+                kind="directive",
+                text=args.text,
+                now=datetime.now(UTC),
+            )
+            print(f"directive sent: event_id={event_id}")
+            print("agent will see this on next context compile")
+        finally:
+            conn.close()
+        return 0
+
+    if args.command == "inbox":
+        from lhgp.persistence.messages import get_messages
+
+        root = Path(args.data_dir).expanduser().resolve() if args.data_dir else default_data_root()
+        conn = connect(StoreConfig(db_path=root / "state.db"))
+        try:
+            msgs = get_messages(conn, contract_id=args.contract_id)
+            directives = [m for m in msgs if m["kind"] == "directive"]
+            questions = [m for m in msgs if m["kind"] == "question"]
+            context_msgs = [m for m in msgs if m["kind"] == "context"]
+        finally:
+            conn.close()
+        if directives:
+            print("── Directives (user → agent) ──")
+            for m in directives:
+                print(f"  [{m['at']}] {m['text']}")
+        if questions:
+            print("── Questions (agent → user) ──")
+            for m in questions:
+                print(f"  [{m['at']}] {m['text']}")
+        if context_msgs:
+            print("── Context notes ──")
+            for m in context_msgs[-5:]:
+                print(f"  [{m['at']}] {m['text']}")
+        if not msgs:
+            print("(no messages)")
+        return 0
 
     if args.command == "timeline":
         from lhgp.persistence.timeline import build_timeline_html

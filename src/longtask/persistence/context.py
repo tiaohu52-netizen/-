@@ -174,6 +174,11 @@ def compile_context_snapshot(
     digest = _recent_attempt_digest(conn, contract.contract_id)
     deadline_snapshot = get_latest_forecast_snapshot(conn, contract_id=contract.contract_id)
 
+    # Agent messaging：用户的 directive 消息注入到 agent 上下文最前面——
+    # 这让用户可以在 agent 工作中途改变方向而不用终止重来。
+    from lhgp.persistence.messages import pending_directives
+
+    directives = pending_directives(conn, contract_id=contract.contract_id)
     sections: list[str] = [
         f"# Active Context: {contract.contract_id} / {attempt_id}",
         "",
@@ -181,6 +186,18 @@ def compile_context_snapshot(
         f"- expires_at: {(now + timedelta(minutes=policy.expires_after_minutes)).isoformat()}",
         f"- contract_revision: {contract.revision}",
         "",
+    ]
+    if directives:
+        sections += ["## ⚡ 用户指令（必须遵守）", ""]
+        for d in directives:
+            sections.append(f"- **{d['text']}**")
+        sections += [
+            "",
+            "以上指令来自用户，优先级高于合同中的 soft_guidance。"
+            "如果你无法遵守，在写回中说明原因。",
+            "",
+        ]
+    sections += [
         "## 合同锚点（冻结区，只读）",
         f"- objective: {draft.objective}",
         f"- deadline_at: {draft.deadline_at.isoformat()}",
