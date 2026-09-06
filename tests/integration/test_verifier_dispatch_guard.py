@@ -96,8 +96,8 @@ def _running_executor(conn: Any, cid: str) -> str:
     attempt_id = "att-running-1"
     conn.execute(
         "INSERT INTO attempts (attempt_id, contract_id, goal_id, role, executor_id, state,"
-        " admitted_at, contract_revision, updated_at)"
-        " VALUES (?, ?, ?, 'executor', 'exec-a', 'running', ?, 1, ?)",
+        " admitted_at, contract_revision, updated_at, session_token_hash)"
+        " VALUES (?, ?, ?, 'executor', 'exec-a', 'running', ?, 1, ?, 'test-session-hash')",
         (attempt_id, cid, cid, NOW.isoformat(), NOW.isoformat()),
     )
     from longtask.persistence.store import acquire_lease

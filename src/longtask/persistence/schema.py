@@ -228,7 +228,8 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
             process_identity_json TEXT,  -- 提示，不得单独作为身份真相
             capability_snapshot_json TEXT,
             handle_registered_at TEXT,
-            orphaned_at TEXT  -- 进入 orphan grace 的起点（§11.3 分支 3）
+            orphaned_at TEXT,  -- 进入 orphan grace 的起点（§11.3 分支 3）
+            session_token_hash TEXT  -- per-attempt 会话凭据哈希
         )
         """
     )
@@ -428,6 +429,7 @@ def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
     _add_column_if_missing("attempts", "capability_snapshot_json TEXT")
     _add_column_if_missing("attempts", "handle_registered_at TEXT")
     _add_column_if_missing("attempts", "orphaned_at TEXT")
+    _add_column_if_missing("attempts", "session_token_hash TEXT")
 
     # 回填 goal_id（幂等：WHERE 条件本身防重复改写）
     conn.execute("UPDATE contracts SET goal_id = contract_id WHERE goal_id IS NULL OR goal_id = ''")

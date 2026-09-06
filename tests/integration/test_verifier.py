@@ -131,8 +131,8 @@ class TestVerifierDispatch:
             # 后才派 verifier）；attempts 行标 succeeded，不挡活租约守卫。
             conn.execute(
                 "INSERT INTO attempts (attempt_id, contract_id, goal_id, role, executor_id,"
-                " state, admitted_at, contract_revision, updated_at)"
-                " VALUES ('att-1', ?, ?, 'executor', 'exec-a', 'succeeded', ?, 1, ?)",
+                " state, admitted_at, contract_revision, updated_at, session_token_hash)"
+                " VALUES ('att-1', ?, ?, 'executor', 'exec-a', 'succeeded', ?, 1, ?, NULL)",
                 (cid, cid, NOW.isoformat(), NOW.isoformat()),
             )
             conn.commit()
@@ -164,8 +164,8 @@ class TestVerifierDispatch:
             # 同上：executor 已 succeeded、租约已释放的收尾后路径。
             conn.execute(
                 "INSERT INTO attempts (attempt_id, contract_id, goal_id, role, executor_id,"
-                " state, admitted_at, contract_revision, updated_at)"
-                " VALUES ('att-1', ?, ?, 'executor', 'only-exec', 'succeeded', ?, 1, ?)",
+                " state, admitted_at, contract_revision, updated_at, session_token_hash)"
+                " VALUES ('att-1', ?, ?, 'executor', 'only-exec', 'succeeded', ?, 1, ?, NULL)",
                 (cid, cid, NOW.isoformat(), NOW.isoformat()),
             )
             conn.commit()

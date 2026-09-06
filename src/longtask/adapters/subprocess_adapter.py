@@ -349,6 +349,9 @@ class SubprocessAdapter(ExecutorAdapter):
             raise refuse("spawn 无法确定期望 workspace_root")
         # 环境白名单：只透显式列出的变量；模型输出永不进入 argv 或环境
         env = {name: os.environ[name] for name in launch.env_allowlist if name in os.environ}
+        # Per-attempt session token：执行者进程通过此环境变量获取写回凭据
+        if input_.session_token:
+            env["LHGP_SESSION_TOKEN"] = input_.session_token
         # 任务文本注入（DESIGN §12.1）：{task} 占位符 → 原位替换；无占位符
         # → 尾元素追加（向后兼容：cli-bridge 等位置参数 CLI 的既有形态）。
         # 文本是用户审定的冻结区数据，非模型输出；列表参数 + shell=False，

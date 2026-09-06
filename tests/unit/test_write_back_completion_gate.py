@@ -8,6 +8,7 @@ verifier 裁决路径（tick _judge_verifier_outcomes）写入。
 
 from __future__ import annotations
 
+import hashlib as _hl
 import sqlite3
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -28,6 +29,8 @@ from lhgp.rpc.methods import Method
 from lhgp.rpc.server import RequestEnvelope
 
 NOW = datetime(2026, 9, 5, 12, 0, 0, tzinfo=UTC)
+TEST_TOKEN = "test-session-token-0123456789abcdef"  # noqa: S105 - test fixture
+TEST_TOKEN_HASH = _hl.sha256(TEST_TOKEN.encode()).hexdigest()
 CID = "lt-wbsec-01"
 
 
@@ -65,9 +68,9 @@ def _attempt_with_lease(conn: sqlite3.Connection, *, role: str = "executor") -> 
     attempt_id = f"att-{role}-wb"
     conn.execute(
         "INSERT INTO attempts (attempt_id, contract_id, goal_id, role, state,"
-        " admitted_at, contract_revision, updated_at)"
-        " VALUES (?, ?, ?, ?, 'running', ?, 1, ?)",
-        (attempt_id, CID, CID, role, NOW.isoformat(), NOW.isoformat()),
+        " admitted_at, contract_revision, updated_at, session_token_hash)"
+        " VALUES (?, ?, ?, ?, 'running', ?, 1, ?, ?)",
+        (attempt_id, CID, CID, role, NOW.isoformat(), NOW.isoformat(), TEST_TOKEN_HASH),
     )
     acquire_lease(
         conn,
@@ -106,6 +109,7 @@ def test_executor_cannot_set_completion_state(tmp_path: Path, state: str) -> Non
                 "contract_id": CID,
                 "attempt_id": attempt_id,
                 "write_generation": 1,
+                "session_token": TEST_TOKEN,
                 "attempt_state": "succeeded",
                 "contract_state": state,
             },
@@ -133,6 +137,7 @@ def test_verifier_write_back_still_allowed_to_complete(tmp_path: Path) -> None:
                 "contract_id": CID,
                 "attempt_id": attempt_id,
                 "write_generation": 1,
+                "session_token": TEST_TOKEN,
                 "attempt_state": "succeeded",
                 "contract_state": "complete",
                 "evidence": [{"check_id": "c1", "outcome": "pass", "source": "verifier-run"}],
@@ -158,6 +163,7 @@ def test_executor_progress_note_unaffected(tmp_path: Path) -> None:
                 "contract_id": CID,
                 "attempt_id": attempt_id,
                 "write_generation": 1,
+                "session_token": TEST_TOKEN,
                 "progress_note": "half done",
             },
             "req-wb-c3-note",

@@ -489,6 +489,13 @@ def tool_interrupt_attempt(args: dict[str, Any], ctx: dict[str, Any]) -> dict[st
     return _mcp_route(Method.CONTROL_INTERRUPT, args, ctx)
 
 
+def _get_session_token() -> str:
+    """从环境变量获取 per-attempt session token（daemon spawn 时注入）。"""
+    import os
+
+    return os.environ.get("LHGP_SESSION_TOKEN", "")
+
+
 def tool_write_back(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
     """写回进度、终态、结构化验收证据和实际模型身份。"""
     return _mcp_route(Method.ATTEMPT_WRITE_BACK, args, ctx)
@@ -550,6 +557,7 @@ def tool_attach_to_executor(args: dict[str, Any], ctx: dict[str, Any]) -> dict[s
                         "write_generation": generation,
                         "attempt_state": report_state,
                         "progress_note": progress_note or "",
+                        "session_token": _get_session_token(),
                     },
                 }
             )
@@ -582,6 +590,7 @@ def tool_attach_to_executor(args: dict[str, Any], ctx: dict[str, Any]) -> dict[s
                         "attempt_id": attempt_id,
                         "write_generation": generation,
                         "progress_note": progress_note,
+                        "session_token": _get_session_token(),
                     },
                 }
             )

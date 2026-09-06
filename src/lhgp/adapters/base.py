@@ -27,6 +27,7 @@ class AttemptInput:
     partition_id: str | None = None
     context_snapshot_path: str | None = None
     task_prompt: str | None = None
+    session_token: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

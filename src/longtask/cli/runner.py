@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import json
 import sqlite3
 from collections.abc import Callable
@@ -340,6 +341,18 @@ class AttemptRunner:
             return False
         try:
             input_ = build_attempt_input(self._root, self._conn, contract, attempt_id, now)
+            # Per-attempt session token（安全加固）：spawn 前生成一次性凭据
+            import hashlib
+            import secrets
+
+            _raw_token = secrets.token_urlsafe(32)
+            _token_hash = hashlib.sha256(_raw_token.encode()).hexdigest()
+            self._conn.execute(
+                "UPDATE attempts SET session_token_hash = ? WHERE attempt_id = ?",
+                (_token_hash, attempt_id),
+            )
+            self._conn.commit()
+            input_ = dataclasses.replace(input_, session_token=_raw_token)
         except CapacityRefusedError as exc:
             # §4.1 容量合同不满足：拒绝启动 attempt（事件已由编译器记
             # context/capacity-refused，这里补记账并释放租约）
