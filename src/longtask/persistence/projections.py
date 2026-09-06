@@ -8,6 +8,7 @@ contract.yaml / log.jsonl / lease.json / handover.md 等文件都是投影：
 from __future__ import annotations
 
 import json
+import os
 import re
 import sqlite3
 from dataclasses import dataclass
@@ -196,6 +197,13 @@ def check_projection_dirty(root: Path, contract_id: str, current_view: ContractV
         return True
 
 
+def _atomic_write(path: Path, content: str) -> None:
+    """temp + os.replace 的原子写入：crash 不会留下截断文件。"""
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(content, encoding="utf-8")
+    os.replace(str(tmp), str(path))
+
+
 def rebuild_projection(
     root: Path,
     contract_id: str,
@@ -221,13 +229,13 @@ def rebuild_projection(
 
     # 1. 物化 contract.yaml
     contract_path = cdir / CONTRACT_FILE
-    contract_path.write_text(format_contract_yaml(view), encoding="utf-8")
+    _atomic_write(contract_path, format_contract_yaml(view))
     created_paths[CONTRACT_FILE] = contract_path
 
     # 2. 物化 lease.json
     lease_obj = get_lease(conn, contract_id)
     lease_path = cdir / LEASE_FILE
-    lease_path.write_text(format_lease_json(lease_obj), encoding="utf-8")
+    _atomic_write(lease_path, format_lease_json(lease_obj))
     created_paths[LEASE_FILE] = lease_path
 
     # 3. 物化 log.jsonl
@@ -251,7 +259,7 @@ def rebuild_projection(
         )
         for e in events
     ]
-    log_path.write_text("\n".join(log_lines) + ("\n" if log_lines else ""), encoding="utf-8")
+    _atomic_write(log_path, "\n".join(log_lines) + ("\n" if log_lines else ""))
     created_paths[LOG_FILE] = log_path
 
     # 4. 初始化 handover.md / task_plan.md / progress.md / findings.md
@@ -267,7 +275,7 @@ def rebuild_projection(
             source_attempt_id="init",
             open_risks=(),
         )
-        handover_path.write_text(default_handover.format_markdown(), encoding="utf-8")
+        _atomic_write(handover_path, default_handover.format_markdown())
     created_paths[HANDOVER_FILE] = handover_path
 
     created_at_iso = view.created_at.isoformat()
@@ -283,7 +291,7 @@ def rebuild_projection(
     for f_name, header in init_headers:
         p = cdir / f_name
         if not p.is_file():
-            p.write_text(header, encoding="utf-8")
+            _atomic_write(p, header)
         created_paths[f_name] = p
 
     return created_paths

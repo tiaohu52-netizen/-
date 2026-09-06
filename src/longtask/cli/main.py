@@ -604,6 +604,16 @@ def main(argv: list[str] | None = None) -> int:
             if not isinstance(plan, dict):
                 print("error: proposal has no plan object", file=sys.stderr)
                 return 1
+            # E3 校验：apply 时用同一套校验（提案和落地结构一致）
+            from lhgp.promoter.proposals import validate_proposed_plan
+
+            validation = validate_proposed_plan(plan)
+            if not validation.ok:
+                print(
+                    f"error: plan validation failed: {'; '.join(validation.errors)}",
+                    file=sys.stderr,
+                )
+                return 1
             goal_before = get_goal(conn, args.goal_id)
             if goal_before is None:
                 print(f"error: goal {args.goal_id} not found", file=sys.stderr)
