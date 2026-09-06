@@ -79,8 +79,8 @@ def store(tmp_path: Path) -> Any:
 def acquired(conn: Any) -> None:
     conn.execute(
         "INSERT INTO attempts (attempt_id, contract_id, goal_id, role, state,"
-        " admitted_at, contract_revision, updated_at)"
-        " VALUES ('att-1', ?, ?, 'executor', 'running', ?, 1, ?)",
+        " admitted_at, contract_revision, updated_at, session_token_hash)"
+        " VALUES ('att-1', ?, ?, 'executor', 'running', ?, 1, ?, 'test-session-hash')",
         (CID, CID, NOW.isoformat(), NOW.isoformat()),
     )
     conn.commit()

@@ -106,8 +106,8 @@ def test_renew_fenced_marks_stale_instead_of_raising(tmp_path: Path) -> None:
     }
     conn.execute(
         "INSERT INTO attempts (attempt_id, contract_id, goal_id, role, executor_id, state,"
-        " admitted_at, contract_revision, updated_at)"
-        " VALUES (?, ?, ?, 'executor', 'exec-1', 'running', ?, 1, ?)",
+        " admitted_at, contract_revision, updated_at, session_token_hash)"
+        " VALUES (?, ?, ?, 'executor', 'exec-1', 'running', ?, 1, ?, 'test-session-hash')",
         (attempt_id, cid, cid, NOW.isoformat(), NOW.isoformat()),
     )
     conn.commit()
@@ -145,8 +145,8 @@ def test_missing_generation_falls_back_without_type_error(tmp_path: Path) -> Non
     }
     conn.execute(
         "INSERT INTO attempts (attempt_id, contract_id, goal_id, role, executor_id, state,"
-        " admitted_at, contract_revision, updated_at)"
-        " VALUES (?, ?, ?, 'executor', 'exec-1', 'running', ?, 1, ?)",
+        " admitted_at, contract_revision, updated_at, session_token_hash)"
+        " VALUES (?, ?, ?, 'executor', 'exec-1', 'running', ?, 1, ?, 'test-session-hash')",
         (attempt_id, cid, cid, NOW.isoformat(), NOW.isoformat()),
     )
     conn.commit()

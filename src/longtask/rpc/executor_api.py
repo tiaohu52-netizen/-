@@ -256,6 +256,40 @@ def handle_attempt_write_back(
     if write_generation < 0:
         raise RpcError(code=ErrorCode.VALIDATION_FAILED, message="write_generation is required")
 
+    # Per-attempt session token（安全加固）：只对 executor 客户端强制。
+    # daemon 内部调用（verifier 派发、reconcile 等）走主令牌已可信。
+    if envelope.client_id == "executor":
+        session_token = params.get("session_token")
+        if not isinstance(session_token, str) or not session_token:
+            raise RpcError(
+                code=ErrorCode.VALIDATION_FAILED,
+                message="session_token is required (injected as LHGP_SESSION_TOKEN at spawn)",
+            )
+        import hashlib
+
+        token_hash = hashlib.sha256(session_token.encode()).hexdigest()
+        hash_row = conn.execute(
+            "SELECT session_token_hash, state FROM attempts WHERE attempt_id = ?",
+            (attempt_id,),
+        ).fetchone()
+        if hash_row is None:
+            raise RpcError(
+                code=ErrorCode.VALIDATION_FAILED,
+                message=f"attempt {attempt_id} not found for token check",
+            )
+        stored_hash, attempt_state = hash_row[0], hash_row[1]
+        if attempt_state in ("succeeded", "failed", "cancelled", "stale"):
+            raise RpcError(
+                code=ErrorCode.VALIDATION_FAILED,
+                message=f"attempt {attempt_id} is terminal; session token revoked",
+            )
+        if stored_hash is None or token_hash != stored_hash:
+            raise RpcError(
+                code=ErrorCode.VALIDATION_FAILED,
+                message="session_token mismatch; "
+                "use the LHGP_SESSION_TOKEN environment variable from spawn",
+            )
+
     contract_state: ContractState | None = None
     raw_state = params.get("contract_state")
     if raw_state is not None:
