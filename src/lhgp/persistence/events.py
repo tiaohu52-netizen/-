@@ -30,6 +30,7 @@ class EventType(StrEnum):
     ATTEMPT_WRITE_BACK = "attempt/write-back"
     DEADLINE_STATUS_CHANGED = "deadline/status-changed"
     ACCEPTANCE_STATUS_CHANGED = "acceptance/status-changed"
+    ACCEPTANCE_CALIBRATED = "acceptance/calibrated"
     DECISION_RECORDED = "decision/recorded"
     LEASE_ACQUIRED = "lease/acquired"
     LEASE_RENEWED = "lease/renewed"
