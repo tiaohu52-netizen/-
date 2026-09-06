@@ -244,6 +244,24 @@ def build_parser() -> argparse.ArgumentParser:
     watch_p.add_argument("--for", type=int, default=None, dest="duration")
     watch_p.add_argument("--follow", action="store_true")
 
+    # timeline：合同事件时间轴 HTML
+    tl_p = sub.add_parser("timeline", help="渲染合同事件时间轴为自包含 HTML")
+    tl_p.add_argument("contract_id", type=str)
+    tl_p.add_argument(
+        "--out", type=str, default=None, help="输出 HTML 路径（默认 stdout 不含 HTML）"
+    )
+
+    # validate：合同草稿预检
+    val_p = sub.add_parser("validate", help="prepare 前预检合同草稿 JSON")
+    val_p.add_argument("draft_file", type=str)
+    val_p.add_argument(
+        "--workspace", type=str, default=None, help="workspace_root（用于检查验收命令 target）"
+    )
+
+    # forecast：deadline 风险快照人话版
+    fc_p = sub.add_parser("forecast", help="deadline 风险快照（人话版）")
+    fc_p.add_argument("contract_id", type=str)
+
     # templates：内置合同模板
     tpl_p = sub.add_parser("template", help="内置合同模板（list/show/use）")
     tpl_sub = tpl_p.add_subparsers(dest="template_cmd")
@@ -456,6 +474,74 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         finally:
             conn.close()
+
+    if args.command == "timeline":
+        from lhgp.persistence.timeline import build_timeline_html
+
+        conn = _open_read_conn(args.data_dir)
+        try:
+            page, error = build_timeline_html(
+                conn, contract_id=args.contract_id, now=datetime.now(UTC)
+            )
+        finally:
+            conn.close()
+        if error:
+            print(f"error: {error}", file=sys.stderr)
+            return 1
+        if args.out:
+            Path(args.out).write_text(page, encoding="utf-8")
+            print(f"timeline written: {args.out}")
+        else:
+            print(page)
+        return 0
+
+    if args.command == "validate":
+        from lhgp.templates.validate import validate_draft_file
+
+        workspace = Path(args.workspace).resolve() if args.workspace else None
+        problems = validate_draft_file(Path(args.draft_file), workspace_root=workspace)
+        if problems:
+            print(f"FOUND {len(problems)} problem(s):")
+            for p in problems:
+                print(f"  - {p}")
+            return 1
+        print("OK: no problems found")
+        return 0
+
+    if args.command == "forecast":
+        from lhgp.persistence.insights import build_brief
+
+        conn = _open_read_conn(args.data_dir)
+        try:
+            brief = build_brief(conn, contract_id=args.contract_id, now=datetime.now(UTC))
+        finally:
+            conn.close()
+        if not brief.get("found"):
+            print(f"error: contract {args.contract_id!r} not found", file=sys.stderr)
+            return 1
+        risk = brief.get("risk", {})
+        risk_level = risk.get("risk", "unknown")
+        slack = risk.get("slack_p50_minutes")
+        deadline_status = brief.get("deadline_status", "unknown")
+        state = brief.get("state", "unknown")
+        lines = [
+            f"contract:  {args.contract_id}",
+            f"state:     {state}",
+            f"deadline:  {brief.get('deadline_at')}  ({deadline_status})",
+            f"risk:      {risk_level} (confidence: {risk.get('confidence', 'unknown')})",
+        ]
+        if slack is not None:
+            hours = float(slack) / 60.0
+            direction = "ahead" if hours >= 0 else "OVERDUE by"
+            lines.append(f"slack:     {abs(hours):.1f}h {direction} deadline (p50)")
+        blocked = brief.get("blocked_reason")
+        if blocked:
+            lines.append(f"blocked:   {blocked}")
+        latest = brief.get("latest_attempt")
+        if latest and latest.get("state") == "failed":
+            lines.append(f"last failure: {latest.get('error_class', 'unknown')}")
+        print("\n".join(lines))
+        return 0
 
     if args.command == "template":
         from pathlib import Path as _Path
