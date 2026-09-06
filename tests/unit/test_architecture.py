@@ -78,9 +78,7 @@ class TestLayeredDependencies:
                 if isinstance(node, ast.ImportFrom) and node.module:
                     parts = node.module.split(".")
                     if len(parts) >= 2 and parts[1] in ("persistence", "cli"):
-                        violations.append(
-                            f"{path.name} imports {node.module}"
-                        )
+                        violations.append(f"{path.name} imports {node.module}")
         assert not violations, f"contracts/ layer violation: {violations}"
 
     def test_persistence_never_imports_promoter_or_adapters(self) -> None:
@@ -92,29 +90,30 @@ class TestLayeredDependencies:
                     continue
                 tree = _parse(path)
                 for node in ast.walk(tree):
-                    if isinstance(node, ast.ImportFrom) and node.module:
-                        if "promoter" in node.module or "adapters" in node.module:
-                            if "types" not in node.module:
-                                violations.append(
-                                    f"{path.relative_to(SRC_ROOT)}: {node.module}"
-                                )
+                    if (
+                        isinstance(node, ast.ImportFrom)
+                        and node.module
+                        and ("promoter" in node.module or "adapters" in node.module)
+                        and "types" not in node.module
+                    ):
+                        violations.append(f"{path.relative_to(SRC_ROOT)}: {node.module}")
         assert not violations, f"persistence layer violation: {violations}"
 
     def test_contracts_canonical_side_is_pure_data(self) -> None:
         """lhgp/contracts/ files should only import from contracts/ or stdlib."""
-        allowed_prefixes = ("lhgp.contracts", "longtask.contracts")
         violations: list[str] = []
         for path in (SRC_ROOT / "lhgp" / "contracts").rglob("*.py"):
             if "__pycache__" in str(path):
                 continue
             tree = _parse(path)
             for node in ast.walk(tree):
-                if isinstance(node, ast.ImportFrom) and node.module:
-                    parts = node.module.split(".")
-                    # Allow stdlib, lhgp.contracts.*, longtask.contracts.*
-                    if node.level == 0 and len(parts) >= 2:
-                        if parts[0] in ("lhgp", "longtask") and parts[1] != "contracts":
-                            violations.append(
-                                f"{path.name} imports {node.module}"
-                            )
+                if (
+                    isinstance(node, ast.ImportFrom)
+                    and node.module
+                    and node.level == 0
+                    and len(parts := node.module.split(".")) >= 2
+                    and parts[0] in ("lhgp", "longtask")
+                    and parts[1] != "contracts"
+                ):
+                    violations.append(f"{path.name} imports {node.module}")
         assert not violations, f"lhgp/contracts cross-layer import: {violations}"
