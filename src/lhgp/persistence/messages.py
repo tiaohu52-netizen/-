@@ -1,0 +1,107 @@
+"""Agent messaging layer: structured communication between user, daemon, and agents.
+
+Three message kinds:
+- directive: user tells the agent what to do differently ("skip check X", "use approach B")
+- context: agent shares findings with the next agent (beyond handover.md)
+- question: agent asks the user/daemon a question that blocks progress
+
+Messages are events (auditable) that get injected into the next attempt's
+context snapshot, so the working agent sees them without polling.
+"""
+
+from __future__ import annotations
+
+import sqlite3
+from datetime import datetime
+from typing import Any
+
+from lhgp.persistence.events import EventType
+from lhgp.persistence.events_query import append_event, get_events
+
+VALID_KINDS = ("directive", "context", "question", "handover")
+
+
+def send_message(
+    conn: sqlite3.Connection,
+    *,
+    contract_id: str,
+    from_actor: str,
+    kind: str,
+    text: str,
+    now: datetime,
+    goal_id: str | None = None,
+    to_agent: str | None = None,
+) -> int:
+    """Send a structured message on a contract's event stream.
+
+    Messages are first-class events: auditable, visible to all parties,
+    and injected into the next attempt's context snapshot.
+    """
+    if kind not in VALID_KINDS:
+        raise ValueError(f"invalid message kind {kind!r}; must be one of {VALID_KINDS}")
+    event = append_event(
+        conn,
+        contract_id=contract_id,
+        goal_id=goal_id or contract_id,
+        event_type=EventType.AGENT_MESSAGE,
+        payload={
+            "from": from_actor,
+            "kind": kind,
+            "text": text,
+            "to_agent": to_agent,
+        },
+        now=now,
+        actor=from_actor,
+    )
+    return event.event_id
+
+
+def get_messages(
+    conn: sqlite3.Connection,
+    *,
+    contract_id: str,
+    kind: str | None = None,
+    after_event_id: int = 0,
+) -> list[dict[str, Any]]:
+    """Read messages for a contract, optionally filtered by kind."""
+    messages = []
+    for e in get_events(conn, contract_id=contract_id, after_event_id=after_event_id):
+        if str(e.event_type) != EventType.AGENT_MESSAGE.value:
+            continue
+        import json
+
+        try:
+            payload = json.loads(e.payload_json or "{}")
+        except ValueError:
+            continue
+        if kind and payload.get("kind") != kind:
+            continue
+        messages.append(
+            {
+                "event_id": e.event_id,
+                "at": e.created_at.isoformat() if e.created_at else "",
+                "from": payload.get("from", "unknown"),
+                "kind": payload.get("kind", "unknown"),
+                "text": payload.get("text", ""),
+                "to_agent": payload.get("to_agent"),
+            }
+        )
+    return messages
+
+
+def pending_directives(
+    conn: sqlite3.Connection,
+    *,
+    contract_id: str,
+    after_event_id: int = 0,
+) -> list[dict[str, Any]]:
+    """Get unread user directives for the working agent."""
+    return [
+        m
+        for m in get_messages(
+            conn, contract_id=contract_id, kind="directive", after_event_id=after_event_id
+        )
+    ]
+
+
+__all__ = ["VALID_KINDS", "get_messages", "pending_directives", "send_message"]

@@ -388,6 +388,30 @@ def tool_propose_plan(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, An
     }
 
 
+def tool_send_message(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
+    """发送结构化消息（directive/context/question）。"""
+    from lhgp.persistence.messages import send_message
+
+    event_id = send_message(
+        ctx["conn"],
+        contract_id=args["contract_id"],
+        from_actor="model",
+        kind=args.get("kind", "context"),
+        text=args["text"],
+        now=_now(),
+        to_agent=args.get("to"),
+    )
+    return {"ok": True, "event_id": event_id}
+
+
+def tool_inbox(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
+    """读取合同上的消息（directive/question/context）。"""
+    from lhgp.persistence.messages import get_messages
+
+    msgs = get_messages(ctx["conn"], contract_id=args["contract_id"])
+    return {"messages": msgs, "count": len(msgs)}
+
+
 def tool_get_goal(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
     """Read a stable Goal aggregate, independent of a contract revision."""
     return _mcp_route(Method.GOAL_GET, args, ctx)
@@ -920,6 +944,49 @@ TOOLS: dict[
                     },
                 },
             },
+        },
+    ),
+    "lhgp_send_message": (
+        tool_send_message,
+        {
+            "description": (
+                "发送结构化消息（context=进度笔记 / question=向用户提问）。"
+                "directive 类仅用户可发。消息会出现在下个 attempt 的上下文里。"
+            ),
+            "inputSchema": {
+                "type": "object",
+                "required": ["contract_id", "text"],
+                "properties": {
+                    "contract_id": {"type": "string"},
+                    "text": {"type": "string"},
+                    "kind": {
+                        "type": "string",
+                        "enum": ["context", "question"],
+                        "default": "context",
+                    },
+                    "to": {"type": "string"},
+                },
+            },
+            "annotations": {
+                "readOnlyHint": False,
+                "destructiveHint": False,
+                "openWorldHint": False,
+            },
+        },
+    ),
+    "lhgp_inbox": (
+        tool_inbox,
+        {
+            "description": (
+                "读取合同上的所有消息：用户指令、agent 进度笔记、待回答问题。"
+                "何时用：接手 attempt 或 poll 之间检查有没有新指令。"
+            ),
+            "inputSchema": {
+                "type": "object",
+                "required": ["contract_id"],
+                "properties": {"contract_id": {"type": "string"}},
+            },
+            "annotations": {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False},
         },
     ),
     "lhgp_brief": (
